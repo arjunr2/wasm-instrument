@@ -1,0 +1,16 @@
+(module
+  (func (export "main") (param i32 i32 i32) (result i32)
+    (block
+      (i32.const 11)
+      (br_if 1 (local.get 0))
+      (drop)
+      (i32.const 22)
+      (br_if 1 (local.get 1))
+      (drop)
+      (i32.const 33)
+      (br_if 1 (local.get 2))
+      (drop)
+    )
+    (i32.const 44)
+  )
+)

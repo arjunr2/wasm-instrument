@@ -1,0 +1,15 @@
+(module
+  (func $test (param i32 f64 i32) (result i32)
+    (local.get 2)
+    (local.get 1)
+    (i32.trunc_f64_s)
+    (local.get 0)
+    (i32.mul)
+    (i32.sub)
+    (return)
+  )
+  (memory (;0;) 2 4)
+  (export "memory" (memory 0))
+  (export "main" (func $test))
+)
+    

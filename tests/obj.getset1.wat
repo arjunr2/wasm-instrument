@@ -1,0 +1,13 @@
+(module
+  (import "weewasm" "obj.new" (func $n (result externref)))
+  (import "weewasm" "obj.get" (func $g (param externref externref) (result externref)))
+  (import "weewasm" "obj.set" (func $s (param externref externref externref)))
+  (import "weewasm" "obj.box_i32" (func $b (param i32) (result externref)))
+  (import "weewasm" "i32.unbox" (func $u (param externref) (result i32)))
+  (func (export "main") (param i32) (result i32)
+    (local $f externref)
+    (local.set $f (call $n))
+    (call $s (local.get $f) (call $b (i32.const 9999)) (call $b (local.get 0)))
+    (call $u (call $g (local.get $f) (call $b (i32.const 9999))))
+  )
+)
