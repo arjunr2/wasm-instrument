@@ -29,6 +29,9 @@ instrument: $(SRC_O)
 build-test:
 	cd tests; ./build.sh
 
+clean-test:
+	cd tests; rm *.wasm
+
 clean:
 	rm -rf build
 

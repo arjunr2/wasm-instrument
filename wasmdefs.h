@@ -6,6 +6,7 @@
 #define PAGE_SIZE 65536
 
 // Section constants
+#define WASM_SECT_CUSTOM 0
 #define WASM_SECT_TYPE 1
 #define WASM_SECT_IMPORT 2
 #define WASM_SECT_FUNCTION 3
@@ -17,6 +18,7 @@
 #define WASM_SECT_ELEMENT 9
 #define WASM_SECT_CODE 10
 #define WASM_SECT_DATA 11
+#define WASM_SECT_DATACOUNT 12
 
 // Type decoding
 #define WASM_TYPE_I32 0x7F
