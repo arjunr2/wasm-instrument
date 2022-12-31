@@ -22,24 +22,9 @@ typedef enum {
   MEMORY = WASM_IE_DESC_MEM
 } wasm_kind_t;
 
-typedef struct {
-  wasm_type_t tag;
-  union {
-    uint32_t i32;
-    double f64;
-    void* ref;
-  } val;
-} wasm_value_t;
 
-wasm_value_t parse_wasm_value(char* string);
-void print_wasm_value(wasm_value_t val);
-void trace_wasm_value(wasm_value_t val);
 const char* wasm_type_string(wasm_type_t type);
 
-wasm_value_t wasm_i32_value(int32_t val);
-wasm_value_t wasm_f64_value(double val);
-wasm_value_t wasm_ref_value(void* val);
-size_t wasm_tag_size(wasm_type_t type);
 
 typedef struct {
   uint32_t initial;
@@ -110,7 +95,10 @@ typedef struct {
   uint32_t index;
 } wasm_export_decl_t;
 
-
+typedef struct {
+  uint32_t length;
+  byte* bytes;
+} wasm_custom_decl_t;
 
 typedef struct {
   uint32_t num_mems;
@@ -139,6 +127,9 @@ typedef struct {
 
   uint32_t num_elems;
   wasm_elems_decl_t* elems;
+
+  uint32_t num_custom;
+  wasm_custom_decl_t* customs;
 
   int has_start;
   uint32_t start_idx;
