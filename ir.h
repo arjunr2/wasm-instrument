@@ -1,13 +1,16 @@
 #pragma once
 
 #include <stdint.h>
-#include "weewasm.h"
+#include "wasmdefs.h"
 
 typedef uint8_t byte;
 
 typedef enum {
   I32 = WASM_TYPE_I32, 
+  I64 = WASM_TYPE_I64,
+  F32 = WASM_TYPE_F32,
   F64 = WASM_TYPE_F64, 
+  V128 = WASM_TYPE_V128,
   EXTERNREF = WASM_TYPE_EXTERNREF,
   FUNCREF = WASM_TYPE_FUNCREF
 } wasm_type_t;

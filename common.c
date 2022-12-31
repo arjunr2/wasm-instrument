@@ -105,7 +105,7 @@ ssize_t load_file(const char* path, uint8_t** start, uint8_t** end) {
     remain -= r;
     p += r;
   }
-  return (int)size;
+  return (ssize_t)size;
 }
 
 // Read an unsigned 32-bit LEB, advancing the buffer.

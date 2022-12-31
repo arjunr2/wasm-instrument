@@ -1,4 +1,4 @@
-.PHONY: all clean dir bench
+.PHONY: all clean dir
 
 CC=gcc
 CXX=g++
@@ -6,18 +6,15 @@ CXX=g++
 CFLAGS = -g
 CPPFLAGS = -g
 
-SRC_C = weerun.c common.c ir.c test.c weedis.c
+SRC_C = main.c common.c ir.c parse.c
 #SRC_CPP = xbyak_c_api.cpp
 
 SRC_O = $(addprefix build/, $(SRC_C:.c=.o) $(SRC_CPP:.cpp=.o))
 
-all: dir weerun
+all: dir instrument
 
 dir:
 	mkdir -p build
-
-test: weerun
-	./weerun -test
 
 build/%.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -25,14 +22,13 @@ build/%.o: %.c
 build/%.o: %.cpp
 	$(CXX) $(CPPFLAGS) -c -o $@ $<
 
-weerun: $(SRC_O)
-	$(CXX) $(CPPFLAGS) -o weerun $^ -lm
+instrument: $(SRC_O)
+	$(CXX) $(CPPFLAGS) -o $@ $^ -lm
 	cp $@ build/$@
 
-build-test: weerun
+build-test:
 	cd tests; ./build.sh
 
 clean:
-	rm -f weerun
 	rm -rf build
 
