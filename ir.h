@@ -10,6 +10,7 @@
 #include "common.h"
 #include "wasmdefs.h"
 
+typedef std::vector<wasm_type_t> typearr;
 
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
@@ -38,10 +39,8 @@ struct CustomDecl {
 };
 
 struct SigDecl {
-  uint32_t num_params;
-  wasm_type_t* params;
-  uint32_t num_results;
-  wasm_type_t* results;
+  typearr params;
+  typearr results;
 };
 
 struct ImportDecl {
@@ -113,6 +112,7 @@ struct WasmModule {
   std::list <ElemDecl>    elems;
   std::list <DataDecl>    datas;
 
+  /* Start section */
   uint32_t start_idx;
   int has_start;
 

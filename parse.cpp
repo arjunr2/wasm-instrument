@@ -101,40 +101,34 @@
 //}
 
 
-//static wasm_type_t* read_type_list(uint32_t num, buffer_t *buf) {
-//  MALLOC(types, wasm_type_t, num);
-//  /* Add all types for params */
-//  for (uint32_t j = 0; j < num; j++) {
-//    types[j] = (wasm_type_t)(RD_BYTE());
-//  }
-//  return types;
-//}
+inline static typearr read_type_list(uint32_t num, buffer_t &buf) {
+  typearr vec;
+  /* Add all types for params */
+  for (uint32_t j = 0; j < num; j++) {
+    vec.push_back((wasm_type_t)(RD_BYTE()));
+  }
+  return vec;
+}
 
 void WasmModule::decode_type_section(buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_sigs = read_u32leb(buf);
-//
-//  MALLOC(sigs, wasm_sig_decl_t, num_sigs);
-//
-//  for (uint32_t i = 0; i < num_sigs; i++) {
-//    wasm_sig_decl_t* sig = sigs + i;
-//    /* Read type */
-//    byte type = RD_BYTE();
-//    if (type != WASM_TYPE_FUNC) {
-//      ERR("Has to be func type for signature!\n");
-//      return;
-//    }
-//
-//    /* For params */
-//    sig->num_params = RD_U32();
-//    sig->params = read_type_list(sig->num_params, buf);
-//    /* For results */
-//    sig->num_results = read_u32leb(buf);
-//    sig->results = read_type_list(sig->num_results, buf);
-//  }
-//
-//  module->num_sigs = num_sigs;
-//  module->sigs = sigs;
+  uint32_t num_sigs = RD_U32();
+  for (uint32_t i = 0; i < num_sigs; i++) {
+    SigDecl sig;
+    /* Read type */
+    byte type = RD_BYTE();
+    if (type != WASM_TYPE_FUNC) {
+      throw std::runtime_error("Parse error: Signatures have to be func type!\n");
+    }
+
+    /* For params */
+    uint32_t num_params = RD_U32();
+    sig.params = read_type_list(num_params, buf);
+    /* For results */
+    uint32_t num_results = RD_U32();
+    sig.results = read_type_list(num_results, buf);
+    
+    this->sigs.push_back(sig);
+  }
 }
 
 
@@ -287,8 +281,8 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_start_section (buffer_t &buf, uint32_t len) {
-  module->has_start = true;
-  module->start_idx = RD_U32();
+  this->has_start = true;
+  this->start_idx = RD_U32();
 }
 
 
