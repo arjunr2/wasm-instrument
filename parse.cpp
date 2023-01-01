@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <iostream>
 
 #include "ir.h"
 #include "common.h"
@@ -13,7 +14,7 @@
 #define RD_BYTE()       read_u8(&buf)
 #define RD_U32_RAW()    read_u32(&buf)
 #define RD_U64()        read_u64(&buf)
-#define RD_NAME(len)    read_name(&buf, &(len))
+#define RD_NAME()       read_name(&buf)
 #define RD_BYTESTR(len) read_bytes(&buf, len)
 /********************/
 
@@ -667,23 +668,14 @@ void WasmModule::decode_datacount_section(buffer_t &buf, uint32_t len) {
 }
 
 void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  const byte* end_sec = buf.ptr + len;
-//  /* Cap at 8 custom sections */
-//  int i = module->num_customs++;
-//  if (i == 0) {
-//    MALLOC(customs, wasm_custom_decl_t, 8);
-//    module->customs = customs;
-//  } else if (i >= 8) {
-//    ERR ("More than 8 custom sections encountered! Cannot support\n");
-//    return;
-//  }
-//
-//  wasm_custom_decl_t* custom = module->customs + i;
-//
-//  custom->name = RD_NAME(custom->name_length);
-//  custom->bytes_length = end_sec - buf.ptr;
-//  custom->bytes = RD_BYTESTR(custom->bytes_length);
+  const byte* end_sec = buf.ptr + len;
+
+  CustomDecl custom;
+  custom.name = RD_NAME();
+  uint32_t num_bytes = end_sec - buf.ptr;
+  custom.bytes = RD_BYTESTR(num_bytes);
+
+  this->customs.push_back(custom);
 }
 
 

@@ -2,8 +2,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
+#include <string>
+#include <vector>
 
 typedef uint8_t byte;
+typedef std::vector<byte> bytearr;
 
 // Limit file size to something reasonable.
 #define MAX_FILE_SIZE 2000000000
@@ -59,9 +62,9 @@ uint32_t read_u32(buffer_t* buf);
 // Read a 64-bit unsigned int, advancing the buffer
 uint64_t read_u64(buffer_t* buf);
 
-// Read a name, advancing the buffer and storing length in len
-char* read_name(buffer_t* buf, uint32_t* len);
+// Read a name, advancing the buffer (len + string)
+std::string read_name(buffer_t* buf);
 
 // Read num_bytes, advancing the buffer
-byte* read_bytes(buffer_t* buf, uint32_t num_bytes);
+bytearr read_bytes(buffer_t* buf, uint32_t num_bytes);
 

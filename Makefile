@@ -1,13 +1,13 @@
 .PHONY: all clean dir
 
-CC=g++
+CC=gcc
 CXX=g++
 
 CFLAGS = -g
 CPPFLAGS = -g
 
-SRC_C = common.c
-SRC_CPP = ir.cpp main.cpp parse.cpp
+#SRC_C = 
+SRC_CPP = common.cpp ir.cpp main.cpp parse.cpp
 
 SRC_O = $(addprefix build/, $(SRC_C:.c=.o) $(SRC_CPP:.cpp=.o))
 

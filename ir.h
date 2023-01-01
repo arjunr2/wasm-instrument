@@ -33,10 +33,8 @@ struct wasm_local_decl_t {
 
 /* Section Field Declarations */
 struct CustomDecl {
-  uint32_t name_length;
   std::string name;
-  uint32_t bytes_length;
-  byte* bytes;
+  bytearr bytes;
 };
 
 struct SigDecl {

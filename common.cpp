@@ -143,28 +143,27 @@ uint64_t read_u64(buffer_t* buf) {
   return val;
 }
 
-// Read a name, advancing the buffer and storing length in len
-char* read_name(buffer_t* buf, uint32_t* len) {
+// Read a name, advancing the buffer (len + string)
+std::string read_name(buffer_t* buf) {
   uint32_t sz = read_u32leb(buf);
   if (buf->ptr + sz > buf->end) {
     ERR("string read out of bounds\n");
     return NULL;
   }
-  
-  char *res = (char*) malloc((sz + 1) * sizeof(char));
-  memcpy(res, buf->ptr, sz);
-  res[sz] = 0;
-
+ 
+  std::string str((const char*) buf->ptr, (size_t) sz);
   buf->ptr += sz;
-  *len = sz;
-  return res;  
+  return str;  
 
 }
 
 // Read num_bytes, advancing the buffer
-byte* read_bytes(buffer_t* buf, uint32_t num_bytes) {
-  byte* bytes = (byte*) malloc(num_bytes);
-  memcpy(bytes, buf->ptr, num_bytes);
+bytearr read_bytes(buffer_t* buf, uint32_t num_bytes) {
+  if (buf->ptr + num_bytes > buf->end) {
+    ERR("bytes read out of bounds\n");
+    return bytearr(buf->ptr, buf->ptr);
+  }
+  bytearr bytes(buf->ptr, buf->ptr + num_bytes);
   buf->ptr += num_bytes;
   return bytes;
 }
