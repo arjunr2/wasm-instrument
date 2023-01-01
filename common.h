@@ -70,6 +70,9 @@ uint32_t read_u32(buffer_t* buf);
 // Read a 64-bit unsigned int, advancing the buffer
 uint64_t read_u64(buffer_t* buf);
 
-// Read a string of length n, advancing the buffer
-char* read_string(buffer_t* buf, uint32_t* len);
+// Read a name, advancing the buffer and storing length in len
+char* read_name(buffer_t* buf, uint32_t* len);
+
+// Read num_bytes, advancing the buffer
+byte* read_bytes(buffer_t* buf, uint32_t num_bytes);
 

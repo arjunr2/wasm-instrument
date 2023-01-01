@@ -61,7 +61,7 @@
 
 
 #define RD_APPEND_STR_STRING(s, buf, len, res) ({ \
-  char *str_val = read_string(buf, &len); \
+  char *str_val = read_name(buf, &len); \
   APPEND_STR_U32(s, len); \
   APPEND_STR(s, "\"");  \
   APPEND_STR(s, str_val); \
@@ -77,7 +77,8 @@
 #define RD_BYTE()       read_u8(buf);
 #define RD_U32_RAW()    read_u32(buf);
 #define RD_U64()        read_u64(buf);
-#define RD_STRING(len)  read_string(buf, &len);
+#define RD_NAME(len)    read_name(buf, &(len));
+#define RD_BYTESTR(len) read_bytes(buf, len);
 /********************/
 
 /*** FLUSH OPS ***/
@@ -837,21 +838,22 @@ void decode_datacount_section(wasm_module_t* module, buffer_t *buf, uint32_t len
 }
 
 void decode_custom_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
-//  PRINT_SEC_HEADER(custom, len);
-//  const byte* start_sec = buf->ptr;
-//  
-//  ALLOC_STR(s);
-//
-//  APPEND_TAB(s);
-//  uint32_t _;
-//  char * __;
-//  RD_APPEND_STR_STRING(s, buf, _, __);
-//  FLUSH_STR(s);
-//  
-//  DELETE_STR(s);
-//  
-//  buf->ptr = start_sec + len;
+  const byte* end_sec = buf->ptr + len;
+  /* Cap at 8 custom sections */
+  int i = module->num_customs++;
+  if (i == 0) {
+    MALLOC(customs, wasm_custom_decl_t, 8);
+    module->customs = customs;
+  } else if (i >= 8) {
+    ERR ("More than 8 custom sections encountered! Cannot support\n");
+    return;
+  }
+
+  wasm_custom_decl_t* custom = module->customs + i;
+
+  custom->name = RD_NAME(custom->name_length);
+  custom->bytes_length = end_sec - buf->ptr;
+  custom->bytes = RD_BYTESTR(custom->bytes_length);
 }
 
 
@@ -888,7 +890,6 @@ void decode_sections(wasm_module_t *module, buffer_t *buf) {
     TRACE("Found section \"%s\", len: %d\n", section_name(section_id), len);
 
     buffer_t cbuf = {buf->ptr, buf->ptr, buf->ptr + len};
-
     switch (section_id) {
       case WASM_SECT_TYPE:      decode_type_section(module, &cbuf, len); break;
       case WASM_SECT_IMPORT:    decode_import_section(module, &cbuf, len); break;

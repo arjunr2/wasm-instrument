@@ -144,8 +144,8 @@ uint64_t read_u64(buffer_t* buf) {
   return val;
 }
 
-// Read a string of length n, advancing the buffer
-char* read_string(buffer_t* buf, uint32_t* len) {
+// Read a name, advancing the buffer and storing length in len
+char* read_name(buffer_t* buf, uint32_t* len) {
   uint32_t sz = read_u32leb(buf);
   if (buf->ptr + sz > buf->end) {
     ERR("string read out of bounds\n");
@@ -161,6 +161,15 @@ char* read_string(buffer_t* buf, uint32_t* len) {
   return res;  
 
 }
+
+// Read num_bytes, advancing the buffer
+byte* read_bytes(buffer_t* buf, uint32_t num_bytes) {
+  byte* bytes = (byte*) malloc(num_bytes);
+  memcpy(bytes, buf->ptr, num_bytes);
+  buf->ptr += num_bytes;
+  return bytes;
+}
+
 
 // Read an unsigned 8-bit byte, advancing the buffer.
 uint8_t read_u8(buffer_t* buf) {

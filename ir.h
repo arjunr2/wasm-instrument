@@ -96,7 +96,9 @@ typedef struct {
 } wasm_export_decl_t;
 
 typedef struct {
-  uint32_t length;
+  uint32_t name_length;
+  char* name;
+  uint32_t bytes_length;
   byte* bytes;
 } wasm_custom_decl_t;
 
@@ -128,7 +130,7 @@ typedef struct {
   uint32_t num_elems;
   wasm_elems_decl_t* elems;
 
-  uint32_t num_custom;
+  uint32_t num_customs;
   wasm_custom_decl_t* customs;
 
   int has_start;
