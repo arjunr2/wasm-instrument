@@ -1,6 +1,6 @@
 .PHONY: all clean dir
 
-CC=g++
+CC=gcc
 CXX=g++
 
 CFLAGS = -g

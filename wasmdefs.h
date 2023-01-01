@@ -28,12 +28,12 @@
 #define WASM_TYPE_V128 0x7B 
 #define WASM_TYPE_FUNCREF 0x70
 #define WASM_TYPE_EXTERNREF 0x6F
+#define WASM_TYPE_FUNC 0x60
 
 // Mutable val
 #define WASM_TYPE_GLOBAL_MUTABLE 0x01
 
 // Kind decoding
-#define WASM_KIND_FUNC 0x60
 
 // Import/export desc decoding
 #define WASM_IE_DESC_FUNC 0x00

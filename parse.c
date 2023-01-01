@@ -252,56 +252,42 @@
 //  global->type = type;
 //  global->mutable = mutable;
 //}
-//
-//
-//static wasm_type_t* read_type_list(uint32_t num, string *sp, buffer_t *buf) {
-//  MALLOC(types, wasm_type_t, num);
-//
-//  APPEND_STR_U32(*sp, num);
-//  /* Add all types for params */
-//  for (uint32_t j = 0; j < num; j++) {
-//    byte type = read_u8(buf);
-//    APPEND_STR(*sp, type_name(type));
-//    APPEND_SPACE(*sp);
-//
-//    types[j] = type;
-//  }
-//  return types;
-//}
+
+
+static wasm_type_t* read_type_list(uint32_t num, buffer_t *buf) {
+  MALLOC(types, wasm_type_t, num);
+  /* Add all types for params */
+  for (uint32_t j = 0; j < num; j++) {
+    types[j] = RD_BYTE();
+  }
+  return types;
+}
 
 void decode_type_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
-//  uint32_t num_types = read_u32leb(buf);
-//  PRINT_SEC_HEADER(type, num_types);
-//
-//  MALLOC(sigs, wasm_sig_decl_t, num_types);
-//
-//  ALLOC_STR(s);
-//  for (uint32_t i = 0; i < num_types; i++) {
-//    wasm_sig_decl_t* sig = &sigs[i];
-//    /* Read type */
-//    byte kind = read_u8(buf);
-//    if (kind != WASM_KIND_FUNC) {
-//      ERR("Has to be func type for signature!\n");
-//      return;
-//    }
-//
-//    APPEND_TAB(s);
-//    APPEND_STR(s, "sig ");
-//    
-//    /* For params */
-//    sig->num_params = read_u32leb(buf);
-//    sig->params = read_type_list(sig->num_params, &s, buf);
-//    /* For results */
-//    sig->num_results = read_u32leb(buf);
-//    sig->results = read_type_list(sig->num_results, &s, buf);
-//
-//    FLUSH_STR(s);
-//  }
-//  DELETE_STR(s);
-//
-//  module->num_sigs = num_types;
-//  module->sigs = sigs;
+
+  uint32_t num_sigs = read_u32leb(buf);
+
+  MALLOC(sigs, wasm_sig_decl_t, num_sigs);
+
+  for (uint32_t i = 0; i < num_sigs; i++) {
+    wasm_sig_decl_t* sig = sigs + i;
+    /* Read type */
+    byte type = RD_BYTE();
+    if (type != WASM_TYPE_FUNC) {
+      ERR("Has to be func type for signature!\n");
+      return;
+    }
+
+    /* For params */
+    sig->num_params = RD_U32();
+    sig->params = read_type_list(sig->num_params, buf);
+    /* For results */
+    sig->num_results = read_u32leb(buf);
+    sig->results = read_type_list(sig->num_results, buf);
+  }
+
+  module->num_sigs = num_sigs;
+  module->sigs = sigs;
 }
 
 
@@ -796,14 +782,12 @@ void decode_global_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 
 void decode_data_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
   buf->ptr += len;
-//  uint32_t num_data = read_u32leb(buf);
-//  PRINT_SEC_HEADER(data, num_data);
+//  uint32_t num_datas = RD_U32();
 //
-//  MALLOC(datas, wasm_data_decl_t, num_data);
+//  MALLOC(datas, wasm_data_decl_t, num_datas);
 //
-//  ALLOC_STR(s);
 //  for (uint32_t i = 0; i < num_data; i++) {
-//    wasm_data_decl_t *data = &datas[i];
+//    wasm_data_decl_t *data = datas + i;
 //    /* Offset val */
 //    data->mem_offset = decode_flag_and_i32_const_off_expr(&s, buf);
 //    /* Size val */
@@ -828,7 +812,7 @@ void decode_data_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 //  }
 //  DELETE_STR(s);
 //
-//  module->num_data = num_data;
+//  module->num_data = num_datas;
 //  module->data = datas;
 }
 
