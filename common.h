@@ -5,17 +5,6 @@
 
 typedef uint8_t byte;
 
-#define MALLOC(dest, dt, num) \
-  dt* dest;  \
-  if (num != 0) { \
-    dest = ( dt* ) malloc ((num) * sizeof( dt )); \
-  }
-
-#define FREE(val, num)  \
-  if (num != 0) { \
-    free((void*)val);  \
-  }
-
 // Limit file size to something reasonable.
 #define MAX_FILE_SIZE 2000000000
 

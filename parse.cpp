@@ -742,28 +742,27 @@ WasmModule parse_bytecode(const byte* start, const byte* end) {
   buffer_t &buf = main_buf;
 
   if (buf.ptr == buf.end) { 
-    throw runtime_error("Empty bytecode");
+    throw std::runtime_error("Empty bytecode");
   }
 
   /* Magic number & Version */
   uint32_t magic = RD_U32_RAW();
   if (magic != WASM_MAGIC) {
-    throw runtime_error("Parse | Wasm Magic Value");
+    throw std::runtime_error("Parse | Wasm Magic Value");
   }
 
   uint32_t version = RD_U32_RAW();
   if (version != WASM_VERSION) {
-    throw runtime_error("Parse | Wasm Version");
+    throw std::runtime_error("Parse | Wasm Version");
   }
 
-  module.magic = magic;
   module.version = version;
 
   decode_sections(module, buf);
   
   /* Has to match exactly */
   if (buf.ptr != buf.end) {
-    throw runtime_error("Parse | Unexpected end");
+    throw std::runtime_error("Parse | Unexpected end");
   }
   return module;
 }

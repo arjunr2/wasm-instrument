@@ -5,35 +5,15 @@
 #include <list>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 #include "common.h"
 #include "wasmdefs.h"
 
-using namespace std;
-
-typedef uint8_t byte;
-
-typedef enum {
-  I32 = WASM_TYPE_I32, 
-  I64 = WASM_TYPE_I64,
-  F32 = WASM_TYPE_F32,
-  F64 = WASM_TYPE_F64, 
-  V128 = WASM_TYPE_V128,
-  EXTERNREF = WASM_TYPE_EXTERNREF,
-  FUNCREF = WASM_TYPE_FUNCREF
-} wasm_type_t;
-
-typedef enum {
-  FUNC = WASM_IE_DESC_FUNC, 
-  GLOBAL = WASM_IE_DESC_GLOBAL, 
-  TABLE = WASM_IE_DESC_TABLE, 
-  MEMORY = WASM_IE_DESC_MEM
-} wasm_kind_t;
 
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
 const char* wasm_section_name(byte sec_code);
-
 
 class WasmModule;
 
@@ -54,7 +34,7 @@ struct wasm_local_decl_t {
 /* Section Field Declarations */
 struct CustomDecl {
   uint32_t name_length;
-  string name;
+  std::string name;
   uint32_t bytes_length;
   byte* bytes;
 };
@@ -68,9 +48,9 @@ struct SigDecl {
 
 struct ImportDecl {
   uint32_t mod_name_length;
-  string  mod_name;
+  std::string  mod_name;
   uint32_t member_name_length;
-  string member_name;
+  std::string member_name;
   wasm_kind_t kind;
   uint32_t index;
 };
@@ -114,65 +94,32 @@ struct ElemDecl {
 
 struct ExportDecl {
   uint32_t length;
-  string name;
+  std::string name;
   wasm_kind_t kind;
   uint32_t index;
 };
 
+
 /* Section */
-/* Base class */
-template <typename T>
-class Section {
-  uint32_t count;
-  list<T> decl;
-  public:
-    Section() : count(0) { }
-
-    uint32_t get_count()        { return count; }
-    void set_count(uint32_t ct) { count = ct; }
-
-    void decode_section(WasmModule &module, buffer_t *buf, uint32_t len);
-    void encode_section(buffer_t *buf, uint32_t len);
-
-};
-
-
 struct WasmModule {
-  uint32_t magic;
   uint32_t version;
 
-  uint32_t num_customs;
-  list<CustomDecl>  customs;
-
-  uint32_t num_sigs;
-  list<SigDecl>     sigs;
-
-  uint32_t num_imports;
-  list<ImportDecl>  imports;
-
-  uint32_t num_funcs;
-  list<FuncDecl>    funcs;
-
-  uint32_t num_tables;
-  list<TableDecl>   tables;
-  
-  uint32_t num_mems;
-  list<MemoryDecl>  mems;
-  
-  uint32_t num_globals;
-  list<GlobalDecl>  globals;
-  
-  uint32_t num_exports;
-  list<ExportDecl>  exports;
-
-  uint32_t num_elems;
-  list<ElemDecl>    elems;
-  
-  uint32_t num_datas;
-  list<DataDecl>    datas;
+  std::list <CustomDecl>  customs;
+  std::list <SigDecl>     sigs;
+  std::list <ImportDecl>  imports;
+  std::list <FuncDecl>    funcs;
+  std::list <TableDecl>   tables;
+  std::list <MemoryDecl>  mems;
+  std::list <GlobalDecl>  globals;
+  std::list <ExportDecl>  exports;
+  std::list <ElemDecl>    elems;
+  std::list <DataDecl>    datas;
 
   uint32_t start_idx;
   int has_start;
+
+  /* Only for validation */
+  uint32_t num_datas;
   int has_datacount;
 
 
