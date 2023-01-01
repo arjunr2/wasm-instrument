@@ -6,8 +6,8 @@ CXX=g++
 CFLAGS = -g
 CPPFLAGS = -g
 
-SRC_C = main.c common.c ir.c
-SRC_CPP = parse.cpp
+SRC_C = common.c ir.c
+SRC_CPP = main.cpp parse.cpp
 
 SRC_O = $(addprefix build/, $(SRC_C:.c=.o) $(SRC_CPP:.cpp=.o))
 

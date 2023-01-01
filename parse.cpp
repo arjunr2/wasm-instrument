@@ -5,6 +5,8 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+#include <stdexcept>
+
 #include "ir.h"
 #include "common.h"
 
@@ -72,13 +74,13 @@
 /********************/
 
 /********************/
-#define RD_U32()        read_u32leb(buf)
-#define RD_I32()        read_i32leb(buf)
-#define RD_BYTE()       read_u8(buf)
-#define RD_U32_RAW()    read_u32(buf)
-#define RD_U64()        read_u64(buf)
-#define RD_NAME(len)    read_name(buf, &(len))
-#define RD_BYTESTR(len) read_bytes(buf, len)
+#define RD_U32()        read_u32leb(&buf)
+#define RD_I32()        read_i32leb(&buf)
+#define RD_BYTE()       read_u8(&buf)
+#define RD_U32_RAW()    read_u32(&buf)
+#define RD_U64()        read_u64(&buf)
+#define RD_NAME(len)    read_name(&buf, &(len))
+#define RD_BYTESTR(len) read_bytes(&buf, len)
 /********************/
 
 /*** FLUSH OPS ***/
@@ -254,45 +256,45 @@
 //}
 
 
-static wasm_type_t* read_type_list(uint32_t num, buffer_t *buf) {
-  MALLOC(types, wasm_type_t, num);
-  /* Add all types for params */
-  for (uint32_t j = 0; j < num; j++) {
-    types[j] = (wasm_type_t)(RD_BYTE());
-  }
-  return types;
+//static wasm_type_t* read_type_list(uint32_t num, buffer_t *buf) {
+//  MALLOC(types, wasm_type_t, num);
+//  /* Add all types for params */
+//  for (uint32_t j = 0; j < num; j++) {
+//    types[j] = (wasm_type_t)(RD_BYTE());
+//  }
+//  return types;
+//}
+
+void WasmModule::decode_type_section(buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
+//  uint32_t num_sigs = read_u32leb(buf);
+//
+//  MALLOC(sigs, wasm_sig_decl_t, num_sigs);
+//
+//  for (uint32_t i = 0; i < num_sigs; i++) {
+//    wasm_sig_decl_t* sig = sigs + i;
+//    /* Read type */
+//    byte type = RD_BYTE();
+//    if (type != WASM_TYPE_FUNC) {
+//      ERR("Has to be func type for signature!\n");
+//      return;
+//    }
+//
+//    /* For params */
+//    sig->num_params = RD_U32();
+//    sig->params = read_type_list(sig->num_params, buf);
+//    /* For results */
+//    sig->num_results = read_u32leb(buf);
+//    sig->results = read_type_list(sig->num_results, buf);
+//  }
+//
+//  module->num_sigs = num_sigs;
+//  module->sigs = sigs;
 }
 
-void decode_type_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 
-  uint32_t num_sigs = read_u32leb(buf);
-
-  MALLOC(sigs, wasm_sig_decl_t, num_sigs);
-
-  for (uint32_t i = 0; i < num_sigs; i++) {
-    wasm_sig_decl_t* sig = sigs + i;
-    /* Read type */
-    byte type = RD_BYTE();
-    if (type != WASM_TYPE_FUNC) {
-      ERR("Has to be func type for signature!\n");
-      return;
-    }
-
-    /* For params */
-    sig->num_params = RD_U32();
-    sig->params = read_type_list(sig->num_params, buf);
-    /* For results */
-    sig->num_results = read_u32leb(buf);
-    sig->results = read_type_list(sig->num_results, buf);
-  }
-
-  module->num_sigs = num_sigs;
-  module->sigs = sigs;
-}
-
-
-void decode_import_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_imports = read_u32leb(buf);
 //  PRINT_SEC_HEADER(import, num_imports);
 //
@@ -331,8 +333,8 @@ void decode_import_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 //  module->imports = imports;
 }
 
-void decode_function_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_funcs = read_u32leb(buf);
 //  
 //  uint32_t num_imports = module->num_imports;
@@ -364,8 +366,8 @@ void decode_function_section(wasm_module_t *module, buffer_t *buf, uint32_t len)
 }
 
 
-void decode_table_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_table_section (buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_tabs = read_u32leb(buf);
 //
 //  PRINT_SEC_HEADER(table, num_tabs);
@@ -387,8 +389,8 @@ void decode_table_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 }
 
 
-void decode_memory_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_memory_section (buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_mems = read_u32leb(buf);
 //  if (num_mems != 1) {
 //    ERR("Memory component has to be 1!\n");
@@ -407,8 +409,8 @@ void decode_memory_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 }
 
 
-void decode_export_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_exps = read_u32leb(buf);
 //  PRINT_SEC_HEADER(export, num_exps);
 //  
@@ -439,8 +441,8 @@ void decode_export_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 }
 
 
-void decode_start_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_start_section (buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t fn_idx = read_u32leb(buf);
 //  PRINT_SEC_HEADER(start, fn_idx);
 //
@@ -449,8 +451,8 @@ void decode_start_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 }
 
 
-void decode_element_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_elem = read_u32leb(buf);
 //  PRINT_SEC_HEADER(element, num_elem);
 //
@@ -721,8 +723,8 @@ void decode_element_section(wasm_module_t *module, buffer_t *buf, uint32_t len) 
 
 
 /* Gets run after function section; in order */
-void decode_code_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_fn = read_u32leb(buf);
 //  PRINT_SEC_HEADER(code, num_fn);
 //
@@ -740,13 +742,13 @@ void decode_code_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 //    /* Local section */
 //    decode_locals(&module->funcs[idx], buf);
 //
-//    module->funcs[idx].code_start = buf->ptr;
+//    module->funcs[idx].code_start = buf.ptr;
 //    /* Fn body: Instruction decoding */
 //    decode_expr(buf, false, 1, false);
-//    module->funcs[idx].code_end = buf->ptr;
+//    module->funcs[idx].code_end = buf.ptr;
 //    if (replace_brs) {
 //      /* Branch replacement */
-//      buf->ptr = module->funcs[idx].code_start;
+//      buf.ptr = module->funcs[idx].code_start;
 //      decode_expr(buf, true, 1, true);
 //    }
 //  }
@@ -754,8 +756,8 @@ void decode_code_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 }
 
 
-void decode_global_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_global_section(buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_globs = read_u32leb(buf);
 //  PRINT_SEC_HEADER(global, num_globs);
 //
@@ -768,9 +770,9 @@ void decode_global_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 //    read_global_type(global, &s, buf);
 //    FLUSH_STR(s);
 //
-//    global->init_expr_start = buf->ptr;
+//    global->init_expr_start = buf.ptr;
 //    decode_expr(buf, true, 1, false);
-//    global->init_expr_end = buf->ptr;
+//    global->init_expr_end = buf.ptr;
 //  }
 //  DELETE_STR(s);
 //
@@ -779,8 +781,8 @@ void decode_global_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 }
 
 
-void decode_data_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
 //  uint32_t num_datas = RD_U32();
 //
 //  MALLOC(datas, wasm_data_decl_t, num_datas);
@@ -795,8 +797,8 @@ void decode_data_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 //    APPEND_STR_U32(s, sz);
 //    FLUSH_STR(s);
 //
-//    data->bytes_start = buf->ptr;
-//    data->bytes_end = buf->ptr + sz;
+//    data->bytes_start = buf.ptr;
+//    data->bytes_end = buf.ptr + sz;
 //    /* Print bytes */
 //    for (uint32_t i = 0; i < sz; i++) {
 //      if ((i & (BYTES_PER_LINE-1)) == 0) { 
@@ -815,30 +817,30 @@ void decode_data_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 //  module->data = datas;
 }
 
-void decode_datacount_section(wasm_module_t* module, buffer_t *buf, uint32_t len) {
-  module->has_datacount = true;
-  module->num_datas = RD_U32();
+void WasmModule::decode_datacount_section(buffer_t &buf, uint32_t len) {
+  this->has_datacount = true;
+  this->num_datas = RD_U32();
 }
 
-void decode_custom_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
-  const byte* end_sec = buf->ptr + len;
-  /* Cap at 8 custom sections */
-  int i = module->num_customs++;
-  if (i == 0) {
-    MALLOC(customs, wasm_custom_decl_t, 8);
-    module->customs = customs;
-  } else if (i >= 8) {
-    ERR ("More than 8 custom sections encountered! Cannot support\n");
-    return;
-  }
-
-  wasm_custom_decl_t* custom = module->customs + i;
-
-  custom->name = RD_NAME(custom->name_length);
-  custom->bytes_length = end_sec - buf->ptr;
-  custom->bytes = RD_BYTESTR(custom->bytes_length);
+void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
+  buf.ptr += len;
+//  const byte* end_sec = buf.ptr + len;
+//  /* Cap at 8 custom sections */
+//  int i = module->num_customs++;
+//  if (i == 0) {
+//    MALLOC(customs, wasm_custom_decl_t, 8);
+//    module->customs = customs;
+//  } else if (i >= 8) {
+//    ERR ("More than 8 custom sections encountered! Cannot support\n");
+//    return;
+//  }
+//
+//  wasm_custom_decl_t* custom = module->customs + i;
+//
+//  custom->name = RD_NAME(custom->name_length);
+//  custom->bytes_length = end_sec - buf.ptr;
+//  custom->bytes = RD_BYTESTR(custom->bytes_length);
 }
-
 
 
 
@@ -864,79 +866,81 @@ static const char* section_name(byte code) {
 }
 
 
-void decode_sections(wasm_module_t *module, buffer_t *buf) {
+void decode_sections(WasmModule &module, buffer_t &buf) {
 
-  while (buf->ptr < buf->end) {
-    byte section_id = read_u8(buf);
-    uint32_t len = read_u32leb(buf);
+  while (buf.ptr < buf.end) {
+    byte section_id = RD_BYTE();
+    uint32_t len = RD_U32();
 
     TRACE("Found section \"%s\", len: %d\n", section_name(section_id), len);
 
-    buffer_t cbuf = {buf->ptr, buf->ptr, buf->ptr + len};
+    buffer_t cbuf = {buf.ptr, buf.ptr, buf.ptr + len};
+    #define DECODE_CALL(sec)  module.decode_##sec##_section (cbuf, len); break;
     switch (section_id) {
-      case WASM_SECT_TYPE:      decode_type_section(module, &cbuf, len); break;
-      case WASM_SECT_IMPORT:    decode_import_section(module, &cbuf, len); break;
-      case WASM_SECT_FUNCTION:  decode_function_section(module, &cbuf, len); break;
-      case WASM_SECT_TABLE:     decode_table_section(module, &cbuf, len); break;
-      case WASM_SECT_MEMORY:    decode_memory_section(module, &cbuf, len); break;
-      case WASM_SECT_GLOBAL:    decode_global_section(module, &cbuf, len); break;
-      case WASM_SECT_EXPORT:    decode_export_section(module, &cbuf, len); break;
-      case WASM_SECT_START:     decode_start_section(module, &cbuf, len); break;
-      case WASM_SECT_ELEMENT:   decode_element_section(module, &cbuf, len); break;
-      case WASM_SECT_CODE:      decode_code_section(module, &cbuf, len); break;
-      case WASM_SECT_DATA:      decode_data_section(module, &cbuf, len); break;
-      case WASM_SECT_DATACOUNT: decode_datacount_section(module, &cbuf, len); break;
-      case WASM_SECT_CUSTOM:    decode_custom_section(module, &cbuf, len); break;
+      case WASM_SECT_TYPE:     DECODE_CALL(type); 
+      case WASM_SECT_IMPORT:   DECODE_CALL(import); 
+      case WASM_SECT_FUNCTION: DECODE_CALL(function); 
+      case WASM_SECT_TABLE:    DECODE_CALL(table); 
+      case WASM_SECT_MEMORY:   DECODE_CALL(memory); 
+      case WASM_SECT_GLOBAL:   DECODE_CALL(global); 
+      case WASM_SECT_EXPORT:   DECODE_CALL(export); 
+      case WASM_SECT_START:    DECODE_CALL(start); 
+      case WASM_SECT_ELEMENT:  DECODE_CALL(element);  
+      case WASM_SECT_CODE:     DECODE_CALL(code); 
+      case WASM_SECT_DATA:     DECODE_CALL(data); 
+      case WASM_SECT_DATACOUNT:DECODE_CALL(datacount); 
+      case WASM_SECT_CUSTOM:   DECODE_CALL(custom); 
       default:
         ERR("Unknown section id: %u\n", section_id);
+        return;
     }
 
     if (cbuf.ptr != cbuf.end) {
       ERR("Section \"%s\" not aligned after parsing -- start:%lu, ptr:%lu, end:%lu\n", 
           section_name(section_id),
-          cbuf.start - buf->start, 
-          cbuf.ptr - buf->start, 
-          cbuf.end - buf->start);
+          cbuf.start - buf.start, 
+          cbuf.ptr - buf.start, 
+          cbuf.end - buf.start);
       return;
     }
-
     // Advance section
-    buf->ptr = cbuf.ptr;
+    buf.ptr = cbuf.ptr;
   }
 }
 
 //========= BEGIN SOLUTION ==========
 
-wasm_module_t parse_bytecode(const byte* start, const byte* end) {
+WasmModule parse_bytecode(const byte* start, const byte* end) {
   
-  wasm_module_t module = { 0 };
-  
+  WasmModule module = {};
+
   /* Initialize buffer */
-  buffer_t buf = {start, start, end};
+  buffer_t main_buf = {start, start, end};
+  buffer_t &buf = main_buf;
 
   if (buf.ptr == buf.end) { 
-    ERR("Empty bytecode\n");
-    return module; 
+    throw runtime_error("Empty bytecode");
   }
 
   /* Magic number & Version */
-  uint32_t magic = read_u32(&buf);
+  uint32_t magic = RD_U32_RAW();
   if (magic != WASM_MAGIC) {
-    ERR("Error: Wasm Magic Value (%u)\n", magic);
-    return module;
+    throw runtime_error("Parse | Wasm Magic Value");
   }
 
-  uint32_t version = read_u32(&buf);
+  uint32_t version = RD_U32_RAW();
   if (version != WASM_VERSION) {
-    ERR("Error: Wasm Version (%u)\n", version);
-    return module;
+    throw runtime_error("Parse | Wasm Version");
   }
 
-  decode_sections(&module, &buf);
+  module.magic = magic;
+  module.version = version;
+
+  decode_sections(module, buf);
   
   /* Has to match exactly */
   if (buf.ptr != buf.end) {
-    ERR("Parse Error: Unexpected end\n");
+    throw runtime_error("Parse | Unexpected end");
   }
   return module;
 }
