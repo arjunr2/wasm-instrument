@@ -6,7 +6,6 @@
 #include <stdio.h>
 
 #include "common.h"
-#include "string.h"
 
 // The global trace flag
 int g_trace = 0;
