@@ -72,13 +72,13 @@
 /********************/
 
 /********************/
-#define RD_U32()        read_u32leb(buf);
-#define RD_I32()        read_i32leb(buf);
-#define RD_BYTE()       read_u8(buf);
-#define RD_U32_RAW()    read_u32(buf);
-#define RD_U64()        read_u64(buf);
-#define RD_NAME(len)    read_name(buf, &(len));
-#define RD_BYTESTR(len) read_bytes(buf, len);
+#define RD_U32()        read_u32leb(buf)
+#define RD_I32()        read_i32leb(buf)
+#define RD_BYTE()       read_u8(buf)
+#define RD_U32_RAW()    read_u32(buf)
+#define RD_U64()        read_u64(buf)
+#define RD_NAME(len)    read_name(buf, &(len))
+#define RD_BYTESTR(len) read_bytes(buf, len)
 /********************/
 
 /*** FLUSH OPS ***/
@@ -258,7 +258,7 @@ static wasm_type_t* read_type_list(uint32_t num, buffer_t *buf) {
   MALLOC(types, wasm_type_t, num);
   /* Add all types for params */
   for (uint32_t j = 0; j < num; j++) {
-    types[j] = RD_BYTE();
+    types[j] = (wasm_type_t)(RD_BYTE());
   }
   return types;
 }
@@ -334,7 +334,6 @@ void decode_import_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 void decode_function_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
   buf->ptr += len;
 //  uint32_t num_funcs = read_u32leb(buf);
-//  PRINT_SEC_HEADER(function, num_funcs);
 //  
 //  uint32_t num_imports = module->num_imports;
 //  MALLOC(funcs, wasm_func_decl_t, num_imports + num_funcs);
@@ -920,8 +919,6 @@ wasm_module_t parse_bytecode(const byte* start, const byte* end) {
     return module; 
   }
 
-  uint32_t _;
-  
   /* Magic number & Version */
   uint32_t magic = read_u32(&buf);
   if (magic != WASM_MAGIC) {
