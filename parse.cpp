@@ -14,66 +14,7 @@
 #define FN_MAX_SIZE 1048576
 #define BYTES_PER_LINE 32
 
-#define PRINT_SEC_HEADER(type, length)  \
-  DISASS(#type " %u\n", length);
-
-/*** STRING MACROS ***/
-#define APPEND_STR(s, str) \
-  if (g_disassemble) { s = strappend(s, str); }
-
-#define APPEND_TAB(s) \
-  if (g_disassemble) { s = strappend(s, "  "); }
-
-#define APPEND_SPACE(s) \
-  if (g_disassemble) { s = strappend(s, " "); }
-
-#define APPEND_STR_U32(s, val) \
-  if (g_disassemble) { s = strappend_int32(s, val, false); }
-
-#define APPEND_STR_I32(s, val) \
-  if (g_disassemble) { s = strappend_int32(s, val, true); }
-
-#define APPEND_STR_BYTE(s, val) \
-  if (g_disassemble) { s = strappend_byte(s, val); }
-
-#define APPEND_STR_HEX64(s, val) \
-  if (g_disassemble) { s = strappend_hex64(s, val); }
-
-#define ALLOC_STR(s) \
-  string s = stralloc(); \
-  strclear(s);
-
-#define DELETE_STR(s) \
-  strdelete(s);
-
-#define STRIP_STR(s, n) \
-  if (g_disassemble) { s = strip_chars(s, n); }
-
-
-#define RD_APPEND_STR_U32(s, buf, res) ({ \
-  uint32_t val = read_u32leb(buf); \
-  APPEND_STR_U32(s, val);  \
-  res = val; \
-})
-
-#define RD_APPEND_STR_I32(s, buf) ({ \
-  uint32_t val = read_i32leb(buf); \
-  APPEND_STR_I32(s, val);  \
-})
-
-
-#define RD_APPEND_STR_STRING(s, buf, len, res) ({ \
-  char *str_val = read_name(buf, &len); \
-  APPEND_STR_U32(s, len); \
-  APPEND_STR(s, "\"");  \
-  APPEND_STR(s, str_val); \
-  APPEND_STR(s, "\"");  \
-  APPEND_SPACE(s); \
-  res = str_val;  \
-})
-/********************/
-
-/********************/
+/*** Parsing macros ***/
 #define RD_U32()        read_u32leb(&buf)
 #define RD_I32()        read_i32leb(&buf)
 #define RD_BYTE()       read_u8(&buf)
@@ -83,84 +24,6 @@
 #define RD_BYTESTR(len) read_bytes(&buf, len)
 /********************/
 
-/*** FLUSH OPS ***/
-#define FLUSH_STR(s) \
-  DISASS("%s\n", (s).v);  \
-  strclear(s);
-
-#define FLUSH_BYTE(b) \
-  DISASS("%02X ", b); \
-
-/********************/
-
-#define STATIC_BR_START_BLOCK() \
-  static_blocks[static_ctr].op = opcode; \
-  static_blocks[static_ctr].start_addr = (byte*) buf->ptr; \
-  dyn2static_idxs[scope] = static_ctr;  \
-  static_ctr++;
-
-#define STATIC_BR_END_BLOCK() \
-  static_blocks[ dyn2static_idxs[scope] ].end_addr = (byte*)buf->ptr - 1;
-
-/*** INSN MACROS ***/
-#define OPCODE()  \
-  APPEND_STR(s, opname); \
-  APPEND_SPACE(s);
-
-#define SCOPE_COM(s) \
-  APPEND_STR(s, " ;; s"); \
-  APPEND_STR_U32(s, scope); \
-  scope++;  \
-
-#define NO_ARG_INSN() \
-  APPEND_STR(s, opname); break;
-
-#define ONE_U32_INSN() \
-  OPCODE(); \
-  RD_APPEND_STR_U32(s, buf, _);  \
-  break;
-
-#define ONE_I32_INSN() \
-  OPCODE(); \
-  RD_APPEND_STR_I32(s, buf);  \
-  break;
-
-#define SCOPE_BEGIN_INSN() \
-  APPEND_STR(s, opname);  \
-  /* Skip the blocktype */  \
-  uint32_t blocktype = read_u32leb(buf);  \
-  STATIC_BR_START_BLOCK();  \
-  SCOPE_COM(s); \
-  break;
-
-#define MEMARG_INSN() \
-  OPCODE(); \
-  uint32_t v = read_u32leb(buf);  \
-  RD_APPEND_STR_U32(s, buf, _);  \
-  break;
-
-#define SCOPE_COM_DEC(s) \
-  scope--;  \
-  STATIC_BR_END_BLOCK();  \
-  APPEND_STR(s, " ;; s"); \
-  APPEND_STR_U32(s, scope);
-
-/***********************/
-
-#define BR_REPLACE_OFFSET() \
-    idx = read_u32leb(buf);  \
-    /* Get static idx of block*/  \
-    static_idx = dyn2static_idxs[scope-idx-1]; \
-    if (replace_last) { \
-      block_list_t block_dets = static_blocks[ static_idx ];  \
-      target_addr = ((block_dets.op == WASM_OP_LOOP) ?  \
-                            block_dets.start_addr : \
-                            block_dets.end_addr); \
-      offset = target_addr - buf->ptr;  \
-      memcpy((void*)(buf->ptr - 4), &offset, 4); \
-    } \
-    print_val = replace_last ? offset : idx;  \
-    APPEND_STR_I32(s, print_val);
 
 /**********************/
 //static uint32_t construct_u32leb4(uint32_t val) {
@@ -170,18 +33,6 @@
 //  *(((byte*)(&new_val)) + 2)  = 0x80 | ((val >> 14) & 0x7F);
 //  *(((byte*)(&new_val)) + 3)  = 0x80 | ((val >> 21) & 0x7F);
 //  return new_val;
-//}
-//
-//// Returns string for given type
-//static const char* type_name(byte type) {
-//  switch (type) {
-//    case WASM_TYPE_I32: return "i32";
-//    case WASM_TYPE_F64: return "f64";
-//    case WASM_TYPE_EXTERNREF: return "externref";
-//    case WASM_TYPE_FUNCREF: return "funcref";
-//    default:
-//      return "0xDEADBEEF";
-//  }
 //}
 //
 //// Returns string for given import/export description
@@ -844,27 +695,6 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
 
 
 
-// Returns the string name of a section code.
-static const char* section_name(byte code) {
-  switch (code) {
-  case WASM_SECT_TYPE: return "type";
-  case WASM_SECT_IMPORT: return "import";
-  case WASM_SECT_FUNCTION: return "function";
-  case WASM_SECT_TABLE: return "table";
-  case WASM_SECT_MEMORY: return "memory";
-  case WASM_SECT_GLOBAL: return "global";
-  case WASM_SECT_EXPORT: return "export";
-  case WASM_SECT_START: return "start";
-  case WASM_SECT_ELEMENT: return "element";
-  case WASM_SECT_CODE: return "code";
-  case WASM_SECT_DATA: return "data";
-  case WASM_SECT_DATACOUNT: return "datacount";
-  case WASM_SECT_CUSTOM: return "custom";
-  default:
-    return "unknown";
-  }
-}
-
 
 void decode_sections(WasmModule &module, buffer_t &buf) {
 
@@ -872,7 +702,7 @@ void decode_sections(WasmModule &module, buffer_t &buf) {
     byte section_id = RD_BYTE();
     uint32_t len = RD_U32();
 
-    TRACE("Found section \"%s\", len: %d\n", section_name(section_id), len);
+    TRACE("Found section \"%s\", len: %d\n", wasm_section_name(section_id), len);
 
     buffer_t cbuf = {buf.ptr, buf.ptr, buf.ptr + len};
     #define DECODE_CALL(sec)  module.decode_##sec##_section (cbuf, len); break;
@@ -897,7 +727,7 @@ void decode_sections(WasmModule &module, buffer_t &buf) {
 
     if (cbuf.ptr != cbuf.end) {
       ERR("Section \"%s\" not aligned after parsing -- start:%lu, ptr:%lu, end:%lu\n", 
-          section_name(section_id),
+          wasm_section_name(section_id),
           cbuf.start - buf.start, 
           cbuf.ptr - buf.start, 
           cbuf.end - buf.start);
@@ -908,8 +738,8 @@ void decode_sections(WasmModule &module, buffer_t &buf) {
   }
 }
 
-//========= BEGIN SOLUTION ==========
 
+/* Main Parse routine */
 WasmModule parse_bytecode(const byte* start, const byte* end) {
   
   WasmModule module = {};
