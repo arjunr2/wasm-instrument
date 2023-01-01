@@ -287,12 +287,8 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_start_section (buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t fn_idx = read_u32leb(buf);
-//  PRINT_SEC_HEADER(start, fn_idx);
-//
-//  module->has_start = true;
-//  module->start_idx = fn_idx;
+  module->has_start = true;
+  module->start_idx = RD_U32();
 }
 
 
