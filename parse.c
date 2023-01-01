@@ -71,6 +71,15 @@
 })
 /********************/
 
+/********************/
+#define RD_U32()        read_u32leb(buf);
+#define RD_I32()        read_i32leb(buf);
+#define RD_BYTE()       read_u8(buf);
+#define RD_U32_RAW()    read_u32(buf);
+#define RD_U64()        read_u64(buf);
+#define RD_STRING(len)  read_string(buf, &len);
+/********************/
+
 /*** FLUSH OPS ***/
 #define FLUSH_STR(s) \
   DISASS("%s\n", (s).v);  \
@@ -823,7 +832,8 @@ void decode_data_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {
 }
 
 void decode_datacount_section(wasm_module_t* module, buffer_t *buf, uint32_t len) {
-  buf->ptr += len;
+  module->has_datacount = true;
+  module->num_datas = RD_U32();
 }
 
 void decode_custom_section(wasm_module_t *module, buffer_t *buf, uint32_t len) {

@@ -5,13 +5,6 @@
 
 typedef uint8_t byte;
 
-#define PRINT_TIME_DIFF(label, tse, tsb)  {\
-  double ts = ((tse.tv_nsec - tsb.tv_nsec) / (1000000.0)) + \
-    ((tse.tv_sec - tsb.tv_sec) * 1000); \
-  printf(label "\t:\t%lf msec\n", ts);  \
-  total_time += ts; \
-}
-
 #define MALLOC(dest, dt, num) \
   dt* dest;  \
   if (num != 0) { \
@@ -80,22 +73,3 @@ uint64_t read_u64(buffer_t* buf);
 // Read a string of length n, advancing the buffer
 char* read_string(buffer_t* buf, uint32_t* len);
 
-/* String operations */
-typedef struct {
-  char *v;
-  uint32_t cap;
-} string;
-
-string stralloc();
-
-string strappend(string s, const char* c);
-
-string strappend_int32(string s, uint32_t val, bool sgn);
-string strappend_byte(string s, byte val);
-string strappend_hex64(string s, uint64_t val);
-
-string strclear(string s);
-
-string strip_chars(string s, int n);
-
-void strdelete(string s);

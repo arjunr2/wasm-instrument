@@ -122,8 +122,8 @@ typedef struct {
   uint32_t num_globals;
   wasm_global_decl_t* globals;
   
-  uint32_t num_data;
-  wasm_data_decl_t* data;
+  uint32_t num_datas;
+  wasm_data_decl_t* datas;
 
   uint32_t num_elems;
   wasm_elems_decl_t* elems;
@@ -133,7 +133,8 @@ typedef struct {
 
   int has_start;
   uint32_t start_idx;
-} wasm_module_t;
 
+  int has_datacount;
+} wasm_module_t;
 
 

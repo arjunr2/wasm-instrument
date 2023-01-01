@@ -91,7 +91,7 @@ void module_free(wasm_module_t* mod) {
 
   FREE(mod->globals, mod->num_globals);
 
-  FREE(mod->data, mod->num_data);
+  FREE(mod->datas, mod->num_datas);
 
   for (uint32_t i = 0; i < mod->num_elems; i++) {
     FREE(mod->elems[i].func_indexes, mod->elems[i].length);
