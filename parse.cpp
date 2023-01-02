@@ -185,7 +185,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
         info.num_funcs++;
         uint32_t idx = RD_U32();
         FuncDecl func = {
-          .sig = get_list_elem<SigDecl>(this->sigs, idx)
+          .sig = get_list_elem <SigDecl>(this->sigs, idx)
         };
         funcs.push_back(func);
         import.desc.func = &funcs.back();
@@ -234,7 +234,7 @@ void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
     /* Get signature idx */
     uint32_t idx = RD_U32();
     FuncDecl func = {
-      .sig = get_list_elem<SigDecl>(this->sigs, RD_U32())
+      .sig = get_list_elem <SigDecl>(this->sigs, RD_U32())
     };
     this->funcs.push_back(func);
   }
@@ -267,34 +267,36 @@ void WasmModule::decode_memory_section (buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_exps = read_u32leb(buf);
-//  PRINT_SEC_HEADER(export, num_exps);
-//  
-//  MALLOC(exports, wasm_export_decl_t, num_exps);
-//
-//  ALLOC_STR(s);
-//  /* String + exp descriptor + idx */
-//  for (uint32_t i = 0; i < num_exps; i++) {
-//    wasm_export_decl_t *export = &exports[i];
-//    APPEND_TAB(s);
-//
-//    /* Export descriptor */
-//    RD_APPEND_STR_STRING(s, buf, export->length, export->name);
-//    APPEND_SPACE(s);
-//    
-//    byte idxtype = read_u8(buf);
-//    APPEND_STR(s, ie_desc_name(idxtype));
-//    APPEND_SPACE(s);
-//    export->kind = idxtype;
-//     
-//    RD_APPEND_STR_U32(s, buf, export->index);
-//    FLUSH_STR(s);
-//  }
-//  DELETE_STR(s);
-//
-//  module->num_exports = num_exps;
-//  module->exports = exports;
+  uint32_t num_exports = RD_U32();
+
+  /* String + exp descriptor + idx */
+  for (uint32_t i = 0; i < num_exports; i++) {
+    ExportDecl exp;
+    exp.name = RD_NAME();
+    exp.kind = (wasm_kind_t) RD_BYTE();
+    uint32_t idx = RD_U32();
+    /* Export descriptor */
+    switch (exp.kind) {
+      case KIND_FUNC:
+        exp.desc.func = get_list_elem <FuncDecl>(this->funcs, idx);
+        break;
+      case KIND_TABLE:
+        exp.desc.table = get_list_elem <TableDecl>(this->tables, idx);
+        break;
+      case KIND_MEMORY:
+        exp.desc.mem = get_list_elem <MemoryDecl>(this->mems, idx);
+        break;
+      case KIND_GLOBAL:
+        exp.desc.global = get_list_elem <GlobalDecl>(this->globals, idx);
+        break;
+      default: {
+        ERR("Export kind: %u\n", exp.kind);
+        throw std::runtime_error("Invalid export type");
+      }
+    }
+
+    this->exports.push_back(exp);
+  }
 }
 
 
@@ -653,7 +655,6 @@ void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
     uint32_t num_bytes = RD_U32();
     data.bytes = RD_BYTESTR(num_bytes);
 
-    TRACE("Data %d -- Offset: %u | Num bytes: %u\n", i, offset, num_bytes);
     this->datas.push_back(data);
   }
 }
@@ -673,7 +674,6 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
 
   this->customs.push_back(custom);
 }
-
 
 
 

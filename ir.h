@@ -74,13 +74,6 @@ struct ElemDecl {
   uint32_t* func_indexes;
 };
 
-struct ExportDecl {
-  uint32_t length;
-  std::string name;
-  wasm_kind_t kind;
-  uint32_t index;
-};
-
 
 union Descriptor {
   FuncDecl* func;
@@ -96,6 +89,13 @@ struct ImportDecl {
   Descriptor desc;
 };
 
+struct ExportDecl {
+  std::string name;
+  wasm_kind_t kind;
+  Descriptor desc;
+};
+
+
 struct ImportInfo {
   std::list <ImportDecl> list;
   uint32_t num_funcs;
@@ -103,6 +103,7 @@ struct ImportInfo {
   uint32_t num_memories;
   uint32_t num_globals;
 };
+
 
 /* Section */
 struct WasmModule {
