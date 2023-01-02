@@ -308,41 +308,33 @@ void WasmModule::decode_start_section (buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_elem = read_u32leb(buf);
-//  PRINT_SEC_HEADER(element, num_elem);
-//
-//  MALLOC(elems, wasm_elems_decl_t, num_elem);
-//
-//  ALLOC_STR(s);
-//  for (uint32_t i = 0; i < num_elem; i++) {
-//    wasm_elems_decl_t *elem = &elems[i];
-//    /* Offset val */
-//    elem->table_offset = decode_flag_and_i32_const_off_expr(&s, buf);
-//
-//    /* Element fn idx vector */
-//    APPEND_TAB(s);
-//    uint32_t num_idxs = read_u32leb(buf);
-//    APPEND_STR_U32(s, num_idxs);
-//    FLUSH_STR(s);
-//
-//    elem->length = num_idxs;
-//
-//    MALLOC(func_idxs, uint32_t, num_idxs);
-//
-//    APPEND_TAB(s);
-//    for (uint32_t j = 0; j < num_idxs; j++) {
-//      RD_APPEND_STR_U32(s, buf, func_idxs[j]);
-//    }
-//    elem->func_indexes = func_idxs;
-//
-//    APPEND_STR(s, "\n");
-//    FLUSH_STR(s);
-//  }
-//  DELETE_STR(s);
-//
-//  module->num_elems = num_elem;
-//  module->elems = elems;
+  uint32_t num_elem = RD_U32();
+  for (uint32_t i = 0; i < num_elem; i++) {
+    ElemDecl elem;
+    /* Flag */
+    uint32_t flag = RD_U32();
+    elem.flag = flag;
+    /* Offset */
+    uint32_t offset = -1;
+    switch (flag) {
+      case 0: offset = decode_const_off_expr(buf); break;
+      default: {
+        ERR("Invalid element segment flag: %d\n", flag);
+        throw std::runtime_error("Flag error");
+      }
+    }
+    elem.table_offset = offset;
+
+    /* Element fn idx vector */
+    uint32_t num_idxs = RD_U32();
+    for (uint32_t i = 0; i < num_idxs; i++) {
+      uint32_t fn_idx = RD_U32();
+      FuncDecl* fptr = get_list_elem <FuncDecl>(this->funcs, fn_idx);
+      elem.func_indices.push_back(fptr);
+    }
+
+    this->elems.push_back(elem);
+  }
 }
 
 
@@ -633,9 +625,10 @@ void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
   for (uint32_t i = 0; i < num_datas; i++) {
     DataDecl data;
     /* Flag */
-    int flag = RD_U32();
+    uint32_t flag = RD_U32();
+    data.flag = flag;
     /* Offset */
-    uint32_t offset = 0;
+    uint32_t offset = -1;
     switch (flag) {
       case 0: offset = decode_const_off_expr(buf); break;
       case 1: offset = 0; break;

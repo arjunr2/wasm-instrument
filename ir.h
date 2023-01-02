@@ -64,14 +64,15 @@ struct GlobalDecl {
 };
 
 struct DataDecl {
+  uint32_t flag;
   uint32_t mem_offset;
   bytearr bytes;
 };
 
 struct ElemDecl {
+  uint32_t flag;
   uint32_t table_offset;
-  uint32_t length;
-  uint32_t* func_indexes;
+  std::list <FuncDecl*> func_indices;
 };
 
 
