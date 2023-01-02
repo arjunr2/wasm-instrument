@@ -132,7 +132,7 @@ int32_t read_i32leb(buffer_t* buf) {
 uint64_t read_u64leb(buffer_t* buf) {
   ssize_t leblen = 0;
   if (buf->ptr >= buf->end) return 0;
-  uint32_t val = decode_u64leb(buf->ptr, buf->end, &leblen);
+  uint64_t val = decode_u64leb(buf->ptr, buf->end, &leblen);
   if (leblen <= 0) buf->ptr = buf->end; // force failure
   else buf->ptr += leblen;
   return val;
@@ -142,7 +142,7 @@ uint64_t read_u64leb(buffer_t* buf) {
 int64_t read_i64leb(buffer_t* buf) {
   ssize_t leblen = 0;
   if (buf->ptr >= buf->end) return 0;
-  int32_t val = decode_i64leb(buf->ptr, buf->end, &leblen);
+  int64_t val = decode_i64leb(buf->ptr, buf->end, &leblen);
   if (leblen <= 0) buf->ptr = buf->end; // force failure
   else buf->ptr += leblen;
   return val;
