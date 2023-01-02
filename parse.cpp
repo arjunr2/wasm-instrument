@@ -80,26 +80,32 @@ inline static wasm_limits_t read_limits(buffer_t &buf) {
   return limits;
 }
 
-///* Read TableType */
-//void read_table_type(wasm_table_decl_t *table, string *sp, buffer_t *buf) {
-//    byte reftype = read_u8(buf);
-//    APPEND_STR(*sp, type_name(reftype));
-//    APPEND_SPACE(*sp);
-//    table->limits = read_limits(sp, buf);
-//}
-//
-///* Read GlobalType */
-//void read_global_type(wasm_global_decl_t* global, string *sp, buffer_t *buf) {
-//  byte type = read_u8(buf);
-//  APPEND_STR(*sp, type_name(type));
-//  APPEND_SPACE(*sp);
-//
-//  byte mutable = read_u8(buf);
-//  if (mutable) { APPEND_STR(*sp, "mutable "); }
-//
-//  global->type = type;
-//  global->mutable = mutable;
-//}
+/* Read MemoryType */
+inline static MemoryDecl read_memtype(buffer_t &buf) {
+  MemoryDecl mem = { .limits = read_limits(buf) };
+  return mem;
+}
+/* Read TableType */
+inline static TableDecl read_tabletype(buffer_t &buf) {
+  byte reftype = RD_BYTE();
+  if ((reftype != WASM_TYPE_FUNCREF) && (reftype != WASM_TYPE_EXTERNREF)) {
+    throw std::runtime_error("Invalid Reftype\n");
+  }
+  TableDecl table = { .limits = read_limits(buf) };
+  return table;
+}
+
+/* Read GlobalType */
+inline static GlobalDecl read_globaltype(buffer_t &buf) {
+  byte type = RD_BYTE();
+  byte is_mutable = RD_BYTE();
+
+  GlobalDecl glob = {
+    .type = (wasm_type_t) type,
+    .is_mutable = is_mutable
+  };
+  return glob;
+}
 
 
 inline static typearr read_type_list(uint32_t num, buffer_t &buf) {
@@ -133,43 +139,41 @@ void WasmModule::decode_type_section(buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_imports = read_u32leb(buf);
-//  PRINT_SEC_HEADER(import, num_imports);
-//
-//  MALLOC(imports, wasm_import_decl_t, num_imports);
-//
-//  ALLOC_STR(s);
-//  for (uint32_t i = 0; i < num_imports; i++) {
-//    wasm_import_decl_t *import = &imports[i];
-//
-//    APPEND_TAB(s);
-//    /* Module */
-//    RD_APPEND_STR_STRING(s, buf, import->mod_name_length, import->mod_name);
-//    APPEND_SPACE(s);
-//    
-//    /* Import name */
-//    RD_APPEND_STR_STRING(s, buf, import->member_name_length, import->member_name);
-//    APPEND_SPACE(s);
-//
-//    /* Import type and args */    
-//    byte idxtype = read_u8(buf);
-//    APPEND_STR(s, ie_desc_name(idxtype));
-//    APPEND_SPACE(s);
-//
-//    import->kind = idxtype;
-//    switch(idxtype) {
-//      case WASM_IE_DESC_FUNC:   RD_APPEND_STR_U32(s, buf, import->index); break;
-//      default:
-//        ERR("Invalid Index type found!\n");
-//    }
-//    FLUSH_STR(s);
-//
-//  }
-//  DELETE_STR(s);
-//
-//  module->num_imports = num_imports;
-//  module->imports = imports;
+  uint32_t num_imports = RD_U32();
+
+  for (uint32_t i = 0; i < num_imports; i++) {
+    ImportDecl import;
+    import.mod_name = RD_NAME();
+    import.member_name = RD_NAME();
+    import.kind = (wasm_kind_t) RD_BYTE();
+
+    /* Populate the index space of respective kind */
+    switch (import.kind) {
+      case KIND_FUNC: 
+        RD_U32();
+        break;
+        //FuncDecl f = { .sig
+        //this->funcs.push_back(import.desc.
+        //import.desc.func = &this->funcs.back();
+
+      case KIND_TABLE:
+        read_tabletype(buf);
+        break;
+      case KIND_MEMORY:
+        read_memtype(buf);
+        break;
+      case KIND_GLOBAL:
+        read_globaltype(buf);
+        break;
+
+      default:
+        ERR("Import kind: %u\n", import.kind);
+        throw std::runtime_error("Invalid import type");
+    }
+
+    this->imports.push_back(import);
+  }
+
 }
 
 void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
@@ -230,13 +234,10 @@ void WasmModule::decode_table_section (buffer_t &buf, uint32_t len) {
 
 void WasmModule::decode_memory_section (buffer_t &buf, uint32_t len) {
   uint32_t num_mems = RD_U32();
-  MemoryDecl mem;
-
   if (num_mems != 1) {
     throw std::runtime_error("Memory component has to be 1!");
   }
-
-  mem.limits = read_limits(buf);
+  MemoryDecl mem = read_memtype(buf);
   this->mems.push_back(mem);
 }
 

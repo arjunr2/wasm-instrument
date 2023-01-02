@@ -10,7 +10,7 @@
 #include "common.h"
 #include "wasmdefs.h"
 
-typedef std::vector<wasm_type_t> typearr;
+typedef std::list<wasm_type_t> typearr;
 
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
@@ -18,18 +18,12 @@ const char* wasm_section_name(byte sec_code);
 
 class WasmModule;
 
-/* Intermediate structs */
+/* Intermediate components */
 struct wasm_limits_t {
   uint32_t initial;
   uint32_t max;
   unsigned has_max : 1;
 };
-
-struct wasm_local_decl_t {
-  uint32_t count;
-  wasm_type_t type;
-};
-
 
 
 /* Section Field Declarations */
@@ -43,19 +37,10 @@ struct SigDecl {
   typearr results;
 };
 
-struct ImportDecl {
-  std::string  mod_name;
-  std::string member_name;
-  wasm_kind_t kind;
-  uint32_t index;
-};
 
 struct FuncDecl {
-  uint32_t sig_index;
   SigDecl* sig;
-  uint32_t num_local_vec;
-  uint32_t num_locals;
-  wasm_local_decl_t *local_decl;
+  typearr pure_locals;
   const byte* code_start;
   const byte* code_end;
 };
@@ -70,7 +55,7 @@ struct TableDecl {
 
 struct GlobalDecl {
   wasm_type_t type;
-  unsigned mutable : 1;
+  unsigned is_mutable : 1;
   const byte* init_expr_start;
   const byte* init_expr_end;
 };
@@ -95,6 +80,20 @@ struct ExportDecl {
 };
 
 
+union Descriptor {
+  FuncDecl* func;
+  GlobalDecl* global;
+  TableDecl* table;
+  MemoryDecl* mem;
+};
+
+struct ImportDecl {
+  std::string mod_name;
+  std::string member_name;
+  wasm_kind_t kind;
+  Descriptor desc;
+};
+
 /* Section */
 struct WasmModule {
   uint32_t version;
@@ -102,9 +101,13 @@ struct WasmModule {
   std::list <CustomDecl>  customs;
   std::list <SigDecl>     sigs;
   std::list <ImportDecl>  imports;
+  /* Func space */
   std::list <FuncDecl>    funcs;
+  /* Table space */
   std::list <TableDecl>   tables;
+  /* Mem space */
   std::list <MemoryDecl>  mems;
+  /* Global space */
   std::list <GlobalDecl>  globals;
   std::list <ExportDecl>  exports;
   std::list <ElemDecl>    elems;
