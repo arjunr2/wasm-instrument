@@ -637,7 +637,7 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
 void decode_sections(WasmModule &module, buffer_t &buf) {
 
   while (buf.ptr < buf.end) {
-    byte section_id = RD_BYTE();
+    wasm_section_t section_id = (wasm_section_t) RD_BYTE();
     uint32_t len = RD_U32();
 
     TRACE("Found section \"%s\", len: %d\n", wasm_section_name(section_id), len);
