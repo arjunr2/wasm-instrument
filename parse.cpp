@@ -73,8 +73,8 @@ inline static GlobalDecl read_globaltype(buffer_t &buf) {
   return glob;
 }
 
-inline static typearr read_type_list(uint32_t num, buffer_t &buf) {
-  typearr vec;
+inline static typelist read_type_list(uint32_t num, buffer_t &buf) {
+  typelist vec;
   for (uint32_t j = 0; j < num; j++) {
     vec.push_back((wasm_type_t) RD_BYTE());
   }
@@ -338,43 +338,6 @@ void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
 }
 
 
-//static void decode_locals(wasm_func_decl_t *fn, buffer_t *buf) {
-//
-//  ALLOC_STR(s);
-//  /* Write num local elements */
-//  uint32_t num_elems = read_u32leb(buf);
-//  APPEND_TAB(s);
-//  APPEND_STR_U32(s, num_elems);
-//  FLUSH_STR(s);
-//
-//  MALLOC(locals, wasm_local_decl_t, num_elems);
-//  
-//  uint32_t num_locals = 0;
-//  /* Write local types */
-//  if (num_elems != 0) {
-//    APPEND_TAB(s);
-//    for (uint32_t i = 0; i < num_elems; i++) {
-//      /* Number of locals of type */
-//      uint32_t num = read_u32leb(buf);
-//      APPEND_STR_U32(s, num);
-//      num_locals += num;
-//      /* Type */
-//      byte type = read_u8(buf);
-//      APPEND_STR(s, type_name(type));
-//      APPEND_SPACE(s);
-//
-//      locals[i].count = num;
-//      locals[i].type = type;
-//    }
-//    FLUSH_STR(s);
-//  }
-//  
-//  fn->num_local_vec = num_elems;
-//  fn->num_locals = num_locals;
-//  fn->local_decl = locals;
-//
-//  DELETE_STR(s);
-//}
 //
 //block_list_t static_blocks[FN_MAX_SIZE];
 //
@@ -570,37 +533,38 @@ void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
 //}
 
 
+static wasm_localcsv_t decode_locals(buffer_t &buf) {
+  /* Write num local elements */
+  uint32_t num_localcse = RD_U32();
+  
+  uint32_t num_locals = 0;
+  wasm_localcsv_t csv;
+  for (uint32_t i = 0; i < num_localcse; i++) {
+    uint32_t count = RD_U32();
+    wasm_type_t type = (wasm_type_t) RD_BYTE();
+    wasm_localcse_t cse = { .count = count, .type = type };
+    csv.push_back(cse);
+  }
+  return csv;
+}
+
 /* Gets run after function section; in order */
 void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_fn = read_u32leb(buf);
-//  PRINT_SEC_HEADER(code, num_fn);
-//
-//  ALLOC_STR(s);
-//  for (uint32_t i = 0; i < num_fn; i++) {
-//    uint32_t idx = module->num_imports + i;
-//    /* Fn size */
-//    uint32_t size = read_u32leb(buf);
-//    APPEND_TAB(s);
-//    APPEND_STR(s, "body ");
-//    APPEND_STR_U32(s, size);
-//    FLUSH_STR(s);
-//
-//    /* Parse body */
-//    /* Local section */
-//    decode_locals(&module->funcs[idx], buf);
-//
-//    module->funcs[idx].code_start = buf.ptr;
-//    /* Fn body: Instruction decoding */
-//    decode_expr(buf, false, 1, false);
-//    module->funcs[idx].code_end = buf.ptr;
-//    if (replace_brs) {
-//      /* Branch replacement */
-//      buf.ptr = module->funcs[idx].code_start;
-//      decode_expr(buf, true, 1, true);
-//    }
-//  }
-//  DELETE_STR(s);
+  uint32_t num_fn = RD_U32();
+  
+  auto func_itr = std::next(this->funcs.begin(), this->imports.num_funcs);
+  for (uint32_t i = 0; i < num_fn; i++) {
+    FuncDecl &func = *func_itr;
+    /* Fn size (locals + body) */
+    uint32_t size = RD_U32();
+    const byte* end_fn = buf.ptr + size;
+
+    /* Local section */
+    func.pure_locals = decode_locals(buf);
+    /* TODO: Fn body expr */
+    while (buf.ptr != end_fn) { RD_BYTE(); }
+    std::advance (func_itr, 1);
+  }
 }
 
 

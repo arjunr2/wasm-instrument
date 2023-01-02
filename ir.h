@@ -10,7 +10,7 @@
 #include "common.h"
 #include "wasmdefs.h"
 
-typedef std::list<wasm_type_t> typearr;
+typedef std::list<wasm_type_t> typelist;
 
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
@@ -26,6 +26,11 @@ struct wasm_limits_t {
   unsigned has_max : 1;
 };
 
+struct wasm_localcse_t {
+  uint32_t count;
+  wasm_type_t type;
+};
+typedef std::list<wasm_localcse_t> wasm_localcsv_t;
 
 /* Section Field Declarations */
 struct CustomDecl {
@@ -34,8 +39,8 @@ struct CustomDecl {
 };
 
 struct SigDecl {
-  typearr params;
-  typearr results;
+  typelist params;
+  typelist results;
 };
 
 
@@ -43,7 +48,7 @@ struct FuncDecl {
   /* From func/import section */
   SigDecl* sig;
   /* From code section */
-  typearr pure_locals;
+  wasm_localcsv_t pure_locals;
   const byte* code_start;
   const byte* code_end;
 };
