@@ -31,33 +31,8 @@
 //  *(((byte*)(&new_val)) + 3)  = 0x80 | ((val >> 21) & 0x7F);
 //  return new_val;
 //}
-//
-///* Function to read i32.const offset since 
-//  data/elem section only uses these */
-//static uint32_t decode_flag_and_i32_const_off_expr(string *sp, buffer_t *buf) {
-//  APPEND_TAB(*sp);
-//  uint32_t flag = read_u32leb(buf);
-//  // Has to be 0 flag for this
-//  if (flag != 0) {  ERR("Non-0 flag for data/elem section\n"); }
-//  // Has to be i32.const offset for this
-//  byte opc = read_u8(buf);
-//  if (opc != WASM_OP_I32_CONST) {
-//    ERR("Offset for data section has to be \"i32.const\"");
-//  } 
-//  // Offset val
-//  uint32_t offset;
-//  RD_APPEND_STR_U32(*sp, buf, offset);
-//  
-//  byte endopc = read_u8(buf);
-//  if (endopc != WASM_OP_END) {
-//    ERR("Offset for data section can't find end after i32.const\n");
-//  }
-//
-//  FLUSH_STR(*sp);
-//  return offset;
-//}
-//
-//
+
+
 
 /* Read LimitsType */
 inline static wasm_limits_t read_limits(buffer_t &buf) {
@@ -104,6 +79,33 @@ inline static typearr read_type_list(uint32_t num, buffer_t &buf) {
     vec.push_back((wasm_type_t) RD_BYTE());
   }
   return vec;
+}
+
+
+/* Function to read const offset expression i32.const offset for elem/data */
+static uint32_t decode_const_off_expr(buffer_t &buf) {
+  // Has to be i32.const or i64.const offset for this
+  byte opc = RD_BYTE();
+  uint64_t offset = -1;
+  switch (opc) {
+    case WASM_OP_I32_CONST: {
+      offset = RD_I32();
+      break;
+    }
+    case WASM_OP_I64_CONST: {
+      offset = RD_I64();
+      break;
+    }
+    default:
+      ERR("Unknown opcode in offset expr (%d): Must be i32/64 const\n", opc);
+      throw std::runtime_error("Opcode error");
+  }
+  
+  byte end = RD_BYTE();
+  if (end != WASM_OP_END) {
+    throw std::runtime_error("Malformed end in offset expr");
+  }
+  return offset;
 }
 
 // TODO: Init exprs
@@ -624,39 +626,36 @@ void WasmModule::decode_global_section(buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_datas = RD_U32();
-//
-//  MALLOC(datas, wasm_data_decl_t, num_datas);
-//
-//  for (uint32_t i = 0; i < num_data; i++) {
-//    wasm_data_decl_t *data = datas + i;
-//    /* Offset val */
-//    data->mem_offset = decode_flag_and_i32_const_off_expr(&s, buf);
-//    /* Size val */
-//    APPEND_TAB(s);
-//    uint32_t sz = read_u32leb(buf);
-//    APPEND_STR_U32(s, sz);
-//    FLUSH_STR(s);
-//
-//    data->bytes_start = buf.ptr;
-//    data->bytes_end = buf.ptr + sz;
-//    /* Print bytes */
-//    for (uint32_t i = 0; i < sz; i++) {
-//      if ((i & (BYTES_PER_LINE-1)) == 0) { 
-//        if (i != 0) { FLUSH_STR(s); }
-//        APPEND_TAB(s);
-//      }
-//      byte b = read_u8(buf);
-//      APPEND_STR_BYTE(s, b);
-//    }
-//    APPEND_STR(s, "\n");
-//    FLUSH_STR(s);
-//  }
-//  DELETE_STR(s);
-//
-//  module->num_data = num_datas;
-//  module->data = datas;
+  uint32_t num_datas = RD_U32();
+
+  for (uint32_t i = 0; i < num_datas; i++) {
+    DataDecl data;
+    /* Flag */
+    int flag = RD_U32();
+    /* Offset */
+    uint32_t offset = 0;
+    switch (flag) {
+      case 0: offset = decode_const_off_expr(buf); break;
+      case 1: offset = 0; break;
+      case 2: {
+        uint32_t mem_idx = RD_U32();
+        if (mem_idx != 0) throw std::runtime_error("Flag error: Only memory 0 allowed\n");
+        offset = decode_const_off_expr(buf);
+        break;
+      }
+      default: {
+        ERR("Invalid data segment flag: %d\n", flag);
+        throw std::runtime_error("Flag error");
+      }
+    }
+    data.mem_offset = offset;
+    /* Size val */
+    uint32_t num_bytes = RD_U32();
+    data.bytes = RD_BYTESTR(num_bytes);
+
+    TRACE("Data %d -- Offset: %u | Num bytes: %u\n", i, offset, num_bytes);
+    this->datas.push_back(data);
+  }
 }
 
 void WasmModule::decode_datacount_section(buffer_t &buf, uint32_t len) {

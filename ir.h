@@ -65,8 +65,7 @@ struct GlobalDecl {
 
 struct DataDecl {
   uint32_t mem_offset;
-  const byte* bytes_start;
-  const byte* bytes_end;
+  bytearr bytes;
 };
 
 struct ElemDecl {
