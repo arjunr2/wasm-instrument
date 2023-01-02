@@ -3,10 +3,10 @@
 CC=gcc
 CXX=g++
 
-CFLAGS = -g
+CFLAGS =
 CPPFLAGS = -g
 
-#SRC_C = 
+SRC_C = opcode_table.c
 SRC_CPP = common.cpp ir.cpp main.cpp parse.cpp
 
 SRC_O = $(addprefix build/, $(SRC_C:.c=.o) $(SRC_CPP:.cpp=.o))
