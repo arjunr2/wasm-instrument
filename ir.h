@@ -15,6 +15,7 @@ typedef std::list<wasm_type_t> typearr;
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
 const char* wasm_section_name(byte sec_code);
+const char* wasm_kind_string(wasm_kind_t kind);
 
 class WasmModule;
 

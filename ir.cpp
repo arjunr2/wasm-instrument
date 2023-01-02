@@ -9,10 +9,21 @@ const char* wasm_type_string(wasm_type_t type) {
     case V128:      return "v128"; break;
     case EXTERNREF: return "externref"; break;
     case FUNCREF:   return "funcref"; break;
+    default:  
+      return "unknown";
   }
-  return NULL;
 }
 
+const char* wasm_kind_string(wasm_kind_t kind) {
+  switch (kind) {
+    case KIND_FUNC:     return "func"; break;
+    case KIND_TABLE:    return "table"; break;
+    case KIND_MEMORY:   return "memory"; break;
+    case KIND_GLOBAL:   return "global"; break;
+    default:  
+      return "unknown";
+  }
+}
 
 // Returns the string name of a section code.
 const char* wasm_section_name(byte code) {

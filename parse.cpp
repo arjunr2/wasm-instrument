@@ -29,18 +29,6 @@
 //  return new_val;
 //}
 //
-//// Returns string for given import/export description
-//static const char* ie_desc_name(byte idxtype) {
-//  switch (idxtype) {
-//    case WASM_IE_DESC_FUNC: return "func";
-//    case WASM_IE_DESC_TABLE: return "table";
-//    case WASM_IE_DESC_MEM: return "memory";
-//    case WASM_IE_DESC_GLOBAL: return "global";
-//    default:
-//      return "0xDEADBEEF";
-//  }
-//}
-//
 ///* Function to read i32.const offset since 
 //  data/elem section only uses these */
 //static uint32_t decode_flag_and_i32_const_off_expr(string *sp, buffer_t *buf) {
@@ -141,7 +129,13 @@ void WasmModule::decode_type_section(buffer_t &buf, uint32_t len) {
 void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
   uint32_t num_imports = RD_U32();
 
-  ImportInfo *info = &this->imports;
+  ImportInfo &info = this->imports;
+
+  std::list <FuncDecl> &funcs = this->funcs;
+  std::list <TableDecl> &tables = this->tables;
+  std::list <MemoryDecl> &mems = this->mems;
+  std::list <GlobalDecl> &globals = this->globals;
+
   for (uint32_t i = 0; i < num_imports; i++) {
     ImportDecl import;
     import.mod_name = RD_NAME();
@@ -150,30 +144,34 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
     /* Populate the index space of respective kind */
     switch (import.kind) {
       case KIND_FUNC: {
-        info->num_funcs++;
+        info.num_funcs++;
+        uint32_t idx = RD_U32();
         FuncDecl func = {
-          .sig = get_list_elem<SigDecl>(this->sigs, RD_U32())
+          .sig = get_list_elem<SigDecl>(this->sigs, idx)
         };
-        this->funcs.push_back(func);
-        import.desc.func = &this->funcs.back();
+        funcs.push_back(func);
+        import.desc.func = &funcs.back();
         break;
-        //FuncDecl f = { .sig
-        //this->funcs.push_back(import.desc.
-        //import.desc.func = &this->funcs.back();
       }
       case KIND_TABLE: {
-        info->num_tables++;
-        read_tabletype(buf);
+        info.num_tables++;
+        TableDecl table = read_tabletype(buf);
+        tables.push_back(table);
+        import.desc.table = &tables.back();
         break;
       }
       case KIND_MEMORY: {
-        info->num_memories++;
-        read_memtype(buf);
+        info.num_memories++;
+        MemoryDecl mem = read_memtype(buf);
+        mems.push_back(mem);
+        import.desc.mem = &mems.back();
         break;
       }
       case KIND_GLOBAL: {
-        info->num_tables++;
-        read_globaltype(buf);
+        info.num_globals++;
+        GlobalDecl global = read_globaltype(buf);
+        globals.push_back(global);
+        import.desc.global= &globals.back();
         break;
       }
       default: {
@@ -182,7 +180,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
       }
     }
 
-    info->list.push_back(import);
+    info.list.push_back(import);
   }
 
 }
@@ -190,7 +188,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
 void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
   uint32_t num_imports = this->imports.num_funcs;
   if (num_imports != this->funcs.size()) {
-    throw std::runtime_error ("Malformed func section");
+    throw std::runtime_error ("Malformed func imports");
   }
 
   uint32_t num_funcs = RD_U32();
@@ -198,7 +196,7 @@ void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
     /* Get signature idx */
     uint32_t idx = RD_U32();
     FuncDecl func = {
-      .sig = get_list_elem<SigDecl>(this->sigs, idx)
+      .sig = get_list_elem<SigDecl>(this->sigs, RD_U32())
     };
     this->funcs.push_back(func);
   }
@@ -206,25 +204,16 @@ void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_table_section (buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_tabs = read_u32leb(buf);
-//
-//  PRINT_SEC_HEADER(table, num_tabs);
-//
-//  MALLOC(tables, wasm_table_decl_t, num_tabs);
-//
-//  ALLOC_STR(s);
-//
-//  for (uint32_t i = 0; i < num_tabs; i++) {
-//    wasm_table_decl_t *table = &tables[i];
-//    APPEND_TAB(s);
-//    read_table_type(table, &s, buf);
-//    FLUSH_STR(s);
-//  }
-//
-//  DELETE_STR(s);
-//  module->num_tables = num_tabs;
-//  module->table = tables;
+  uint32_t num_imports = this->imports.num_tables;
+  if (num_imports != this->tables.size()) {
+    throw std::runtime_error ("Malformed table imports");
+  }
+
+  uint32_t num_tables = RD_U32();
+  for (uint32_t i = 0; i < num_tables; i++) {
+    TableDecl table = read_tabletype(buf);
+    this->tables.push_back(table);
+  }
 }
 
 
