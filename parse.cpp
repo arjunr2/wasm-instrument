@@ -67,18 +67,19 @@
 //}
 //
 //
-///* Read LimitsType */
-//wasm_limits_t read_limits(string *sp, buffer_t *buf) {
-//  wasm_limits_t limits;
-//  byte max_provided = read_u8(buf);
-//  limits.has_max = max_provided;
-//  /* Min */
-//  RD_APPEND_STR_U32(*sp, buf, limits.initial);
-//
-//  if (max_provided) { RD_APPEND_STR_U32(*sp, buf, limits.max); }
-//  return limits;
-//}
-//
+
+/* Read LimitsType */
+inline static wasm_limits_t read_limits(buffer_t &buf) {
+  byte max_provided = RD_BYTE();
+  uint32_t min = RD_U32();
+  wasm_limits_t limits = {
+    .initial = min,
+    .max = (max_provided ? RD_U32() : 0),
+    .has_max = max_provided
+  };
+  return limits;
+}
+
 ///* Read TableType */
 //void read_table_type(wasm_table_decl_t *table, string *sp, buffer_t *buf) {
 //    byte reftype = read_u8(buf);
@@ -103,9 +104,8 @@
 
 inline static typearr read_type_list(uint32_t num, buffer_t &buf) {
   typearr vec;
-  /* Add all types for params */
   for (uint32_t j = 0; j < num; j++) {
-    vec.push_back((wasm_type_t)(RD_BYTE()));
+    vec.push_back((wasm_type_t) RD_BYTE());
   }
   return vec;
 }
@@ -229,22 +229,15 @@ void WasmModule::decode_table_section (buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_memory_section (buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_mems = read_u32leb(buf);
-//  if (num_mems != 1) {
-//    ERR("Memory component has to be 1!\n");
-//  }
-//
-//  PRINT_SEC_HEADER(memory, num_mems);
-//
-//  ALLOC_STR(s);
-//
-//  APPEND_TAB(s);
-//  module->num_mems = num_mems;
-//  module->mem_limits = read_limits(&s, buf);
-//  FLUSH_STR(s);
-//
-//  DELETE_STR(s);
+  uint32_t num_mems = RD_U32();
+  MemoryDecl mem;
+
+  if (num_mems != 1) {
+    throw std::runtime_error("Memory component has to be 1!");
+  }
+
+  mem.limits = read_limits(buf);
+  this->mems.push_back(mem);
 }
 
 

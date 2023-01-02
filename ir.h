@@ -44,9 +44,7 @@ struct SigDecl {
 };
 
 struct ImportDecl {
-  uint32_t mod_name_length;
   std::string  mod_name;
-  uint32_t member_name_length;
   std::string member_name;
   wasm_kind_t kind;
   uint32_t index;
