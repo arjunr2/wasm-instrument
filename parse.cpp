@@ -11,11 +11,14 @@
 /*** Parsing macros ***/
 #define RD_U32()        read_u32leb(&buf)
 #define RD_I32()        read_i32leb(&buf)
-#define RD_BYTE()       read_u8(&buf)
-#define RD_U32_RAW()    read_u32(&buf)
-#define RD_U64()        read_u64(&buf)
+#define RD_U64()        read_u64leb(&buf)
+#define RD_I64()        read_i64leb(&buf)
 #define RD_NAME()       read_name(&buf)
 #define RD_BYTESTR(len) read_bytes(&buf, len)
+
+#define RD_BYTE()       read_u8(&buf)
+#define RD_U32_RAW()    read_u32(&buf)
+#define RD_U64_RAW()    read_u64(&buf)
 /********************/
 
 
@@ -95,7 +98,6 @@ inline static GlobalDecl read_globaltype(buffer_t &buf) {
   return glob;
 }
 
-
 inline static typearr read_type_list(uint32_t num, buffer_t &buf) {
   typearr vec;
   for (uint32_t j = 0; j < num; j++) {
@@ -103,6 +105,40 @@ inline static typearr read_type_list(uint32_t num, buffer_t &buf) {
   }
   return vec;
 }
+
+// TODO: Init exprs
+static void decode_init_expr(buffer_t &buf) {
+  byte opcode = RD_BYTE();
+  switch (opcode) {
+    case WASM_OP_I32_CONST: {
+      RD_I32();
+      break;
+    }
+    case WASM_OP_I64_CONST: {
+      int64_t v = RD_I64();
+      break;
+    }
+    case WASM_OP_F32_CONST: {
+      RD_U32_RAW();
+      break;
+    }
+    case WASM_OP_F64_CONST: {
+      RD_U64_RAW();
+      break;
+    }
+
+    default:
+      ERR("Unknown init expr opcode: %u\n", opcode);
+      throw std::runtime_error("Opcode error");
+  }
+
+  byte end = RD_BYTE();
+  if (end != WASM_OP_END) {
+    throw std::runtime_error("Malformed end in init_expr");
+  }
+
+}
+
 
 void WasmModule::decode_type_section(buffer_t &buf, uint32_t len) {
   uint32_t num_sigs = RD_U32();
@@ -263,6 +299,7 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
 void WasmModule::decode_start_section (buffer_t &buf, uint32_t len) {
   this->has_start = true;
   this->start_idx = RD_U32();
+  throw std::runtime_error("Start section not implemented");
 }
 
 
@@ -572,27 +609,17 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_global_section(buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_globs = read_u32leb(buf);
-//  PRINT_SEC_HEADER(global, num_globs);
-//
-//  MALLOC(globals, wasm_global_decl_t, num_globs);
-//
-//  ALLOC_STR(s);
-//  for (uint32_t i = 0; i < num_globs; i++) {
-//    wasm_global_decl_t *global = &globals[i];
-//    APPEND_TAB(s);
-//    read_global_type(global, &s, buf);
-//    FLUSH_STR(s);
-//
-//    global->init_expr_start = buf.ptr;
-//    decode_expr(buf, true, 1, false);
-//    global->init_expr_end = buf.ptr;
-//  }
-//  DELETE_STR(s);
-//
-//  module->num_globals = num_globs;
-//  module->globals = globals;
+  uint32_t num_imports = this->imports.num_globals;
+  if (num_imports != this->globals.size()) {
+    throw std::runtime_error ("Malformed global imports");
+  }
+
+  uint32_t num_globs = RD_U32();
+  for (uint32_t i = 0; i < num_globs; i++) {
+    GlobalDecl global = read_globaltype(buf);
+    decode_init_expr(buf);
+    this->globals.push_back(global);
+  }
 }
 
 

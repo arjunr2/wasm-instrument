@@ -54,6 +54,12 @@ uint32_t read_u32leb(buffer_t* buf);
 // Read a signed 32-bit LEB, advancing the {ptr} in the buffer.
 int32_t read_i32leb(buffer_t* buf);
 
+// Read an unsigned 64-bit LEB, advancing the buffer.
+uint64_t read_u64leb(buffer_t* buf);
+
+// Read a signed 64-bit LEB, advancing the buffer.
+int64_t read_i64leb(buffer_t* buf);
+
 // Read an unsigned 8-bit byte, advancing the {ptr} in the buffer.
 uint8_t read_u8(buffer_t* buf);
 

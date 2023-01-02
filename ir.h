@@ -57,7 +57,6 @@ struct TableDecl {
 };
 
 struct GlobalDecl {
-  bool is_import;
   wasm_type_t type;
   unsigned is_mutable : 1;
   const byte* init_expr_start;

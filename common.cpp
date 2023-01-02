@@ -128,6 +128,26 @@ int32_t read_i32leb(buffer_t* buf) {
   return val;
 }
 
+// Read an unsigned 64-bit LEB, advancing the buffer.
+uint64_t read_u64leb(buffer_t* buf) {
+  ssize_t leblen = 0;
+  if (buf->ptr >= buf->end) return 0;
+  uint32_t val = decode_u64leb(buf->ptr, buf->end, &leblen);
+  if (leblen <= 0) buf->ptr = buf->end; // force failure
+  else buf->ptr += leblen;
+  return val;
+}
+
+// Read a signed 64-bit LEB, advancing the buffer.
+int64_t read_i64leb(buffer_t* buf) {
+  ssize_t leblen = 0;
+  if (buf->ptr >= buf->end) return 0;
+  int32_t val = decode_i64leb(buf->ptr, buf->end, &leblen);
+  if (leblen <= 0) buf->ptr = buf->end; // force failure
+  else buf->ptr += leblen;
+  return val;
+}
+
 // Read a 64-bit unsigned int, advancing the buffer
 uint64_t read_u64(buffer_t* buf) {
   ssize_t len = 0;
