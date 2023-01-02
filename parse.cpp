@@ -141,71 +141,67 @@ void WasmModule::decode_type_section(buffer_t &buf, uint32_t len) {
 void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
   uint32_t num_imports = RD_U32();
 
+  ImportInfo *info = &this->imports;
   for (uint32_t i = 0; i < num_imports; i++) {
     ImportDecl import;
     import.mod_name = RD_NAME();
     import.member_name = RD_NAME();
     import.kind = (wasm_kind_t) RD_BYTE();
-
     /* Populate the index space of respective kind */
     switch (import.kind) {
-      case KIND_FUNC: 
-        RD_U32();
+      case KIND_FUNC: {
+        info->num_funcs++;
+        FuncDecl func = {
+          .sig = get_list_elem<SigDecl>(this->sigs, RD_U32())
+        };
+        this->funcs.push_back(func);
+        import.desc.func = &this->funcs.back();
         break;
         //FuncDecl f = { .sig
         //this->funcs.push_back(import.desc.
         //import.desc.func = &this->funcs.back();
-
-      case KIND_TABLE:
+      }
+      case KIND_TABLE: {
+        info->num_tables++;
         read_tabletype(buf);
         break;
-      case KIND_MEMORY:
+      }
+      case KIND_MEMORY: {
+        info->num_memories++;
         read_memtype(buf);
         break;
-      case KIND_GLOBAL:
+      }
+      case KIND_GLOBAL: {
+        info->num_tables++;
         read_globaltype(buf);
         break;
-
-      default:
+      }
+      default: {
         ERR("Import kind: %u\n", import.kind);
         throw std::runtime_error("Invalid import type");
+      }
     }
 
-    this->imports.push_back(import);
+    info->list.push_back(import);
   }
 
 }
 
 void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
-  buf.ptr += len;
-//  uint32_t num_funcs = read_u32leb(buf);
-//  
-//  uint32_t num_imports = module->num_imports;
-//  MALLOC(funcs, wasm_func_decl_t, num_imports + num_funcs);
-//
-//  ALLOC_STR(s);
-//  for (uint32_t i = 0; i < num_imports; i++) {
-//    wasm_func_decl_t *func = &funcs[i];
-//    func->sig_index = module->imports[i].index;
-//    func->sig = &module->sigs[func->sig_index];
-//  }
-//  for (uint32_t i = 0; i < num_funcs; i++) {
-//    wasm_func_decl_t *func = &funcs[i + num_imports];
-//    APPEND_TAB(s);
-//
-//    /* Get signature idx */
-//    uint32_t idx = read_u32leb(buf);
-//    APPEND_STR_U32(s, idx);
-//    func->sig_index = idx;
-//    func->sig = &module->sigs[idx];
-//    
-//    /* Print fn idx */
-//    FLUSH_STR(s);
-//  }
-//  DELETE_STR(s);
-//
-//  module->num_funcs = num_funcs;
-//  module->funcs = funcs;
+  uint32_t num_imports = this->imports.num_funcs;
+  if (num_imports != this->funcs.size()) {
+    throw std::runtime_error ("Malformed func section");
+  }
+
+  uint32_t num_funcs = RD_U32();
+  for (uint32_t i = 0; i < num_funcs; i++) {
+    /* Get signature idx */
+    uint32_t idx = RD_U32();
+    FuncDecl func = {
+      .sig = get_list_elem<SigDecl>(this->sigs, idx)
+    };
+    this->funcs.push_back(func);
+  }
 }
 
 
@@ -234,11 +230,12 @@ void WasmModule::decode_table_section (buffer_t &buf, uint32_t len) {
 
 void WasmModule::decode_memory_section (buffer_t &buf, uint32_t len) {
   uint32_t num_mems = RD_U32();
-  if (num_mems != 1) {
+  MemoryDecl mem = read_memtype(buf);
+  if ((num_mems == 1) && this->mems.empty()) {
+    this->mems.push_back(mem);
+  } else {
     throw std::runtime_error("Memory component has to be 1!");
   }
-  MemoryDecl mem = read_memtype(buf);
-  this->mems.push_back(mem);
 }
 
 

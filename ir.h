@@ -39,7 +39,9 @@ struct SigDecl {
 
 
 struct FuncDecl {
+  /* From func/import section */
   SigDecl* sig;
+  /* From code section */
   typearr pure_locals;
   const byte* code_start;
   const byte* code_end;
@@ -54,6 +56,7 @@ struct TableDecl {
 };
 
 struct GlobalDecl {
+  bool is_import;
   wasm_type_t type;
   unsigned is_mutable : 1;
   const byte* init_expr_start;
@@ -94,13 +97,21 @@ struct ImportDecl {
   Descriptor desc;
 };
 
+struct ImportInfo {
+  std::list <ImportDecl> list;
+  uint32_t num_funcs;
+  uint32_t num_tables;
+  uint32_t num_memories;
+  uint32_t num_globals;
+};
+
 /* Section */
 struct WasmModule {
   uint32_t version;
 
   std::list <CustomDecl>  customs;
   std::list <SigDecl>     sigs;
-  std::list <ImportDecl>  imports;
+  ImportInfo              imports;
   /* Func space */
   std::list <FuncDecl>    funcs;
   /* Table space */

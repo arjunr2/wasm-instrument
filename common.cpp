@@ -143,6 +143,26 @@ uint64_t read_u64(buffer_t* buf) {
   return val;
 }
 
+
+// Read an unsigned 8-bit byte, advancing the buffer.
+uint8_t read_u8(buffer_t* buf) {
+  if (buf->ptr >= buf->end) {
+    ERR("u8 read out of bounds");
+    return 0;
+  }
+  byte val = *buf->ptr;
+  buf->ptr++;
+  return val;
+}
+
+// Read an unsigned 32-bit byte, advancing the buffer.
+uint32_t read_u32(buffer_t* buf) {
+  ssize_t len;
+  uint32_t val = decode_u32(buf->ptr, buf->ptr + 4, &len);
+  buf->ptr += 4;
+  return val;
+}
+
 // Read a name, advancing the buffer (len + string)
 std::string read_name(buffer_t* buf) {
   uint32_t sz = read_u32leb(buf);
@@ -167,27 +187,6 @@ bytearr read_bytes(buffer_t* buf, uint32_t num_bytes) {
   buf->ptr += num_bytes;
   return bytes;
 }
-
-
-// Read an unsigned 8-bit byte, advancing the buffer.
-uint8_t read_u8(buffer_t* buf) {
-  if (buf->ptr >= buf->end) {
-    ERR("u8 read out of bounds");
-    return 0;
-  }
-  byte val = *buf->ptr;
-  buf->ptr++;
-  return val;
-}
-
-// Read an unsigned 32-bit byte, advancing the buffer.
-uint32_t read_u32(buffer_t* buf) {
-  ssize_t len;
-  uint32_t val = decode_u32(buf->ptr, buf->ptr + 4, &len);
-  buf->ptr += 4;
-  return val;
-}
-
 
 ssize_t unload_file(uint8_t** start, uint8_t** end) {
   free(*start);
