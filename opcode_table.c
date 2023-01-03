@@ -1,5 +1,5 @@
 /* C file for designated initializers */
-#include "wasmdefs.h"
+#include "wasmops.h"
 
 /* Table of one-byte opcode */
 opcode_entry_t opcode_table[256] = {

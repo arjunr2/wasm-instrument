@@ -108,8 +108,9 @@ static uint32_t decode_const_off_expr(buffer_t &buf) {
   return offset;
 }
 
-// TODO: Init exprs
-static void decode_init_expr(buffer_t &buf) {
+// TODO: Init exprs (just return bytes right now)
+static bytearr decode_init_expr(buffer_t &buf) {
+  const byte* startp = buf.ptr;
   byte opcode = RD_BYTE();
   switch (opcode) {
     case WASM_OP_I32_CONST: {
@@ -138,7 +139,8 @@ static void decode_init_expr(buffer_t &buf) {
   if (end != WASM_OP_END) {
     throw std::runtime_error("Malformed end in init_expr");
   }
-
+  const byte* endp = buf.ptr;
+  return bytearr(startp, endp);
 }
 
 
@@ -548,6 +550,8 @@ static wasm_localcsv_t decode_locals(buffer_t &buf) {
   return csv;
 }
 
+
+
 /* Gets run after function section; in order */
 void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
   uint32_t num_fn = RD_U32();
@@ -561,8 +565,10 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
 
     /* Local section */
     func.pure_locals = decode_locals(buf);
+    
     /* TODO: Fn body expr */
-    while (buf.ptr != end_fn) { RD_BYTE(); }
+    const byte* start_fn = buf.ptr;
+    func.code_bytes = RD_BYTESTR(end_fn - start_fn);
     std::advance (func_itr, 1);
   }
 }
@@ -577,7 +583,7 @@ void WasmModule::decode_global_section(buffer_t &buf, uint32_t len) {
   uint32_t num_globs = RD_U32();
   for (uint32_t i = 0; i < num_globs; i++) {
     GlobalDecl global = read_globaltype(buf);
-    decode_init_expr(buf);
+    global.init_expr_bytes = decode_init_expr(buf);
     this->globals.push_back(global);
   }
 }

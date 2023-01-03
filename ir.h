@@ -6,11 +6,14 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <memory>
 
 #include "common.h"
 #include "wasmdefs.h"
 
 typedef std::list<wasm_type_t> typelist;
+//typedef std::shared_ptr<InstBase> InstBasePtr;
+//typedef std::list<InstBasePtr> InstList;
 
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
@@ -49,8 +52,7 @@ struct FuncDecl {
   SigDecl* sig;
   /* From code section */
   wasm_localcsv_t pure_locals;
-  const byte* code_start;
-  const byte* code_end;
+  bytearr code_bytes;
 };
 
 struct MemoryDecl {
@@ -64,8 +66,7 @@ struct TableDecl {
 struct GlobalDecl {
   wasm_type_t type;
   unsigned is_mutable : 1;
-  const byte* init_expr_start;
-  const byte* init_expr_end;
+  bytearr init_expr_bytes;
 };
 
 struct DataDecl {

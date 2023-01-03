@@ -1,4 +1,5 @@
 #pragma once
+/* Must be a C-compatible header for designated init */
 
 /* Opcode constants: 172 */
 #define WASM_OP_UNREACHABLE		0x00 /* "unreachable" */
@@ -200,3 +201,37 @@
 #define WASM_OP_BR_ON_NULL		0xD4 /* "br_on_null", ImmSigs.LABEL */
 #define WASM_OP_REF_EQ			0xD5 /* "ref.eq", ImmSigs.NONE */
 #define WASM_OP_BR_ON_NON_NULL		0xD6 /* "br_on_non_null", ImmSigs.LABEL */
+
+
+/* Opcode immediate types */
+typedef enum {
+  IMM_NONE = 0,
+  IMM_BLOCKT,
+  IMM_LABEL,
+  IMM_LABELS,
+  IMM_FUNC,
+  IMM_SIG_TABLE,
+  IMM_LOCAL,
+  IMM_GLOBAL,
+  IMM_TABLE,
+  IMM_MEMARG,
+  IMM_I32,
+  IMM_F64,
+  IMM_MEMORY,
+  IMM_TAG,
+  IMM_I64,
+  IMM_F32,
+  IMM_REFNULLT,
+  IMM_VALTS
+} opcode_imm_type;
+
+/* Information associated with each opcode */
+typedef struct {
+  const char*       mnemonic;
+  opcode_imm_type   imm_type;
+  int               invalid;
+} opcode_entry_t;
+
+/* Defined in C file so we can use designated initializers */
+extern opcode_entry_t opcode_table[256];
+
