@@ -8,19 +8,6 @@
 #define FN_MAX_SIZE 1048576
 #define BYTES_PER_LINE 32
 
-/*** Parsing macros ***/
-#define RD_U32()        read_u32leb(&buf)
-#define RD_I32()        read_i32leb(&buf)
-#define RD_U64()        read_u64leb(&buf)
-#define RD_I64()        read_i64leb(&buf)
-#define RD_NAME()       read_name(&buf)
-#define RD_BYTESTR(len) read_bytes(&buf, len)
-
-#define RD_BYTE()       read_u8(&buf)
-#define RD_U32_RAW()    read_u32(&buf)
-#define RD_U64_RAW()    read_u64(&buf)
-/********************/
-
 
 /**********************/
 //static uint32_t construct_u32leb4(uint32_t val) {
@@ -31,7 +18,6 @@
 //  *(((byte*)(&new_val)) + 3)  = 0x80 | ((val >> 21) & 0x7F);
 //  return new_val;
 //}
-
 
 
 /* Read LimitsType */
@@ -551,6 +537,10 @@ static wasm_localcsv_t decode_locals(buffer_t &buf) {
 }
 
 
+static InstList decode_expr_to_insts (buffer_t &buf) {
+  InstList ilist = { };
+  return ilist;
+}
 
 /* Gets run after function section; in order */
 void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
@@ -561,14 +551,15 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
     FuncDecl &func = *func_itr;
     /* Fn size (locals + body) */
     uint32_t size = RD_U32();
-    const byte* end_fn = buf.ptr + size;
+    const byte* end_insts = buf.ptr + size;
 
     /* Local section */
     func.pure_locals = decode_locals(buf);
     
-    /* TODO: Fn body expr */
-    const byte* start_fn = buf.ptr;
-    func.code_bytes = RD_BYTESTR(end_fn - start_fn);
+    /* Fn body expr bytes */
+    const byte* start_insts = buf.ptr;
+    func.instructions = decode_expr_to_insts(buf);
+    func.code_bytes = RD_BYTESTR(end_insts - start_insts);
     std::advance (func_itr, 1);
   }
 }
@@ -640,8 +631,23 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
 
 
 
-void decode_sections(WasmModule &module, buffer_t &buf) {
+void WasmModule::decode_buffer(buffer_t &buf) {
 
+  /* Magic number & Version */
+  uint32_t magic = RD_U32_RAW();
+  if (magic != WASM_MAGIC) {
+    throw std::runtime_error("Parse | Wasm Magic Value");
+  }
+
+  uint32_t version = RD_U32_RAW();
+  if (version != WASM_VERSION) {
+    throw std::runtime_error("Parse | Wasm Version");
+  }
+
+  this->magic = magic;
+  this->version = version;
+
+  /* Decode sections */
   while (buf.ptr < buf.end) {
     wasm_section_t section_id = (wasm_section_t) RD_BYTE();
     uint32_t len = RD_U32();
@@ -649,7 +655,7 @@ void decode_sections(WasmModule &module, buffer_t &buf) {
     TRACE("Found section \"%s\", len: %d\n", wasm_section_name(section_id), len);
 
     buffer_t cbuf = {buf.ptr, buf.ptr, buf.ptr + len};
-    #define DECODE_CALL(sec)  module.decode_##sec##_section (cbuf, len); break;
+    #define DECODE_CALL(sec)  this->decode_##sec##_section (cbuf, len); break;
     switch (section_id) {
       case WASM_SECT_TYPE:     DECODE_CALL(type); 
       case WASM_SECT_IMPORT:   DECODE_CALL(import); 
@@ -666,7 +672,7 @@ void decode_sections(WasmModule &module, buffer_t &buf) {
       case WASM_SECT_CUSTOM:   DECODE_CALL(custom); 
       default:
         ERR("Unknown section id: %u\n", section_id);
-        return;
+        throw std::runtime_error("Section parsing error");
     }
 
     if (cbuf.ptr != cbuf.end) {
@@ -675,7 +681,7 @@ void decode_sections(WasmModule &module, buffer_t &buf) {
           cbuf.start - buf.start, 
           cbuf.ptr - buf.start, 
           cbuf.end - buf.start);
-      return;
+      throw std::runtime_error("Section parsing error");
     }
     // Advance section
     buf.ptr = cbuf.ptr;
@@ -684,7 +690,7 @@ void decode_sections(WasmModule &module, buffer_t &buf) {
 
 
 /* Main Parse routine */
-WasmModule parse_bytecode(const byte* start, const byte* end) {
+WasmModule parse_bytecode(const byte* start, const byte* end, bool gen_cfg = true) {
   
   WasmModule module = {};
 
@@ -696,20 +702,8 @@ WasmModule parse_bytecode(const byte* start, const byte* end) {
     throw std::runtime_error("Empty bytecode");
   }
 
-  /* Magic number & Version */
-  uint32_t magic = RD_U32_RAW();
-  if (magic != WASM_MAGIC) {
-    throw std::runtime_error("Parse | Wasm Magic Value");
-  }
-
-  uint32_t version = RD_U32_RAW();
-  if (version != WASM_VERSION) {
-    throw std::runtime_error("Parse | Wasm Version");
-  }
-
-  module.version = version;
-
-  decode_sections(module, buf);
+  /* Decode entire module elements */
+  module.decode_buffer(buf);
   
   /* Has to match exactly */
   if (buf.ptr != buf.end) {

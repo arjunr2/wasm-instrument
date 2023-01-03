@@ -9,6 +9,19 @@
 typedef uint8_t byte;
 typedef std::vector<byte> bytearr;
 
+/*** Parsing macros ***/
+#define RD_U32()        read_u32leb(&buf)
+#define RD_I32()        read_i32leb(&buf)
+#define RD_U64()        read_u64leb(&buf)
+#define RD_I64()        read_i64leb(&buf)
+#define RD_NAME()       read_name(&buf)
+#define RD_BYTESTR(len) read_bytes(&buf, len)
+
+#define RD_BYTE()       read_u8(&buf)
+#define RD_U32_RAW()    read_u32(&buf)
+#define RD_U64_RAW()    read_u64(&buf)
+/********************/
+
 // Limit file size to something reasonable.
 #define MAX_FILE_SIZE 2000000000
 

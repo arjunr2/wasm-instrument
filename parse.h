@@ -3,4 +3,4 @@
 #include "common.h"
 #include "ir.h"
 
-WasmModule parse_bytecode(const byte* start, const byte* end);
+WasmModule parse_bytecode(const byte* start, const byte* end, bool gen_cfg = true);

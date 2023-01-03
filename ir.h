@@ -11,9 +11,11 @@
 #include "common.h"
 #include "wasmdefs.h"
 
+class InstBase;
+typedef std::shared_ptr<InstBase> InstBasePtr;
+typedef std::list<InstBasePtr> InstList;
+
 typedef std::list<wasm_type_t> typelist;
-//typedef std::shared_ptr<InstBase> InstBasePtr;
-//typedef std::list<InstBasePtr> InstList;
 
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
@@ -53,6 +55,9 @@ struct FuncDecl {
   /* From code section */
   wasm_localcsv_t pure_locals;
   bytearr code_bytes;
+  /* Code: Raw static instructions */ 
+  InstList instructions;
+  /* CFG for function */
 };
 
 struct MemoryDecl {
@@ -113,64 +118,71 @@ struct ImportInfo {
 
 
 /* Section */
-struct WasmModule {
-  uint32_t version;
+class WasmModule {
+  private:
+    uint32_t magic;
+    uint32_t version;
 
-  std::list <CustomDecl>  customs;
-  std::list <SigDecl>     sigs;
-  ImportInfo              imports;
-  /* Func space */
-  std::list <FuncDecl>    funcs;
-  /* Table space */
-  std::list <TableDecl>   tables;
-  /* Mem space */
-  std::list <MemoryDecl>  mems;
-  /* Global space */
-  std::list <GlobalDecl>  globals;
-  std::list <ExportDecl>  exports;
-  std::list <ElemDecl>    elems;
-  std::list <DataDecl>    datas;
+    std::list <CustomDecl>  customs;
+    std::list <SigDecl>     sigs;
+    ImportInfo              imports;
+    /* Func space */
+    std::list <FuncDecl>    funcs;
+    /* Table space */
+    std::list <TableDecl>   tables;
+    /* Mem space */
+    std::list <MemoryDecl>  mems;
+    /* Global space */
+    std::list <GlobalDecl>  globals;
+    std::list <ExportDecl>  exports;
+    std::list <ElemDecl>    elems;
+    std::list <DataDecl>    datas;
 
-  /* Start section */
-  uint32_t start_idx;
-  int has_start;
+    /* Start section */
+    uint32_t start_idx;
+    int has_start;
 
-  /* Only for validation */
-  uint32_t num_datas;
-  int has_datacount;
+    /* Only for validation */
+    uint32_t num_datas;
+    int has_datacount;
 
+    /* Decode functions */
+    #define DECODE_DECL(sec)  \
+      void decode_##sec##_section (buffer_t &buf, uint32_t len);
+    DECODE_DECL(type);
+    DECODE_DECL(import);
+    DECODE_DECL(function);
+    DECODE_DECL(table);
+    DECODE_DECL(memory);
+    DECODE_DECL(global);
+    DECODE_DECL(export);
+    DECODE_DECL(start);
+    DECODE_DECL(element);
+    DECODE_DECL(code);
+    DECODE_DECL(data);
+    DECODE_DECL(datacount);
+    DECODE_DECL(custom);
 
-  #define DECODE_DECL(sec)  \
-    void decode_##sec##_section (buffer_t &buf, uint32_t len);
-  DECODE_DECL(type);
-  DECODE_DECL(import);
-  DECODE_DECL(function);
-  DECODE_DECL(table);
-  DECODE_DECL(memory);
-  DECODE_DECL(global);
-  DECODE_DECL(export);
-  DECODE_DECL(start);
-  DECODE_DECL(element);
-  DECODE_DECL(code);
-  DECODE_DECL(data);
-  DECODE_DECL(datacount);
-  DECODE_DECL(custom);
+    /* Encode functions */
+    #define ENCODE_DECL(sec)  \
+      void encode_##sec##_section (buffer_t &buf, uint32_t len);
+    ENCODE_DECL(type);
+    ENCODE_DECL(import);
+    ENCODE_DECL(function);
+    ENCODE_DECL(table);
+    ENCODE_DECL(memory);
+    ENCODE_DECL(global);
+    ENCODE_DECL(export);
+    ENCODE_DECL(start);
+    ENCODE_DECL(element);
+    ENCODE_DECL(code);
+    ENCODE_DECL(data);
+    ENCODE_DECL(datacount);
+    ENCODE_DECL(custom);
 
-  #define ENCODE_DECL(sec)  \
-    void encode_##sec##_section (buffer_t &buf, uint32_t len);
-  ENCODE_DECL(type);
-  ENCODE_DECL(import);
-  ENCODE_DECL(function);
-  ENCODE_DECL(table);
-  ENCODE_DECL(memory);
-  ENCODE_DECL(global);
-  ENCODE_DECL(export);
-  ENCODE_DECL(start);
-  ENCODE_DECL(element);
-  ENCODE_DECL(code);
-  ENCODE_DECL(data);
-  ENCODE_DECL(datacount);
-  ENCODE_DECL(custom);
+  public:
+    /* Decode wasm file from buffer */
+    void decode_buffer (buffer_t &buf);
 };
 
 
