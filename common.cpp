@@ -52,7 +52,7 @@ int64_t decode_i64leb(const uint8_t* ptr, const uint8_t* limit, ssize_t *len) {
 }
 
 uint64_t decode_u64leb(const uint8_t* ptr, const uint8_t* limit, ssize_t *len) {
-  BODY(int64_t, 0xFF, 0x01);
+  BODY(uint64_t, 0xFF, 0x01);
 }
 
 uint32_t decode_u32(const uint8_t* ptr, const uint8_t* limit, ssize_t *len) {

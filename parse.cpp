@@ -538,7 +538,8 @@ static wasm_localcsv_t decode_locals(buffer_t &buf) {
 }
 
 
-static InstList decode_expr_to_insts (buffer_t &buf) {
+/* Code decoding for instructions: Calls internal instructions */
+InstList WasmModule::decode_expr_to_insts (buffer_t &buf) {
   InstList ilist = { };
   while (buf.ptr < buf.end) {
     byte opcode = RD_BYTE();
@@ -553,7 +554,7 @@ static InstList decode_expr_to_insts (buffer_t &buf) {
     InstBasePtr instptr;
     #define ICS(cs, clsname) \
       case cs:  \
-        instptr.reset(new clsname(opcode, buf)); break;
+        instptr.reset(new clsname((*this), opcode, buf)); break;
     switch (imm_type) {
       ICS (IMM_NONE, ImmNoneInst);
       ICS (IMM_BLOCKT, ImmBlocktInst);

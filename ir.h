@@ -180,6 +180,9 @@ class WasmModule {
     ENCODE_DECL(datacount);
     ENCODE_DECL(custom);
 
+    /* Code decoding for instructions */
+    InstList decode_expr_to_insts (buffer_t &buf);
+
   public:
     /* Decode wasm file from buffer */
     void decode_buffer (buffer_t &buf);

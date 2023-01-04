@@ -16,131 +16,132 @@ class InstBase {
 
 
 /* Immediate types intermediate class 
-* Decode immediate is performed within constructor
+* Decode immediate is performed within (module,byte,buf) constructor context
 * Encode immediate is a virtual method
 * */
 class ImmNoneInst : public InstBase {
   public:
-    ImmNoneInst (byte opcode, buffer_t &buf);
+    ImmNoneInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmBlocktInst: public InstBase {
-
+  int64_t type;
   public:
-    ImmBlocktInst (byte opcode, buffer_t &buf);
+    ImmBlocktInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmLabelInst: public InstBase {
-
+  uint32_t idx;
   public:
-    ImmLabelInst (byte opcode, buffer_t &buf);
+    ImmLabelInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmLabelsInst: public InstBase {
-
+  std::list<uint32_t> idxs;
+  uint32_t def_idx;
   public:
-    ImmLabelsInst (byte opcode, buffer_t &buf);
+    ImmLabelsInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmFuncInst: public InstBase {
-
+  FuncDecl* func;
   public:
-    ImmFuncInst (byte opcode, buffer_t &buf);
+    ImmFuncInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmSigTableInst: public InstBase {
 
   public:
-    ImmSigTableInst (byte opcode, buffer_t &buf);
+    ImmSigTableInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmLocalInst: public InstBase {
 
   public:
-    ImmLocalInst (byte opcode, buffer_t &buf);
+    ImmLocalInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmGlobalInst: public InstBase {
 
   public:
-    ImmGlobalInst (byte opcode, buffer_t &buf);
+    ImmGlobalInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmTableInst: public InstBase {
 
   public:
-    ImmTableInst (byte opcode, buffer_t &buf);
+    ImmTableInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmMemargInst: public InstBase {
 
   public:
-    ImmMemargInst (byte opcode, buffer_t &buf);
+    ImmMemargInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmI32Inst: public InstBase {
 
   public:
-    ImmI32Inst (byte opcode, buffer_t &buf);
+    ImmI32Inst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmF64Inst: public InstBase {
 
   public:
-    ImmF64Inst (byte opcode, buffer_t &buf);
+    ImmF64Inst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmMemoryInst: public InstBase {
 
   public:
-    ImmMemoryInst (byte opcode, buffer_t &buf);
+    ImmMemoryInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmTagInst: public InstBase {
 
   public:
-    ImmTagInst (byte opcode, buffer_t &buf);
+    ImmTagInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmI64Inst: public InstBase {
 
   public:
-    ImmI64Inst (byte opcode, buffer_t &buf);
+    ImmI64Inst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmF32Inst: public InstBase {
 
   public:
-    ImmF32Inst (byte opcode, buffer_t &buf);
+    ImmF32Inst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmRefnulltInst: public InstBase {
 
   public:
-    ImmRefnulltInst (byte opcode, buffer_t &buf);
+    ImmRefnulltInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmValtsInst: public InstBase {
 
   public:
-    ImmValtsInst (byte opcode, buffer_t &buf);
+    ImmValtsInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
