@@ -3,6 +3,7 @@
 
 #include "ir.h"
 #include "common.h"
+#include "inst_internal.h"
 
 
 #define FN_MAX_SIZE 1048576
@@ -539,6 +540,49 @@ static wasm_localcsv_t decode_locals(buffer_t &buf) {
 
 static InstList decode_expr_to_insts (buffer_t &buf) {
   InstList ilist = { };
+  while (buf.ptr < buf.end) {
+    byte opcode = RD_BYTE();
+    opcode_entry_t op_entry = opcode_table[opcode];
+    if (op_entry.invalid) {
+      ERR("Unimplemented opcode %d: %s\n", opcode, op_entry.mnemonic);
+      throw std::runtime_error("Unimplemented");
+    }
+
+    opcode_imm_type imm_type = opcode_table[opcode].imm_type;
+
+    InstBasePtr instptr;
+    #define ICS(cs, clsname) \
+      case cs:  \
+        instptr.reset(new clsname(opcode, buf)); break;
+    switch (imm_type) {
+      ICS (IMM_NONE, ImmNoneInst);
+      ICS (IMM_BLOCKT, ImmBlocktInst);
+      ICS (IMM_LABEL, ImmLabelInst);
+      ICS (IMM_LABELS, ImmLabelsInst);
+      ICS (IMM_FUNC, ImmFuncInst);
+      ICS (IMM_SIG_TABLE, ImmSigTableInst);
+      ICS (IMM_LOCAL, ImmLocalInst);
+      ICS (IMM_GLOBAL, ImmGlobalInst);
+      ICS (IMM_TABLE, ImmTableInst);
+      ICS (IMM_MEMARG, ImmMemargInst);
+      ICS (IMM_I32, ImmI32Inst);
+      ICS (IMM_F64, ImmF64Inst);
+      ICS (IMM_MEMORY, ImmMemoryInst);
+      ICS (IMM_TAG, ImmTagInst);
+      ICS (IMM_I64, ImmI64Inst);
+      ICS (IMM_F32, ImmF32Inst);
+      ICS (IMM_REFNULLT, ImmRefnulltInst);
+      ICS (IMM_VALTS, ImmValtsInst);
+      default:
+        ERR("Unknown imm type: %d\n", imm_type);
+        throw std::runtime_error("Unknown imm");
+    }
+    TRACE("O: %s\n", op_entry.mnemonic);
+  }
+  if (buf.ptr != buf.end) {
+    throw std::runtime_error("Unaligned end for instruction parsing\n");
+  }
+  TRACE("=== Function Parsed Successfully ===\n");
   return ilist;
 }
 
@@ -556,10 +600,12 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
     /* Local section */
     func.pure_locals = decode_locals(buf);
     
-    /* Fn body expr bytes */
     const byte* start_insts = buf.ptr;
-    func.instructions = decode_expr_to_insts(buf);
+    /* Fn body bytes and expr */
     func.code_bytes = RD_BYTESTR(end_insts - start_insts);
+    buffer_t cbuf = { start_insts, start_insts, end_insts };
+    func.instructions = decode_expr_to_insts(cbuf);
+
     std::advance (func_itr, 1);
   }
 }

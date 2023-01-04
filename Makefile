@@ -7,7 +7,7 @@ CFLAGS =
 CPPFLAGS = -g
 
 SRC_C = opcode_table.c
-SRC_CPP = common.cpp ir.cpp main.cpp parse.cpp
+SRC_CPP = common.cpp ir.cpp main.cpp parse.cpp inst_internal.cpp
 
 SRC_O = $(addprefix build/, $(SRC_C:.c=.o) $(SRC_CPP:.cpp=.o))
 
