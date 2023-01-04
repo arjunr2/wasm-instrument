@@ -174,7 +174,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
         info.num_funcs++;
         uint32_t idx = RD_U32();
         FuncDecl func = {
-          .sig = get_list_elem <SigDecl>(this->sigs, idx)
+          .sig = GET_LIST_ELEM(this->sigs, idx)
         };
         funcs.push_back(func);
         import.desc.func = &funcs.back();
@@ -223,7 +223,7 @@ void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
     /* Get signature idx */
     uint32_t idx = RD_U32();
     FuncDecl func = {
-      .sig = get_list_elem <SigDecl>(this->sigs, RD_U32())
+      .sig = GET_LIST_ELEM(this->sigs, idx)
     };
     this->funcs.push_back(func);
   }
@@ -267,16 +267,16 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
     /* Export descriptor */
     switch (exp.kind) {
       case KIND_FUNC:
-        exp.desc.func = get_list_elem <FuncDecl>(this->funcs, idx);
+        exp.desc.func = GET_LIST_ELEM(this->funcs, idx);
         break;
       case KIND_TABLE:
-        exp.desc.table = get_list_elem <TableDecl>(this->tables, idx);
+        exp.desc.table = GET_LIST_ELEM(this->tables, idx);
         break;
       case KIND_MEMORY:
-        exp.desc.mem = get_list_elem <MemoryDecl>(this->mems, idx);
+        exp.desc.mem = GET_LIST_ELEM(this->mems, idx);
         break;
       case KIND_GLOBAL:
-        exp.desc.global = get_list_elem <GlobalDecl>(this->globals, idx);
+        exp.desc.global = GET_LIST_ELEM(this->globals, idx);
         break;
       default: {
         ERR("Export kind: %u\n", exp.kind);
@@ -318,7 +318,7 @@ void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
     uint32_t num_idxs = RD_U32();
     for (uint32_t i = 0; i < num_idxs; i++) {
       uint32_t fn_idx = RD_U32();
-      FuncDecl* fptr = get_list_elem <FuncDecl>(this->funcs, fn_idx);
+      FuncDecl* fptr = GET_LIST_ELEM(this->funcs, fn_idx);
       elem.func_indices.push_back(fptr);
     }
 
@@ -522,18 +522,20 @@ void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
 //}
 
 
-static wasm_localcsv_t decode_locals(buffer_t &buf) {
+static wasm_localcsv_t decode_locals(buffer_t &buf, uint32_t &num_locals) {
   /* Write num local elements */
   uint32_t num_localcse = RD_U32();
   
-  uint32_t num_locals = 0;
+  uint32_t total_ct = 0;
   wasm_localcsv_t csv;
   for (uint32_t i = 0; i < num_localcse; i++) {
     uint32_t count = RD_U32();
     wasm_type_t type = (wasm_type_t) RD_BYTE();
     wasm_localcse_t cse = { .count = count, .type = type };
     csv.push_back(cse);
+    total_ct += count;
   }
+  num_locals = total_ct;
   return csv;
 }
 
@@ -599,7 +601,7 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
     const byte* end_insts = buf.ptr + size;
 
     /* Local section */
-    func.pure_locals = decode_locals(buf);
+    func.pure_locals = decode_locals(buf, func.num_pure_locals);
     
     const byte* start_insts = buf.ptr;
     /* Fn body bytes and expr */

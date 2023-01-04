@@ -21,6 +21,12 @@ typedef std::vector<byte> bytearr;
 #define RD_U32_RAW()    read_u32(&buf)
 #define RD_U64_RAW()    read_u64(&buf)
 /********************/
+/*** Access macros ***/
+#define GET_LIST_ELEM(ll, idx) ({ \
+  auto it = std::next(ll.begin(), idx); \
+  &(*it);  \
+})
+/********************/
 
 // Limit file size to something reasonable.
 #define MAX_FILE_SIZE 2000000000

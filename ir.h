@@ -54,6 +54,7 @@ struct FuncDecl {
   SigDecl* sig;
   /* From code section */
   wasm_localcsv_t pure_locals;
+  uint32_t num_pure_locals;
   bytearr code_bytes;
   /* Code: Raw static instructions */ 
   InstList instructions;

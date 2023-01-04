@@ -55,14 +55,15 @@ class ImmFuncInst: public InstBase {
 
 
 class ImmSigTableInst: public InstBase {
-
+  SigDecl* sig;
+  FuncDecl* func;
   public:
     ImmSigTableInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmLocalInst: public InstBase {
-
+  uint32_t idx;
   public:
     ImmLocalInst (WasmModule &module, byte opcode, buffer_t &buf);
 };

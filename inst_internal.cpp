@@ -29,6 +29,11 @@ ImmLabelsInst::ImmLabelsInst (WasmModule &module, byte opcode, buffer_t &buf)
 }
 
 
+#define PTR_FROM_IDX(type, arr) ({ \
+  uint32_t idx = RD_U32();  \
+  get_list_elem<type>(arr, idx);  \
+});
+
 ImmFuncInst::ImmFuncInst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
   uint32_t fn_idx = RD_U32();
@@ -37,8 +42,8 @@ ImmFuncInst::ImmFuncInst (WasmModule &module, byte opcode, buffer_t &buf)
 
 ImmSigTableInst::ImmSigTableInst (WasmModule &module, byte opcode, buffer_t &buf)
   : InstBase(opcode) {
-  RD_U32();
-  RD_U32();
+  uint32_t sig_idx = RD_U32();
+  uint32_t fn_idx = RD_U32();
 }
 
 
