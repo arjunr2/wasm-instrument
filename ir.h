@@ -185,6 +185,16 @@ class WasmModule {
     InstList decode_expr_to_insts (buffer_t &buf);
 
   public:
+    /* Accessors */
+    inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }
+    inline FuncDecl* getFunc(uint32_t idx)      { return GET_LIST_ELEM(this->funcs, idx); }
+    inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_LIST_ELEM(this->globals, idx); }
+    inline TableDecl* getTable(uint32_t idx)    { return GET_LIST_ELEM(this->tables, idx); }
+    inline MemoryDecl* getMemory(uint32_t idx)  { 
+      if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
+      return GET_LIST_ELEM(this->mems, idx); 
+    }
+
     /* Decode wasm file from buffer */
     void decode_buffer (buffer_t &buf);
 };

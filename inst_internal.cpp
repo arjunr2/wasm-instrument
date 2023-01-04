@@ -1,4 +1,5 @@
 #include "inst_internal.h"
+#include <cstring>
 
 ImmNoneInst::ImmNoneInst (WasmModule &module, byte opcode, buffer_t &buf)
                           : InstBase(opcode) { }
@@ -29,91 +30,87 @@ ImmLabelsInst::ImmLabelsInst (WasmModule &module, byte opcode, buffer_t &buf)
 }
 
 
-#define PTR_FROM_IDX(type, arr) ({ \
-  uint32_t idx = RD_U32();  \
-  get_list_elem<type>(arr, idx);  \
-});
-
 ImmFuncInst::ImmFuncInst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  uint32_t fn_idx = RD_U32();
+  this->func = module.getFunc (RD_U32());
 }
 
 
 ImmSigTableInst::ImmSigTableInst (WasmModule &module, byte opcode, buffer_t &buf)
-  : InstBase(opcode) {
-  uint32_t sig_idx = RD_U32();
-  uint32_t fn_idx = RD_U32();
+    : InstBase(opcode) {
+  this->sig = module.getSig (RD_U32());
+  this->func = module.getFunc (RD_U32());
 }
 
 
 ImmLocalInst::ImmLocalInst (WasmModule &module, byte opcode, buffer_t &buf)
-  : InstBase(opcode) {
-  RD_U32();
+    : InstBase(opcode) {
+  this->idx = RD_U32();
 }
 
 
 ImmGlobalInst::ImmGlobalInst (WasmModule &module, byte opcode, buffer_t &buf)
-  : InstBase(opcode) {
-  RD_U32();
+    : InstBase(opcode) {
+  this->global = module.getGlobal (RD_U32());
 }
 
 
 ImmTableInst::ImmTableInst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  RD_U32();
+  this->table = module.getTable (RD_U32());
 }
 
 
 ImmMemargInst::ImmMemargInst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  RD_U32();
-  RD_U32();
+  this->align = RD_U32();
+  this->offset = RD_U32();
 }
 
 
 ImmI32Inst::ImmI32Inst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  RD_I32();
+  this->value = RD_I32();
 }
 
 
 ImmF64Inst::ImmF64Inst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  RD_U64_RAW();
+  uint64_t rawbits = RD_U64_RAW();
+  memcpy(&this->value, &rawbits, sizeof(double));
 }
 
 
 ImmMemoryInst::ImmMemoryInst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  byte val = RD_BYTE();
-  if (val) {
-    throw std::runtime_error("Memory Immediate must be 0\n");
-  }
+  this->mem = module.getMemory (RD_U32());
 }
 
 /* Unimplemented */
 ImmTagInst::ImmTagInst (WasmModule &module, byte opcode, buffer_t &buf)
-    : InstBase(opcode) {
-
-}
+    : InstBase(opcode) {}
 
 
 ImmI64Inst::ImmI64Inst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  RD_I64();
+  this->value = RD_I64();
 }
 
 
 ImmF32Inst::ImmF32Inst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  RD_U32_RAW();
+  uint32_t rawbits = RD_U32_RAW();
+  memcpy(&this->value, &rawbits, sizeof(float));
 }
 
 
 ImmRefnulltInst::ImmRefnulltInst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
-  RD_BYTE();
+  wasm_type_t type = (wasm_type_t) RD_BYTE();
+  if (!isReftype(type)) {
+    throw std::runtime_error("RefNull instruction must take a reftype\n");
+  }
+  this->type = (wasm_type_t) type;
 }
 
 
@@ -121,7 +118,8 @@ ImmValtsInst::ImmValtsInst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
   uint32_t num_vals = RD_U32();
   for (uint32_t i = 0; i < num_vals; i++) {
-    RD_BYTE();
+    wasm_type_t type = (wasm_type_t) RD_BYTE();
+    this->types.push_back(type);
   }
 }
 

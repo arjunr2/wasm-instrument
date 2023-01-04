@@ -70,47 +70,49 @@ class ImmLocalInst: public InstBase {
 
 
 class ImmGlobalInst: public InstBase {
-
+  GlobalDecl* global;
   public:
     ImmGlobalInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmTableInst: public InstBase {
-
+  TableDecl* table;
   public:
     ImmTableInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmMemargInst: public InstBase {
-
+  uint32_t align;
+  uint32_t offset;
   public:
     ImmMemargInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmI32Inst: public InstBase {
-
+  uint32_t value;
   public:
     ImmI32Inst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmF64Inst: public InstBase {
-
+  double value;
   public:
     ImmF64Inst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmMemoryInst: public InstBase {
-
+  MemoryDecl* mem;
   public:
     ImmMemoryInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
+/* Unimplemented */
 class ImmTagInst: public InstBase {
 
   public:
@@ -119,28 +121,28 @@ class ImmTagInst: public InstBase {
 
 
 class ImmI64Inst: public InstBase {
-
+  int64_t value;  
   public:
     ImmI64Inst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmF32Inst: public InstBase {
-
+  float value;
   public:
     ImmF32Inst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmRefnulltInst: public InstBase {
-
+  wasm_type_t type;
   public:
     ImmRefnulltInst (WasmModule &module, byte opcode, buffer_t &buf);
 };
 
 
 class ImmValtsInst: public InstBase {
-
+  std::list<wasm_type_t> types;
   public:
     ImmValtsInst (WasmModule &module, byte opcode, buffer_t &buf);
 };

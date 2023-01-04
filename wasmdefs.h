@@ -57,5 +57,7 @@ typedef enum {
   KIND_GLOBAL = WASM_DESC_GLOBAL
 } wasm_kind_t;
 
-
+static inline bool isReftype(wasm_type_t type) { 
+  return (type == WASM_TYPE_EXTERNREF) || (type == WASM_TYPE_FUNCREF);
+}
 
