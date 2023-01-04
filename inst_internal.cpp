@@ -1,5 +1,5 @@
-#include "inst_internal.h"
 #include <cstring>
+#include "inst_internal.h"
 
 ImmNoneInst::ImmNoneInst (WasmModule &module, byte opcode, buffer_t &buf)
                           : InstBase(opcode) { }

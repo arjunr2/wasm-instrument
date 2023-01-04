@@ -706,19 +706,19 @@ void WasmModule::decode_buffer(buffer_t &buf) {
     buffer_t cbuf = {buf.ptr, buf.ptr, buf.ptr + len};
     #define DECODE_CALL(sec)  this->decode_##sec##_section (cbuf, len); break;
     switch (section_id) {
-      case WASM_SECT_TYPE:     DECODE_CALL(type); 
-      case WASM_SECT_IMPORT:   DECODE_CALL(import); 
-      case WASM_SECT_FUNCTION: DECODE_CALL(function); 
-      case WASM_SECT_TABLE:    DECODE_CALL(table); 
-      case WASM_SECT_MEMORY:   DECODE_CALL(memory); 
-      case WASM_SECT_GLOBAL:   DECODE_CALL(global); 
-      case WASM_SECT_EXPORT:   DECODE_CALL(export); 
-      case WASM_SECT_START:    DECODE_CALL(start); 
-      case WASM_SECT_ELEMENT:  DECODE_CALL(element);  
-      case WASM_SECT_CODE:     DECODE_CALL(code); 
-      case WASM_SECT_DATA:     DECODE_CALL(data); 
-      case WASM_SECT_DATACOUNT:DECODE_CALL(datacount); 
-      case WASM_SECT_CUSTOM:   DECODE_CALL(custom); 
+      case WASM_SECT_TYPE:      DECODE_CALL(type); 
+      case WASM_SECT_IMPORT:    DECODE_CALL(import); 
+      case WASM_SECT_FUNCTION:  DECODE_CALL(function); 
+      case WASM_SECT_TABLE:     DECODE_CALL(table); 
+      case WASM_SECT_MEMORY:    DECODE_CALL(memory); 
+      case WASM_SECT_GLOBAL:    DECODE_CALL(global); 
+      case WASM_SECT_EXPORT:    DECODE_CALL(export); 
+      case WASM_SECT_START:     DECODE_CALL(start); 
+      case WASM_SECT_ELEMENT:   DECODE_CALL(element);  
+      case WASM_SECT_CODE:      DECODE_CALL(code); 
+      case WASM_SECT_DATA:      DECODE_CALL(data); 
+      case WASM_SECT_DATACOUNT: DECODE_CALL(datacount); 
+      case WASM_SECT_CUSTOM:    DECODE_CALL(custom); 
       default:
         ERR("Unknown section id: %u\n", section_id);
         throw std::runtime_error("Section parsing error");
