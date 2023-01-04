@@ -63,7 +63,7 @@ ssize_t unload_file(uint8_t** start, uint8_t** end) {
 #define MORE(b) (((b) & 0x80) != 0)
 #define ERROR (len != NULL ? *len = -(ptr - start) : 0), 0
 
-#define BODY(type, mask, legal)						\
+#define DECODE_BODY(type, mask, legal)						\
   const uint8_t* start = ptr;						\
   type result = 0, shift = 0;						\
   while (ptr < limit) {							\
@@ -87,19 +87,19 @@ ssize_t unload_file(uint8_t** start, uint8_t** end) {
 
 
 int32_t decode_i32leb(const uint8_t* ptr, const uint8_t* limit, ssize_t *len) {
-  BODY(int32_t, 0xF8, 0x78);
+  DECODE_BODY(int32_t, 0xF8, 0x78);
 }
 
 uint32_t decode_u32leb(const uint8_t* ptr, const uint8_t* limit, ssize_t *len) {
-  BODY(uint32_t, 0xF8, 0x08);
+  DECODE_BODY(uint32_t, 0xF8, 0x08);
 }
 
 int64_t decode_i64leb(const uint8_t* ptr, const uint8_t* limit, ssize_t *len) {
-  BODY(int64_t, 0xFF, 0x7F);
+  DECODE_BODY(int64_t, 0xFF, 0x7F);
 }
 
 uint64_t decode_u64leb(const uint8_t* ptr, const uint8_t* limit, ssize_t *len) {
-  BODY(uint64_t, 0xFF, 0x01);
+  DECODE_BODY(uint64_t, 0xFF, 0x01);
 }
 
 uint32_t decode_u32(const uint8_t* ptr, const uint8_t* limit, ssize_t *len) {
@@ -218,3 +218,44 @@ bytearr read_bytes(buffer_t* buf, uint32_t num_bytes) {
   return bytes;
 }
 
+
+
+
+/*** Encode Operations ***/
+#define MORE_ENC()   b |= 0x80
+#define MORE_SIGNED(val, b) \
+  if ( !( ((val == 0) && !(b & 0x40)) || \
+          ((val == -1) && (b & 0x40)) )) \
+          { MORE_ENC(); }
+
+#define MORE_UNSIGNED(val, b)  \
+  if (val != 0) { MORE_ENC(); }
+
+
+#define ENCODE_BODY(sign)  \
+  bytearr result; \
+  result.reserve(11); \
+  byte b = 0xFF; \
+  while (b & 0x80) { \
+    b = val & 0x7F; \
+    val >>= 7;  \
+    MORE_##sign(val, b);  \
+    result.push_back(b);  \
+  } \
+  return result;
+
+bytearr encode_i32leb(int32_t val) {
+  ENCODE_BODY(SIGNED);
+}
+
+bytearr  encode_u32leb(uint32_t val) {
+  ENCODE_BODY(UNSIGNED);
+}
+
+bytearr encode_i64leb(int64_t val) {
+  ENCODE_BODY(SIGNED);
+}
+
+bytearr  encode_u64leb(uint64_t val) {
+  ENCODE_BODY(UNSIGNED);
+}
