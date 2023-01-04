@@ -233,29 +233,54 @@ bytearr read_bytes(buffer_t* buf, uint32_t num_bytes) {
 
 
 #define ENCODE_BODY(sign)  \
-  bytearr result; \
-  result.reserve(11); \
   byte b = 0xFF; \
   while (b & 0x80) { \
     b = val & 0x7F; \
     val >>= 7;  \
     MORE_##sign(val, b);  \
-    result.push_back(b);  \
+    bdeq.push_back(b);  \
   } \
-  return result;
 
-bytearr encode_i32leb(int32_t val) {
+void encode_i32leb (bytedeque &bdeq, int32_t val) {
   ENCODE_BODY(SIGNED);
 }
 
-bytearr  encode_u32leb(uint32_t val) {
+void encode_u32leb (bytedeque &bdeq, uint32_t val) {
   ENCODE_BODY(UNSIGNED);
 }
 
-bytearr encode_i64leb(int64_t val) {
+void encode_i64leb (bytedeque &bdeq, int64_t val) {
   ENCODE_BODY(SIGNED);
 }
 
-bytearr  encode_u64leb(uint64_t val) {
+void encode_u64leb (bytedeque &bdeq, uint64_t val) {
   ENCODE_BODY(UNSIGNED);
+}
+
+#define ENCODE_RAW(val) { \
+  char* addr = (char*) &val;  \
+  bdeq.insert(bdeq.end(), addr, addr + sizeof(val));  \
+}
+
+void encode_u8 (bytedeque &bdeq, uint8_t val) {
+  bdeq.push_back(val);
+}
+
+void encode_u32 (bytedeque &bdeq, uint32_t val) {
+  ENCODE_RAW(val);
+}
+
+void encode_u64 (bytedeque &bdeq, uint64_t val) {
+  ENCODE_RAW(val);
+}
+
+void encode_name (bytedeque &bdeq, std::string name) {
+  const char* addr = name.c_str();
+  uint32_t sz = name.size();
+  encode_u32leb(bdeq, sz);
+  bdeq.insert(bdeq.end(), addr, addr + sz);
+}
+
+void encode_bytes (bytedeque &bdeq, bytearr &bytes) {
+  bdeq.insert(bdeq.end(), bytes.begin(), bytes.end());
 }

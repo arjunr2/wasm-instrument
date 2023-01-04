@@ -3,12 +3,15 @@
 #include <stdbool.h>
 #include <sys/types.h>
 #include <string>
+#include <deque>
 #include <vector>
+#include <array>
 #include <list>
 
 /*** Generic used typedefs ***/
 typedef uint8_t byte;
 typedef std::vector<byte> bytearr;
+typedef std::deque<byte> bytedeque;
 /* Buffer for parsing/decoding */
 typedef struct {
   const byte* start;
@@ -39,6 +42,20 @@ extern int g_disassemble;
 #define RD_U32_RAW()    read_u32(&buf)
 #define RD_U64_RAW()    read_u64(&buf)
 /********************/
+
+/*** Encoding macros ***/
+#define WR_U32(val)        encode_u32leb(bdeq)
+#define WR_I32(val)        encode_i32leb(bdeq, val)
+#define WR_U64(val)        encode_u64leb(bdeq, val)
+#define WR_I64(val)        encode_i64leb(bdeq, val)
+#define WR_NAME(val)       encode_name(bdeq, val)
+#define WR_BYTESTR(val)    encode_bytes(bdeq, val)
+
+#define WR_BYTE(val)       encode_u8(bdeq, val)
+#define WR_U32_RAW(val)    encode_u32(bdeq, val)
+#define WR_U64_RAW(val)    encode_u64(bdeq, val)
+/********************/
+
 
 
 /*** Access macros ***/
@@ -95,3 +112,18 @@ bytearr read_bytes(buffer_t* buf, uint32_t num_bytes);
 
 
 /*** Encode Operations ***/
+
+/* Encode into LEB128 values, enforcing the specified signedness and maximum range.
+* Bit-width not necessary, but added for readability and params */
+void encode_i32leb (bytedeque &bdeq, int32_t val);
+void encode_u32leb (bytedeque &bdeq, uint32_t val);
+void encode_i64leb (bytedeque &bdeq, int32_t val);
+void encode_u64leb (bytedeque &bdeq, uint64_t val);
+
+/* Encode fixed size byte values */
+void encode_u8 (bytedeque &bdeq, uint8_t val);
+void encode_u32 (bytedeque &bdeq, uint32_t val);
+void encode_u64 (bytedeque &bdeq, uint64_t val);
+
+void encode_name (bytedeque &bdeq, std::string name);
+void encode_bytes (bytedeque &bdeq, bytearr &bytes);

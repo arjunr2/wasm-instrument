@@ -197,6 +197,8 @@ class WasmModule {
 
     /* Decode wasm file from buffer */
     void decode_buffer (buffer_t &buf);
+    /* Encode module into wasm format */
+    bytedeque encode_module ();
 };
 
 

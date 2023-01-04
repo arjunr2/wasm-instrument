@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
   TRACE("loaded %s: %ld bytes\n", filename, r);
   WasmModule module = parse_bytecode(start, end);
   unload_file(&start, &end);
+  bytedeque bq = module.encode_module();
   return 0;
 }
 
