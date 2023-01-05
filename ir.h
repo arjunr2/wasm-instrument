@@ -126,11 +126,11 @@ struct ImportInfo {
   std::list <ImportDecl> list;
   uint32_t num_funcs;
   uint32_t num_tables;
-  uint32_t num_memories;
+  uint32_t num_mems;
   uint32_t num_globals;
 
   inline uint32_t get_num_imports () {
-    return num_funcs + num_tables + num_memories + num_globals;
+    return num_funcs + num_tables + num_mems + num_globals;
   }
 };
 

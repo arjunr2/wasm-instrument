@@ -191,7 +191,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
         break;
       }
       case KIND_MEMORY: {
-        info.num_memories++;
+        info.num_mems++;
         MemoryDecl mem = read_memtype(buf);
         mem.import_idx = i;
         mems.push_back(mem);

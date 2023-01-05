@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include "encode.h"
 #include "ir.h"
 
@@ -52,9 +53,14 @@ void write_type_list (bytedeque &bdeq, typelist &tlist) {
 
 bytedeque WasmModule::encode_type_section() {
   bytedeque bdeq;
+  
+  auto sigs = this->sigs;
+  if (sigs.size() == 0) {
+    return {};
+  }
 
-  WR_U32 (this->sigs.size());
-  for (auto &sig : this->sigs) {
+  WR_U32 (sigs.size());
+  for (auto &sig : sigs) {
     WR_BYTE(WASM_TYPE_FUNC);
     /* For params */
     write_type_list (bdeq, sig.params);
@@ -71,6 +77,10 @@ bytedeque WasmModule::encode_import_section() {
   uint32_t total_imports = imports.get_num_imports();
   if (imports.list.size() != total_imports) {
     throw std::runtime_error ("Import list size and counts don't match\n");
+  }
+  
+  if (total_imports == 0) {
+    return {};
   }
 
   WR_U32(total_imports);
@@ -108,16 +118,63 @@ bytedeque WasmModule::encode_import_section() {
 
 bytedeque WasmModule::encode_function_section() {
   bytedeque bdeq;
+
+  ImportInfo &imports = this->imports;
+
+  auto &funcs = this->funcs;
+  uint32_t num_funcs = funcs.size() - imports.num_funcs;
+  if (num_funcs == 0) {
+    return {};
+  }
+
+  WR_U32 (num_funcs);
+  for (auto itr = std::next(funcs.begin(), imports.num_funcs);
+            itr != funcs.end(); ++itr) {
+    uint32_t idx = GET_LIST_IDX(this->sigs, itr->sig);
+    WR_U32 (idx);
+  }
   return bdeq;
 }
 
 bytedeque WasmModule::encode_table_section() {
   bytedeque bdeq;
+  
+  ImportInfo &imports = this->imports;
+
+  auto &tables = this->tables;
+  uint32_t num_tables = tables.size() - imports.num_tables;
+  if (num_tables == 0) {
+    return {};
+  }
+
+  WR_U32 (num_tables);
+  for (auto itr = std::next(tables.begin(), imports.num_tables);
+            itr != tables.end(); ++itr) {
+    write_tabletype(bdeq, *itr);
+  }
   return bdeq;
 }
 
 bytedeque WasmModule::encode_memory_section() {
   bytedeque bdeq;
+
+  ImportInfo &imports = this->imports;
+  if (this->mems.size() != 1) {
+    throw std::runtime_error ("Can only encode up to 1 Memory!");
+  }
+
+  auto &mems = this->mems;
+  uint32_t num_mems = mems.size() - imports.num_mems;
+  if (num_mems == 0) {
+    return {};
+  }
+
+  WR_U32 (num_mems);
+  for (auto itr = std::next(mems.begin(), imports.num_mems);
+            itr != mems.end(); ++itr) {
+    write_memtype(bdeq, *itr);
+  }
+
   return bdeq;
 }
 
@@ -165,11 +222,13 @@ bytedeque WasmModule::encode_custom_section() {
 static void dump_bytedeque(bytedeque &bdeq) {
   uint32_t i = 0;
   for (auto &it: bdeq) {
-    printf("%02x ", it);
-    i++;
-    if (!(i & 15)) { printf("\n"); }
+    std::cout << it;
+    //printf("%02x ", it);
+    //i++;
+    //if (!(i & 7)) { printf(" "); }
+    //if (!(i & 15)) { printf("\n"); }
   }
-  printf("\n");
+  //printf("\n");
 }
 
 
