@@ -37,6 +37,17 @@ struct wasm_localcse_t {
 };
 typedef std::list<wasm_localcse_t> wasm_localcsv_t;
 
+/* Import or export index: -1 if not imported/exported */
+struct IEIdx {
+  int64_t import_idx;
+  int64_t export_idx;
+
+  IEIdx() { 
+    this->import_idx = -1;
+    this->export_idx = -1;
+  }
+};
+
 /* Section Field Declarations */
 struct CustomDecl {
   std::string name;
@@ -49,7 +60,7 @@ struct SigDecl {
 };
 
 
-struct FuncDecl {
+struct FuncDecl: public IEIdx {
   /* From func/import section */
   SigDecl* sig;
   /* From code section */
@@ -61,15 +72,15 @@ struct FuncDecl {
   /* CFG for function */
 };
 
-struct MemoryDecl {
+struct MemoryDecl: public IEIdx {
   wasm_limits_t limits;
 };
 
-struct TableDecl {
+struct TableDecl: public IEIdx {
   wasm_limits_t limits;
 };
 
-struct GlobalDecl {
+struct GlobalDecl: public IEIdx {
   wasm_type_t type;
   unsigned is_mutable : 1;
   bytearr init_expr_bytes;

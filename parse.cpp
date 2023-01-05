@@ -174,7 +174,8 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
         info.num_funcs++;
         uint32_t idx = RD_U32();
         FuncDecl func = {
-          .sig = GET_LIST_ELEM(this->sigs, idx)
+          .sig = GET_LIST_ELEM(this->sigs, idx),
+          .import_idx = i
         };
         funcs.push_back(func);
         import.desc.func = &funcs.back();
@@ -183,6 +184,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
       case KIND_TABLE: {
         info.num_tables++;
         TableDecl table = read_tabletype(buf);
+        table.import_idx = i;
         tables.push_back(table);
         import.desc.table = &tables.back();
         break;
@@ -190,6 +192,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
       case KIND_MEMORY: {
         info.num_memories++;
         MemoryDecl mem = read_memtype(buf);
+        mems.import_idx = i;
         mems.push_back(mem);
         import.desc.mem = &mems.back();
         break;
@@ -197,6 +200,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
       case KIND_GLOBAL: {
         info.num_globals++;
         GlobalDecl global = read_globaltype(buf);
+        global.import_idx = i;
         globals.push_back(global);
         import.desc.global= &globals.back();
         break;
@@ -268,15 +272,19 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
     switch (exp.kind) {
       case KIND_FUNC:
         exp.desc.func = GET_LIST_ELEM(this->funcs, idx);
+        exp.desc.func->export_idx = i;
         break;
       case KIND_TABLE:
         exp.desc.table = GET_LIST_ELEM(this->tables, idx);
+        exp.desc.table->export_idx = i;
         break;
       case KIND_MEMORY:
         exp.desc.mem = GET_LIST_ELEM(this->mems, idx);
+        exp.desc.mem->export_idx = i;
         break;
       case KIND_GLOBAL:
         exp.desc.global = GET_LIST_ELEM(this->globals, idx);
+        exp.desc.global->export_idx = i;
         break;
       default: {
         ERR("Export kind: %u\n", exp.kind);
