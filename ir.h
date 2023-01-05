@@ -42,10 +42,11 @@ struct IEIdx {
   int64_t import_idx;
   int64_t export_idx;
 
-  IEIdx() { 
-    this->import_idx = -1;
-    this->export_idx = -1;
-  }
+  IEIdx(): 
+    import_idx(-1), export_idx(-1) { }
+
+  //inline void set_import_idx(int64_t i) { import_idx = i; }
+  //inline void set_export_idx(int64_t i) { export_idx = i; }
 };
 
 /* Section Field Declarations */
@@ -77,6 +78,7 @@ struct MemoryDecl: public IEIdx {
 };
 
 struct TableDecl: public IEIdx {
+  wasm_type_t reftype;
   wasm_limits_t limits;
 };
 
@@ -126,6 +128,10 @@ struct ImportInfo {
   uint32_t num_tables;
   uint32_t num_memories;
   uint32_t num_globals;
+
+  inline uint32_t get_num_imports () {
+    return num_funcs + num_tables + num_memories + num_globals;
+  }
 };
 
 

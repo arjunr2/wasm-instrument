@@ -66,6 +66,18 @@ extern int g_disassemble;
   auto it = std::next(ll.begin(), idx); \
   &(*it);  \
 })
+
+#define GET_LIST_IDX(ll, ptr) ({  \
+  auto it = ll.begin(); \
+  uint32_t i = 0; \
+  for (auto it = ll.begin(); it != ll.end(); ++it, ++i) {  \
+    if (&(*it) == ptr) { break; } \
+  } \
+  if (it == ll.end()) \
+    throw std::runtime_error("Element not found in list!\n"); \
+  i;  \
+})
+  
 /********************/
 
 

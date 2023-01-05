@@ -38,13 +38,14 @@ inline static MemoryDecl read_memtype(buffer_t &buf) {
   MemoryDecl mem = { .limits = read_limits(buf) };
   return mem;
 }
+
 /* Read TableType */
 inline static TableDecl read_tabletype(buffer_t &buf) {
   byte reftype = RD_BYTE();
   if ((reftype != WASM_TYPE_FUNCREF) && (reftype != WASM_TYPE_EXTERNREF)) {
     throw std::runtime_error("Invalid Reftype\n");
   }
-  TableDecl table = { .limits = read_limits(buf) };
+  TableDecl table = { .reftype = (wasm_type_t) reftype, .limits = read_limits(buf) };
   return table;
 }
 
@@ -174,9 +175,9 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
         info.num_funcs++;
         uint32_t idx = RD_U32();
         FuncDecl func = {
-          .sig = GET_LIST_ELEM(this->sigs, idx),
-          .import_idx = i
+          .sig = GET_LIST_ELEM(this->sigs, idx)
         };
+        func.import_idx = i;
         funcs.push_back(func);
         import.desc.func = &funcs.back();
         break;
@@ -192,7 +193,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
       case KIND_MEMORY: {
         info.num_memories++;
         MemoryDecl mem = read_memtype(buf);
-        mems.import_idx = i;
+        mem.import_idx = i;
         mems.push_back(mem);
         import.desc.mem = &mems.back();
         break;

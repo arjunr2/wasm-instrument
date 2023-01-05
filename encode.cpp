@@ -1,3 +1,4 @@
+#include <iostream>
 #include "encode.h"
 #include "ir.h"
 
@@ -16,6 +17,32 @@ typedef enum {
   data_id,
   datacount_id
 } section_id;
+
+/* Write LimitsType */
+inline static void write_limits(bytedeque &bdeq, wasm_limits_t &limits) {
+  WR_BYTE (limits.has_max);
+  WR_U32 (limits.initial);
+  if (limits.has_max) {
+    WR_U32 (limits.max);
+  }
+}
+
+/* Write MemoryType */
+inline static void write_memtype(bytedeque &bdeq, MemoryDecl &mem) {
+  write_limits (bdeq, mem.limits);
+}
+
+/* Write TableType */
+inline static void write_tabletype(bytedeque &bdeq, TableDecl &table) {
+  WR_BYTE (table.reftype);
+  write_limits (bdeq, table.limits);
+}
+
+/* Write GlobalType */
+inline static void write_globaltype(bytedeque &bdeq, GlobalDecl &global) {
+  WR_BYTE (global.type);
+  WR_BYTE (global.is_mutable);
+}
 
 void write_type_list (bytedeque &bdeq, typelist &tlist) {
   WR_U32(tlist.size());
@@ -41,9 +68,40 @@ bytedeque WasmModule::encode_import_section() {
   bytedeque bdeq;
 
   ImportInfo &imports = this->imports;
-  uint32_t total_imports = imports.num_funcs + imports.num_tables + 
-                            imports.num_memories + imports.num_globals;
+  uint32_t total_imports = imports.get_num_imports();
+  if (imports.list.size() != total_imports) {
+    throw std::runtime_error ("Import list size and counts don't match\n");
+  }
+
   WR_U32(total_imports);
+  for (auto &import : imports.list) {
+    WR_NAME (import.mod_name);
+    WR_NAME (import.member_name);
+    WR_BYTE (import.kind);
+    switch(import.kind) {
+      case KIND_FUNC: {
+        uint32_t idx = GET_LIST_IDX(this->sigs, import.desc.func->sig);
+        WR_U32 (idx);
+        break;
+      }
+      case KIND_TABLE: {
+        write_tabletype(bdeq, *import.desc.table);
+        break;
+      }
+      case KIND_MEMORY: {
+        write_memtype(bdeq, *import.desc.mem);
+        break;
+      }
+      case KIND_GLOBAL: {
+        write_globaltype(bdeq, *import.desc.global);
+        break;
+      }
+      default:
+        ERR ("Unknown Import Kind: %d | %d\n", 
+          GET_LIST_IDX(imports.list, &import), import.kind);
+        throw std::runtime_error ("Unknown Kind");
+    }
+  }
   
   return bdeq;
 }
@@ -107,7 +165,7 @@ bytedeque WasmModule::encode_custom_section() {
 static void dump_bytedeque(bytedeque &bdeq) {
   uint32_t i = 0;
   for (auto &it: bdeq) {
-    printf("%02X ", it);
+    printf("%02x ", it);
     i++;
     if (!(i & 15)) { printf("\n"); }
   }

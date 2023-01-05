@@ -4,7 +4,7 @@ CC=gcc
 CXX=g++
 
 CFLAGS =
-CPPFLAGS = -g
+CPPFLAGS = -g -std=c++2a
 
 SRC_C = opcode_table.c
 SRC_CPP = common.cpp ir.cpp main.cpp parse.cpp encode.cpp inst_internal.cpp
