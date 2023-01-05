@@ -45,10 +45,15 @@ inline static void write_globaltype(bytedeque &bdeq, GlobalDecl &global) {
   WR_BYTE (global.is_mutable);
 }
 
-void write_type_list (bytedeque &bdeq, typelist &tlist) {
+static void write_type_list (bytedeque &bdeq, typelist &tlist) {
   WR_U32(tlist.size());
   for (auto &type : tlist)
     WR_BYTE(type);
+}
+
+// TODO: Only init expr bytes now
+static void encode_init_expr (bytedeque &bdeq, bytearr &init_expr) {
+  WR_BYTESTR(init_expr);
 }
 
 bytedeque WasmModule::encode_type_section() {
@@ -69,6 +74,7 @@ bytedeque WasmModule::encode_type_section() {
  
   return bdeq;
 }
+
 
 bytedeque WasmModule::encode_import_section() {
   bytedeque bdeq;
@@ -116,6 +122,7 @@ bytedeque WasmModule::encode_import_section() {
   return bdeq;
 }
 
+
 bytedeque WasmModule::encode_function_section() {
   bytedeque bdeq;
 
@@ -136,6 +143,7 @@ bytedeque WasmModule::encode_function_section() {
   return bdeq;
 }
 
+
 bytedeque WasmModule::encode_table_section() {
   bytedeque bdeq;
   
@@ -154,6 +162,7 @@ bytedeque WasmModule::encode_table_section() {
   }
   return bdeq;
 }
+
 
 bytedeque WasmModule::encode_memory_section() {
   bytedeque bdeq;
@@ -178,13 +187,62 @@ bytedeque WasmModule::encode_memory_section() {
   return bdeq;
 }
 
+
 bytedeque WasmModule::encode_global_section() {
   bytedeque bdeq;
+
+  ImportInfo &imports = this->imports;
+
+  auto &globals = this->globals;
+  uint32_t num_globals = globals.size() - imports.num_globals;
+  if (num_globals == 0) {
+    return {};
+  }
+
+  WR_U32 (num_globals);
+  for (auto itr = std::next(globals.begin(), imports.num_globals);
+            itr != globals.end(); ++itr) {
+    write_globaltype(bdeq, *itr);
+    encode_init_expr(bdeq, itr->init_expr_bytes);
+  }
   return bdeq;
 }
 
+
 bytedeque WasmModule::encode_export_section() {
   bytedeque bdeq;
+
+  auto &exports = this->exports;
+  uint32_t num_exports = exports.size();
+  if (num_exports == 0) {
+    return {};
+  }
+
+  WR_U32 (num_exports);
+  for (auto &exp : exports) {
+    WR_NAME (exp.name);
+    WR_BYTE (exp.kind);
+    uint32_t idx;
+    switch (exp.kind) {
+      case KIND_FUNC:
+        idx = GET_LIST_IDX(this->funcs, exp.desc.func);
+        break;
+      case KIND_TABLE:
+        idx = GET_LIST_IDX(this->tables, exp.desc.table);
+        break;
+      case KIND_MEMORY:
+        idx = GET_LIST_IDX(this->mems, exp.desc.mem);
+        break;
+      case KIND_GLOBAL:
+        idx = GET_LIST_IDX(this->globals, exp.desc.global);
+        break;
+      default:
+        ERR("Export kind: %u\n", exp.kind);
+        throw std::runtime_error("Invalid export type");
+    }
+    WR_U32 (idx);
+  }
+
   return bdeq;
 }
 
