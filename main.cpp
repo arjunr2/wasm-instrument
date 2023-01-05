@@ -36,7 +36,7 @@ char* parse_args(int argc, char* argv[]) {
     exit(1);
   }
   
-  printf("Trace: %d | Dis: %d\n", g_trace, g_disassemble);
+  //printf("Trace: %d | Dis: %d\n", g_trace, g_disassemble);
   return argv[optind];
 }
 

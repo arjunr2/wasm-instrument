@@ -44,7 +44,7 @@ extern int g_disassemble;
 /********************/
 
 /*** Encoding macros ***/
-#define WR_U32(val)        encode_u32leb(bdeq)
+#define WR_U32(val)        encode_u32leb(bdeq, val)
 #define WR_I32(val)        encode_i32leb(bdeq, val)
 #define WR_U64(val)        encode_u64leb(bdeq, val)
 #define WR_I64(val)        encode_i64leb(bdeq, val)
@@ -54,6 +54,9 @@ extern int g_disassemble;
 #define WR_BYTE(val)       encode_u8(bdeq, val)
 #define WR_U32_RAW(val)    encode_u32(bdeq, val)
 #define WR_U64_RAW(val)    encode_u64(bdeq, val)
+
+#define WR_SECBYTE_PRE(val)   preencode_u8(secdeq, val)
+#define WR_SECLEN_PRE()       preencode_u32leb(secdeq, secdeq.size())
 /********************/
 
 
@@ -127,3 +130,7 @@ void encode_u64 (bytedeque &bdeq, uint64_t val);
 
 void encode_name (bytedeque &bdeq, std::string name);
 void encode_bytes (bytedeque &bdeq, bytearr &bytes);
+
+/* Prepend encoding */
+void preencode_u32leb (bytedeque &bdeq, uint32_t val);
+void preencode_u8 (bytedeque &bdeq, uint8_t val);

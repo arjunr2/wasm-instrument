@@ -166,7 +166,7 @@ class WasmModule {
 
     /* Encode functions */
     #define ENCODE_DECL(sec)  \
-      void encode_##sec##_section (buffer_t &buf, uint32_t len);
+      bytedeque encode_##sec##_section ();
     ENCODE_DECL(type);
     ENCODE_DECL(import);
     ENCODE_DECL(function);

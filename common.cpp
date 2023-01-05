@@ -231,30 +231,32 @@ bytearr read_bytes(buffer_t* buf, uint32_t num_bytes) {
 #define MORE_UNSIGNED(val, b)  \
   if (val != 0) { MORE_ENC(); }
 
+#define PUSH_BACK() bdeq.push_back(b);
+#define PUSH_FRONT() bdeq.push_front(b);
 
-#define ENCODE_BODY(sign)  \
+#define ENCODE_BODY(sign, dir)  \
   byte b = 0xFF; \
   while (b & 0x80) { \
     b = val & 0x7F; \
     val >>= 7;  \
     MORE_##sign(val, b);  \
-    bdeq.push_back(b);  \
+    PUSH_##dir();  \
   } \
 
 void encode_i32leb (bytedeque &bdeq, int32_t val) {
-  ENCODE_BODY(SIGNED);
+  ENCODE_BODY(SIGNED, BACK);
 }
 
 void encode_u32leb (bytedeque &bdeq, uint32_t val) {
-  ENCODE_BODY(UNSIGNED);
+  ENCODE_BODY(UNSIGNED, BACK);
 }
 
 void encode_i64leb (bytedeque &bdeq, int64_t val) {
-  ENCODE_BODY(SIGNED);
+  ENCODE_BODY(SIGNED, BACK);
 }
 
 void encode_u64leb (bytedeque &bdeq, uint64_t val) {
-  ENCODE_BODY(UNSIGNED);
+  ENCODE_BODY(UNSIGNED, BACK);
 }
 
 #define ENCODE_RAW(val) { \
@@ -283,4 +285,12 @@ void encode_name (bytedeque &bdeq, std::string name) {
 
 void encode_bytes (bytedeque &bdeq, bytearr &bytes) {
   bdeq.insert(bdeq.end(), bytes.begin(), bytes.end());
+}
+
+
+void preencode_u32leb (bytedeque &bdeq, uint32_t val) {
+  ENCODE_BODY(UNSIGNED, FRONT);
+}
+void preencode_u8 (bytedeque &bdeq, uint8_t val) {
+  bdeq.push_front(val);
 }
