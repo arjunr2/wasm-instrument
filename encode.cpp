@@ -88,11 +88,12 @@ bytedeque WasmModule::encode_type_section() {
   bytedeque bdeq;
   
   auto sigs = this->sigs;
-  if (sigs.size() == 0) {
+  uint32_t num_sigs = sigs.size();
+  if (num_sigs == 0) {
     return {};
   }
 
-  WR_U32 (sigs.size());
+  WR_U32 (num_sigs);
   for (auto &sig : sigs) {
     WR_BYTE(WASM_TYPE_FUNC);
     /* For params */
@@ -196,14 +197,13 @@ bytedeque WasmModule::encode_memory_section() {
   bytedeque bdeq;
 
   ImportInfo &imports = this->imports;
-  if (this->mems.size() != 1) {
-    throw std::runtime_error ("Can only encode up to 1 Memory!");
-  }
-
   auto &mems = this->mems;
   uint32_t num_mems = mems.size() - imports.num_mems;
   if (num_mems == 0) {
     return {};
+  }
+  if (mems.size() != 1) {
+    throw std::runtime_error ("Can only encode up to 1 Memory!");
   }
 
   WR_U32 (num_mems);
@@ -367,6 +367,9 @@ bytedeque WasmModule::encode_data_section() {
         "size don't match");
   }
 
+  if (num_datas == 0) {
+    return {};
+  }
   WR_U32 (num_datas);
   for (auto &data : datas) {
     WR_U32 (data.flag);

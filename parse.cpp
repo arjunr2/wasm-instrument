@@ -252,8 +252,8 @@ void WasmModule::decode_table_section (buffer_t &buf, uint32_t len) {
 
 void WasmModule::decode_memory_section (buffer_t &buf, uint32_t len) {
   uint32_t num_mems = RD_U32();
-  MemoryDecl mem = read_memtype(buf);
   if ((num_mems == 1) && this->mems.empty()) {
+    MemoryDecl mem = read_memtype(buf);
     this->mems.push_back(mem);
   } else {
     throw std::runtime_error("Memory component has to be 1!");
