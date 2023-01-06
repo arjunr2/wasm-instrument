@@ -125,7 +125,7 @@ bytedeque WasmModule::encode_import_section() {
     WR_BYTE (import.kind);
     switch(import.kind) {
       case KIND_FUNC: {
-        uint32_t idx = GET_LIST_IDX(this->sigs, import.desc.func->sig);
+        uint32_t idx = this->getSigIdx(import.desc.func->sig);
         WR_U32 (idx);
         break;
       }
@@ -143,7 +143,7 @@ bytedeque WasmModule::encode_import_section() {
       }
       default:
         ERR ("Unknown Import Kind: %d | %d\n", 
-          GET_LIST_IDX(imports.list, &import), import.kind);
+          this->getImportIdx(&import), import.kind);
         throw std::runtime_error ("Unknown Kind");
     }
   }
@@ -166,7 +166,7 @@ bytedeque WasmModule::encode_function_section() {
   WR_U32 (num_funcs);
   for (auto itr = std::next(funcs.begin(), imports.num_funcs);
             itr != funcs.end(); ++itr) {
-    uint32_t idx = GET_LIST_IDX(this->sigs, itr->sig);
+    uint32_t idx = this->getSigIdx(itr->sig);
     WR_U32 (idx);
   }
   return bdeq;
@@ -253,16 +253,16 @@ bytedeque WasmModule::encode_export_section() {
     uint32_t idx;
     switch (exp.kind) {
       case KIND_FUNC:
-        idx = GET_LIST_IDX(this->funcs, exp.desc.func);
+        idx = this->getFuncIdx(exp.desc.func);
         break;
       case KIND_TABLE:
-        idx = GET_LIST_IDX(this->tables, exp.desc.table);
+        idx = this->getTableIdx(exp.desc.table);
         break;
       case KIND_MEMORY:
-        idx = GET_LIST_IDX(this->mems, exp.desc.mem);
+        idx = this->getMemoryIdx(exp.desc.mem);
         break;
       case KIND_GLOBAL:
-        idx = GET_LIST_IDX(this->globals, exp.desc.global);
+        idx = this->getGlobalIdx(exp.desc.global);
         break;
       default:
         ERR("Export kind: %u\n", exp.kind);
@@ -306,7 +306,7 @@ bytedeque WasmModule::encode_element_section() {
 
     WR_U32 (elem.func_indices.size());
     for (auto &func : elem.func_indices) {
-      uint32_t idx = GET_LIST_IDX(this->funcs, func);
+      uint32_t idx = this->getFuncIdx(func);
       WR_U32 (idx);
     }
   }

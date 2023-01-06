@@ -165,7 +165,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
         info.num_funcs++;
         uint32_t idx = RD_U32();
         FuncDecl func = {
-          .sig = GET_LIST_ELEM(this->sigs, idx)
+          .sig = this->getSig(idx)
         };
         funcs.push_back(func);
         import.desc.func = &funcs.back();
@@ -214,7 +214,7 @@ void WasmModule::decode_function_section (buffer_t &buf, uint32_t len) {
     /* Get signature idx */
     uint32_t idx = RD_U32();
     FuncDecl func = {
-      .sig = GET_LIST_ELEM(this->sigs, idx)
+      .sig = this->getSig(idx)
     };
     this->funcs.push_back(func);
   }
@@ -258,16 +258,16 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
     /* Export descriptor */
     switch (exp.kind) {
       case KIND_FUNC:
-        exp.desc.func = GET_LIST_ELEM(this->funcs, idx);
+        exp.desc.func = this->getFunc(idx);
         break;
       case KIND_TABLE:
-        exp.desc.table = GET_LIST_ELEM(this->tables, idx);
+        exp.desc.table = this->getTable(idx);
         break;
       case KIND_MEMORY:
-        exp.desc.mem = GET_LIST_ELEM(this->mems, idx);
+        exp.desc.mem = this->getMemory(idx);
         break;
       case KIND_GLOBAL:
-        exp.desc.global = GET_LIST_ELEM(this->globals, idx);
+        exp.desc.global = this->getGlobal(idx);
         break;
       default: {
         ERR("Export kind: %u\n", exp.kind);
@@ -309,7 +309,7 @@ void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
     uint32_t num_idxs = RD_U32();
     for (uint32_t i = 0; i < num_idxs; i++) {
       uint32_t fn_idx = RD_U32();
-      auto fptr = GET_LIST_ELEM(this->funcs, fn_idx);
+      auto fptr = this->getFunc(fn_idx);
       elem.func_indices.push_back(fptr);
     }
 

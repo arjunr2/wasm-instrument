@@ -197,7 +197,7 @@ class WasmModule {
     bytedeque encode_code (FuncDecl &func);
 
   public:
-    /* Accessors */
+    /* Field Accessors */
     inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }
     inline FuncDecl* getFunc(uint32_t idx)      { return GET_LIST_ELEM(this->funcs, idx); }
     inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_LIST_ELEM(this->globals, idx); }
@@ -206,7 +206,9 @@ class WasmModule {
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
       return GET_LIST_ELEM(this->mems, idx); 
     }
+    inline ImportDecl* getImport(uint32_t idx) { return GET_LIST_ELEM(this->imports.list, idx); }
 
+    /* Index Accessors */
     inline uint32_t getSigIdx(SigDecl *sig)           { return GET_LIST_IDX(this->sigs, sig); }
     inline uint32_t getFuncIdx(FuncDecl *func)        { return GET_LIST_IDX(this->funcs, func); }
     inline uint32_t getGlobalIdx(GlobalDecl *global)  { return GET_LIST_IDX(this->globals, global); }
@@ -216,6 +218,7 @@ class WasmModule {
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
       return idx;
     }
+    inline uint32_t getImportIdx(ImportDecl *import)     { return GET_LIST_IDX(this->imports.list, import); }
 
     inline uint32_t get_num_customs() { return this->customs.size(); }
 
