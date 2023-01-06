@@ -163,7 +163,7 @@
   ;;(memory (;0;) 2 4)
   (global (;0;) (mut i32) (i32.const 22))
   (global (;1;) f64 (f64.const 3408))
-  (global (;2;) i32 (i32.const 5))
+  (global (;2;) i64 (i64.const -324323243245))
   (export "memory" (memory 0))
   (export "main" (func $hello_world))
   (export "main2" (func $hello_world2))
