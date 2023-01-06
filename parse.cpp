@@ -397,6 +397,7 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf) {
         ERR("Unknown imm type: %d\n", imm_type);
         throw std::runtime_error("Unknown imm");
     }
+    ilist.push_back(instptr);
     TRACE("O: %s\n", op_entry.mnemonic);
   }
   if (buf.ptr != buf.end) {
