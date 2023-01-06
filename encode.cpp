@@ -323,11 +323,14 @@ static void encode_locals(bytedeque &bdeq, wasm_localcsv_t &pure_locals) {
 }
 
 // TODO: Encode actual expression
-static void encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytearr &instbytes) {
-  WR_BYTESTR (instbytes);
+void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytearr &code_bytes) {
+  WR_BYTESTR (code_bytes);
+  //for (auto instruction : instlist) {
+  //  instruction->encode_imm(*this, bdeq);
+  //}
 }
 
-static bytedeque encode_code (FuncDecl &func) {
+bytedeque WasmModule::encode_code (FuncDecl &func) {
   bytedeque bdeq;
   encode_locals(bdeq, func.pure_locals);
   encode_expr_to_insts(bdeq, func.instructions, func.code_bytes);

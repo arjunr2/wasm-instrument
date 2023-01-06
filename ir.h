@@ -202,6 +202,10 @@ class WasmModule {
 
     /* Code decoding for instructions */
     InstList decode_expr_to_insts (buffer_t &buf);
+    /* Code encoding for instructions */
+    void encode_expr_to_insts (bytedeque &bdeq, InstList &instlist, bytearr &bytes);
+    /* Code + local encoding for instructions */
+    bytedeque encode_code (FuncDecl &func);
 
   public:
     /* Accessors */
