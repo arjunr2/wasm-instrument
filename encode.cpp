@@ -1,7 +1,7 @@
 #include <iostream>
-#include <algorithm>
-#include "encode.h"
+
 #include "ir.h"
+#include "inst_internal.h"
 
 typedef enum {
   custom_id = 0,
@@ -322,12 +322,25 @@ static void encode_locals(bytedeque &bdeq, wasm_localcsv_t &pure_locals) {
   }
 }
 
-// TODO: Encode actual expression
+#define USE_INSTLIST 1
 void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytearr &code_bytes) {
-  //WR_BYTESTR (code_bytes);
+  #if USE_INSTLIST
   for (auto &instruction : instlist) {
+    byte opcode = instruction->getOpcode();
+    opcode_entry_t op_entry = opcode_table[opcode];
+    if (op_entry.invalid) {
+      ERR("Unimplemented opcode generated %u: %s\n", opcode, op_entry.mnemonic); 
+      throw std::runtime_error("Unimplemented");
+    }
+    /* Write instruction opcode and immediate */
+    WR_BYTE (opcode);
     instruction->encode_imm(*this, bdeq);
+    TRACE("O: %s\n", op_entry.mnemonic);
   }
+  TRACE("=== Function encoded successfully ===\n");
+  #else
+  WR_BYTESTR (code_bytes);
+  #endif
 }
 
 bytedeque WasmModule::encode_code (FuncDecl &func) {

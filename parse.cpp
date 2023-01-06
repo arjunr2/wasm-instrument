@@ -10,17 +10,6 @@
 #define BYTES_PER_LINE 32
 
 
-/**********************/
-//static uint32_t construct_u32leb4(uint32_t val) {
-//  uint32_t new_val;
-//  *((byte*)(&new_val))        = 0x80 | (val & 0x7f);
-//  *(((byte*)(&new_val)) + 1)  = 0x80 | ((val >> 7) & 0x7F);
-//  *(((byte*)(&new_val)) + 2)  = 0x80 | ((val >> 14) & 0x7F);
-//  *(((byte*)(&new_val)) + 3)  = 0x80 | ((val >> 21) & 0x7F);
-//  return new_val;
-//}
-
-
 /* Read LimitsType */
 inline static wasm_limits_t read_limits(buffer_t &buf) {
   byte max_provided = RD_BYTE();
