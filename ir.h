@@ -214,6 +214,16 @@ class WasmModule {
       return GET_LIST_ELEM(this->mems, idx); 
     }
 
+    inline uint32_t getSigIdx(SigDecl *sig)           { return GET_LIST_IDX(this->sigs, sig); }
+    inline uint32_t getFuncIdx(FuncDecl *func)        { return GET_LIST_IDX(this->funcs, func); }
+    inline uint32_t getGlobalIdx(GlobalDecl *global)  { return GET_LIST_IDX(this->globals, global); }
+    inline uint32_t getTableIdx(TableDecl *table)     { return GET_LIST_IDX(this->tables, table); }
+    inline uint32_t getMemoryIdx(MemoryDecl *mem)  { 
+      uint32_t idx = GET_LIST_IDX(this->mems, mem);
+      if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
+      return idx;
+    }
+
     inline uint32_t get_num_customs() { return this->customs.size(); }
 
     /* Decode wasm file from buffer */
