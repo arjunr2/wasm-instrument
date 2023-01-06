@@ -19,6 +19,18 @@ typedef enum {
   datacount_id
 } section_id;
 
+static void dump_bytedeque(bytedeque &bdeq) {
+  uint32_t i = 0;
+  for (auto &it: bdeq) {
+    std::cout << it;
+    //printf("%02x ", it);
+    //i++;
+    //if (!(i & 7)) { printf(" "); }
+    //if (!(i & 15)) { printf("\n"); }
+  }
+  //printf("\n");
+}
+
 /* Write LimitsType */
 inline static void write_limits(bytedeque &bdeq, wasm_limits_t &limits) {
   WR_BYTE (limits.has_max);
@@ -302,8 +314,45 @@ bytedeque WasmModule::encode_element_section() {
 }
 
 
+static void encode_locals(bytedeque &bdeq, wasm_localcsv_t &pure_locals) {
+  WR_U32 (pure_locals.size());
+  for (auto &local_cse : pure_locals) {
+    WR_U32 (local_cse.count);
+    WR_BYTE (local_cse.type);
+  }
+}
+
+// TODO: Encode actual expression
+static void encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytearr &instbytes) {
+  WR_BYTESTR (instbytes);
+}
+
+static bytedeque encode_code (FuncDecl &func) {
+  bytedeque bdeq;
+  encode_locals(bdeq, func.pure_locals);
+  encode_expr_to_insts(bdeq, func.instructions, func.code_bytes);
+  return bdeq;
+}
+
 bytedeque WasmModule::encode_code_section() {
   bytedeque bdeq;
+
+  ImportInfo &imports = this->imports;
+
+  auto &funcs = this->funcs;
+  uint32_t num_funcs = funcs.size() - imports.num_funcs;
+  if (num_funcs == 0) {
+    return {};
+  }
+
+  WR_U32 (num_funcs);
+  for (auto itr = std::next(funcs.begin(), imports.num_funcs);
+            itr != funcs.end(); ++itr) {
+    /* For each non-import func, generate code and its size */
+    auto secdeq = encode_code (*itr);
+    WR_SECLEN_PRE();
+    bdeq.insert(bdeq.end(), secdeq.begin(), secdeq.end());
+  }
   return bdeq;
 }
 
@@ -329,17 +378,6 @@ bytedeque WasmModule::encode_custom_section() {
 }
 
 
-static void dump_bytedeque(bytedeque &bdeq) {
-  uint32_t i = 0;
-  for (auto &it: bdeq) {
-    std::cout << it;
-    //printf("%02x ", it);
-    //i++;
-    //if (!(i & 7)) { printf(" "); }
-    //if (!(i & 15)) { printf("\n"); }
-  }
-  //printf("\n");
-}
 
 
 /* Main Encoder routine */
@@ -359,19 +397,19 @@ bytedeque WasmModule::encode_module() {
       bdeq.insert(bdeq.end(), secdeq.begin(), secdeq.end()); \
     } \
   }
-  ENCODE_CALL(custom); 
-  ENCODE_CALL(type); 
-  ENCODE_CALL(import); 
-  ENCODE_CALL(function); 
-  ENCODE_CALL(table); 
-  ENCODE_CALL(memory); 
-  ENCODE_CALL(global); 
-  ENCODE_CALL(export); 
-  ENCODE_CALL(start); 
-  ENCODE_CALL(element);  
-  ENCODE_CALL(code); 
-  ENCODE_CALL(data); 
-  ENCODE_CALL(datacount); 
+  ENCODE_CALL (custom); 
+  ENCODE_CALL (type); 
+  ENCODE_CALL (import); 
+  ENCODE_CALL (function); 
+  ENCODE_CALL (table); 
+  ENCODE_CALL (memory); 
+  ENCODE_CALL (global); 
+  ENCODE_CALL (export); 
+  ENCODE_CALL (start); 
+  ENCODE_CALL (element);
+  ENCODE_CALL (code); 
+  ENCODE_CALL (data); 
+  ENCODE_CALL (datacount); 
 
   dump_bytedeque(bdeq);
   return bdeq;

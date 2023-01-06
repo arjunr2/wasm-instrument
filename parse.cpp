@@ -410,8 +410,10 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf) {
 void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
   uint32_t num_fn = RD_U32();
   
-  auto func_itr = std::next(this->funcs.begin(), this->imports.num_funcs);
-  for (uint32_t i = 0; i < num_fn; i++) {
+  uint32_t num_imports = this->imports.num_funcs;
+  auto &funcs = this->funcs;
+  for (auto func_itr = std::next(funcs.begin(), num_imports);
+          func_itr != funcs.end(); ++func_itr) {
     FuncDecl &func = *func_itr;
     /* Fn size (locals + body) */
     uint32_t size = RD_U32();
@@ -425,8 +427,6 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
     func.code_bytes = RD_BYTESTR(end_insts - start_insts);
     buffer_t cbuf = { start_insts, start_insts, end_insts };
     func.instructions = decode_expr_to_insts(cbuf);
-
-    std::advance (func_itr, 1);
   }
 }
 
