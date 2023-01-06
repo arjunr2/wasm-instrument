@@ -37,17 +37,6 @@ struct wasm_localcse_t {
 };
 typedef std::list<wasm_localcse_t> wasm_localcsv_t;
 
-/* Import or export index: -1 if not imported/exported */
-struct IEIdx {
-  int64_t import_idx;
-  int64_t export_idx;
-
-  IEIdx(): 
-    import_idx(-1), export_idx(-1) { }
-
-  //inline void set_import_idx(int64_t i) { import_idx = i; }
-  //inline void set_export_idx(int64_t i) { export_idx = i; }
-};
 
 /* Section Field Declarations */
 struct CustomDecl {
@@ -237,7 +226,7 @@ class WasmModule {
 
 
     /* Instrumentation methods */
-    GlobalDecl& add_global (GlobalDecl &global, bool is_import);
+    GlobalDecl& add_global (GlobalDecl &global);
 };
 
 

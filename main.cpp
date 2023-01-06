@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     .is_mutable = true,
     .init_expr_bytes = INIT_EXPR (I32_CONST, 5)
   };
-  module.add_global(global, false);
+  module.add_global(global);
   /* Encode instrumented module */
   bytedeque bq = module.encode_module();
   return 0;

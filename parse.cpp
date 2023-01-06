@@ -309,7 +309,7 @@ void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
     uint32_t num_idxs = RD_U32();
     for (uint32_t i = 0; i < num_idxs; i++) {
       uint32_t fn_idx = RD_U32();
-      FuncDecl* fptr = GET_LIST_ELEM(this->funcs, fn_idx);
+      auto fptr = GET_LIST_ELEM(this->funcs, fn_idx);
       elem.func_indices.push_back(fptr);
     }
 
