@@ -437,10 +437,6 @@ bytedeque WasmModule::encode_module() {
       bdeq.insert(bdeq.end(), secdeq.begin(), secdeq.end()); \
     } \
   }
-  /* Write all the customs at the start */
-  for (auto &custom : this->customs) {
-    ENCODE_CALL (custom, custom);
-  }
   ENCODE_CALL (type); 
   ENCODE_CALL (import); 
   ENCODE_CALL (function); 
@@ -453,6 +449,10 @@ bytedeque WasmModule::encode_module() {
   ENCODE_CALL (code); 
   ENCODE_CALL (data); 
   ENCODE_CALL (datacount); 
+  /* Write all the customs at the end */
+  for (auto &custom : this->customs) {
+    ENCODE_CALL (custom, custom);
+  }
 
   dump_bytedeque(bdeq);
   return bdeq;
