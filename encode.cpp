@@ -332,10 +332,10 @@ void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytea
       ERR("Unimplemented opcode generated %u: %s\n", opcode, op_entry.mnemonic); 
       throw std::runtime_error("Unimplemented");
     }
+    TRACE("O: %s\n", op_entry.mnemonic);
     /* Write instruction opcode and immediate */
     WR_BYTE (opcode);
     instruction->encode_imm(*this, bdeq);
-    TRACE("O: %s\n", op_entry.mnemonic);
   }
   TRACE("=== Function encoded successfully ===\n");
   #else

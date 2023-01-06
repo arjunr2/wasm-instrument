@@ -106,6 +106,7 @@ ImmGlobalInst::ImmGlobalInst (WasmModule &module, byte opcode, buffer_t &buf)
 
 void ImmGlobalInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t idx = module.getGlobalIdx(this->global);
+  WR_U32 (idx);
 }
 
 
@@ -117,6 +118,7 @@ ImmTableInst::ImmTableInst (WasmModule &module, byte opcode, buffer_t &buf)
 
 void ImmTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t idx = module.getTableIdx(this->table);
+  WR_U32 (idx);
 }
 
 
