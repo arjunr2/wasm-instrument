@@ -184,8 +184,8 @@ class WasmModule {
     DECODE_DECL(custom);
 
     /* Encode functions */
-    #define ENCODE_DECL(sec)  \
-      bytedeque encode_##sec##_section ();
+    #define ENCODE_DECL(sec, ...)  \
+      bytedeque encode_##sec##_section (__VA_ARGS__);
     ENCODE_DECL(type);
     ENCODE_DECL(import);
     ENCODE_DECL(function);
@@ -198,7 +198,7 @@ class WasmModule {
     ENCODE_DECL(code);
     ENCODE_DECL(data);
     ENCODE_DECL(datacount);
-    ENCODE_DECL(custom);
+    ENCODE_DECL(custom, CustomDecl &custom);
 
     /* Code decoding for instructions */
     InstList decode_expr_to_insts (buffer_t &buf);
@@ -213,6 +213,8 @@ class WasmModule {
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
       return GET_LIST_ELEM(this->mems, idx); 
     }
+
+    inline uint32_t get_num_customs() { return this->customs.size(); }
 
     /* Decode wasm file from buffer */
     void decode_buffer (buffer_t &buf);

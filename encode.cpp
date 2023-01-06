@@ -356,8 +356,40 @@ bytedeque WasmModule::encode_code_section() {
   return bdeq;
 }
 
+
 bytedeque WasmModule::encode_data_section() {
   bytedeque bdeq;
+
+  auto &datas = this->datas;
+  uint32_t num_datas = datas.size();
+  if (this->has_datacount && (num_datas != this->num_datas)) {
+    throw std::runtime_error ("Datacount section and data section vector "
+        "size don't match");
+  }
+
+  WR_U32 (num_datas);
+  for (auto &data : datas) {
+    WR_U32 (data.flag);
+    switch (data.flag) {
+      case 0: encode_const_off_expr(bdeq, data.opcode_offset, data.mem_offset); break;
+      case 1: break;
+      // Assume only 1 Memory possible
+      case 2: {
+        ERR ("For data flag 2, will default to writing memidx=0\n");
+        WR_U32 (0);
+        encode_const_off_expr(bdeq, data.opcode_offset, data.mem_offset);
+        break;
+      }
+      default: {
+        ERR("Invalid data segment flag: %d\n", data.flag);
+        throw std::runtime_error("Flag error");
+      }
+    }
+    /* Write raw bytes for the data*/
+    WR_U32 (data.bytes.size());
+    WR_BYTESTR (data.bytes);
+  }
+
   return bdeq;
 }
 
@@ -372,12 +404,17 @@ bytedeque WasmModule::encode_datacount_section() {
   return bdeq;
 }
 
-bytedeque WasmModule::encode_custom_section() {
+
+bytedeque WasmModule::encode_custom_section(CustomDecl &custom) {
   bytedeque bdeq;
+  
+  if (custom.name.empty() && custom.bytes.empty()) {
+    return {};
+  }
+  WR_NAME (custom.name);
+  WR_BYTESTR (custom.bytes);
   return bdeq;
 }
-
-
 
 
 /* Main Encoder routine */
@@ -387,8 +424,8 @@ bytedeque WasmModule::encode_module() {
   WR_U32_RAW (this->magic);
   WR_U32_RAW (this->version);
 
-  #define ENCODE_CALL(sec) { \
-    auto secdeq = this->encode_##sec##_section();  \
+  #define ENCODE_CALL(sec, ...) { \
+    auto secdeq = this->encode_##sec##_section(__VA_ARGS__);  \
     uint32_t section_size = secdeq.size();  \
     /* Push section information */  \
     if (section_size) { \
@@ -397,7 +434,10 @@ bytedeque WasmModule::encode_module() {
       bdeq.insert(bdeq.end(), secdeq.begin(), secdeq.end()); \
     } \
   }
-  ENCODE_CALL (custom); 
+  /* Write all the customs at the start */
+  for (auto &custom : this->customs) {
+    ENCODE_CALL (custom, custom);
+  }
   ENCODE_CALL (type); 
   ENCODE_CALL (import); 
   ENCODE_CALL (function); 
