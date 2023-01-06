@@ -132,7 +132,7 @@ bytearr read_bytes(buffer_t* buf, uint32_t num_bytes);
 * Bit-width not necessary, but added for readability and params */
 void encode_i32leb (bytedeque &bdeq, int32_t val);
 void encode_u32leb (bytedeque &bdeq, uint32_t val);
-void encode_i64leb (bytedeque &bdeq, int32_t val);
+void encode_i64leb (bytedeque &bdeq, int64_t val);
 void encode_u64leb (bytedeque &bdeq, uint64_t val);
 
 /* Encode fixed size byte values */

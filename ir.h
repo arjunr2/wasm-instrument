@@ -90,12 +90,14 @@ struct GlobalDecl: public IEIdx {
 
 struct DataDecl {
   uint32_t flag;
+  byte opcode_offset;
   uint32_t mem_offset;
   bytearr bytes;
 };
 
 struct ElemDecl {
   uint32_t flag;
+  byte opcode_offset;
   uint32_t table_offset;
   std::list <FuncDecl*> func_indices;
 };

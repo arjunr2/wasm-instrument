@@ -51,6 +51,22 @@ static void write_type_list (bytedeque &bdeq, typelist &tlist) {
     WR_BYTE(type);
 }
 
+static void encode_const_off_expr(bytedeque &bdeq, byte &opc, uint32_t offset) {
+  WR_BYTE (opc);
+  switch (opc) {
+    case WASM_OP_I32_CONST: {
+      WR_I32 (offset); break;
+    }
+    case WASM_OP_I64_CONST: {
+      WR_I64 (offset); break;
+    }
+    default:
+      ERR("Unknown opcode in offset expr (%d): Must be i32/64 const\n", opc);
+      throw std::runtime_error("Opcode error");
+  }
+  WR_BYTE (WASM_OP_END);
+}
+
 // TODO: Only init expr bytes now
 static void encode_init_expr (bytedeque &bdeq, bytearr &init_expr) {
   WR_BYTESTR(init_expr);
@@ -246,15 +262,45 @@ bytedeque WasmModule::encode_export_section() {
   return bdeq;
 }
 
+
 bytedeque WasmModule::encode_start_section() {
   bytedeque bdeq;
+  if (this->has_start) {
+    throw std::runtime_error ("Start section not implemented");
+  }
   return bdeq;
 }
 
+
 bytedeque WasmModule::encode_element_section() {
   bytedeque bdeq;
+
+  auto &elems = this->elems;
+  uint32_t num_elems = elems.size();
+  if (num_elems == 0) {
+    return {};
+  }
+
+  WR_U32 (num_elems);
+  for (auto &elem : elems) {
+    WR_U32 (elem.flag);
+    switch (elem.flag) {
+      case 0: encode_const_off_expr(bdeq, elem.opcode_offset, elem.table_offset); break;
+      default: {
+        ERR("Invalid element segment flag: %d\n", elem.flag);
+        throw std::runtime_error("Flag error");
+      }
+    }
+
+    WR_U32 (elem.func_indices.size());
+    for (auto &func : elem.func_indices) {
+      uint32_t idx = GET_LIST_IDX(this->funcs, func);
+      WR_U32 (idx);
+    }
+  }
   return bdeq;
 }
+
 
 bytedeque WasmModule::encode_code_section() {
   bytedeque bdeq;
@@ -268,6 +314,12 @@ bytedeque WasmModule::encode_data_section() {
 
 bytedeque WasmModule::encode_datacount_section() {
   bytedeque bdeq;
+  if (this->has_datacount) {
+    if (this->num_datas != this->datas.size()) {
+      throw std::runtime_error ("Data size and datacount do not match");
+    }
+    WR_U32(this->num_datas);
+  }
   return bdeq;
 }
 

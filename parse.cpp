@@ -71,7 +71,7 @@ inline static typelist read_type_list(uint32_t num, buffer_t &buf) {
 
 
 /* Function to read const offset expression i32.const offset for elem/data */
-static uint32_t decode_const_off_expr(buffer_t &buf) {
+static uint32_t decode_const_off_expr(buffer_t &buf, byte &opcode) {
   // Has to be i32.const or i64.const offset for this
   byte opc = RD_BYTE();
   uint64_t offset = -1;
@@ -93,6 +93,7 @@ static uint32_t decode_const_off_expr(buffer_t &buf) {
   if (end != WASM_OP_END) {
     throw std::runtime_error("Malformed end in offset expr");
   }
+  opcode = opc;
   return offset;
 }
 
@@ -315,7 +316,7 @@ void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
     /* Offset */
     uint32_t offset = -1;
     switch (flag) {
-      case 0: offset = decode_const_off_expr(buf); break;
+      case 0: offset = decode_const_off_expr(buf, elem.opcode_offset); break;
       default: {
         ERR("Invalid element segment flag: %d\n", flag);
         throw std::runtime_error("Flag error");
@@ -460,12 +461,12 @@ void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
     /* Offset */
     uint32_t offset = -1;
     switch (flag) {
-      case 0: offset = decode_const_off_expr(buf); break;
+      case 0: offset = decode_const_off_expr(buf, data.opcode_offset); break;
       case 1: offset = 0; break;
       case 2: {
         uint32_t mem_idx = RD_U32();
         if (mem_idx != 0) throw std::runtime_error("Flag error: Only memory 0 allowed\n");
-        offset = decode_const_off_expr(buf);
+        offset = decode_const_off_expr(buf, data.opcode_offset);
         break;
       }
       default: {
