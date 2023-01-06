@@ -147,7 +147,7 @@ void WasmModule::decode_type_section(buffer_t &buf, uint32_t len) {
 void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
   uint32_t num_imports = RD_U32();
 
-  ImportInfo &info = this->imports;
+  auto &info = this->imports;
 
   std::list <FuncDecl> &funcs = this->funcs;
   std::list <TableDecl> &tables = this->tables;

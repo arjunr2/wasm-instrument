@@ -108,7 +108,7 @@ bytedeque WasmModule::encode_type_section() {
 bytedeque WasmModule::encode_import_section() {
   bytedeque bdeq;
 
-  ImportInfo &imports = this->imports;
+  auto &imports = this->imports;
   uint32_t total_imports = imports.get_num_imports();
   if (imports.list.size() != total_imports) {
     throw std::runtime_error ("Import list size and counts don't match\n");
@@ -155,7 +155,7 @@ bytedeque WasmModule::encode_import_section() {
 bytedeque WasmModule::encode_function_section() {
   bytedeque bdeq;
 
-  ImportInfo &imports = this->imports;
+  auto &imports = this->imports;
 
   auto &funcs = this->funcs;
   uint32_t num_funcs = funcs.size() - imports.num_funcs;
@@ -176,7 +176,7 @@ bytedeque WasmModule::encode_function_section() {
 bytedeque WasmModule::encode_table_section() {
   bytedeque bdeq;
   
-  ImportInfo &imports = this->imports;
+  auto &imports = this->imports;
 
   auto &tables = this->tables;
   uint32_t num_tables = tables.size() - imports.num_tables;
@@ -196,7 +196,7 @@ bytedeque WasmModule::encode_table_section() {
 bytedeque WasmModule::encode_memory_section() {
   bytedeque bdeq;
 
-  ImportInfo &imports = this->imports;
+  auto &imports = this->imports;
   auto &mems = this->mems;
   uint32_t num_mems = mems.size() - imports.num_mems;
   if (num_mems == 0) {
@@ -219,7 +219,7 @@ bytedeque WasmModule::encode_memory_section() {
 bytedeque WasmModule::encode_global_section() {
   bytedeque bdeq;
 
-  ImportInfo &imports = this->imports;
+  auto &imports = this->imports;
 
   auto &globals = this->globals;
   uint32_t num_globals = globals.size() - imports.num_globals;
@@ -353,7 +353,7 @@ bytedeque WasmModule::encode_code (FuncDecl &func) {
 bytedeque WasmModule::encode_code_section() {
   bytedeque bdeq;
 
-  ImportInfo &imports = this->imports;
+  auto &imports = this->imports;
 
   auto &funcs = this->funcs;
   uint32_t num_funcs = funcs.size() - imports.num_funcs;
