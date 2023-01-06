@@ -58,6 +58,15 @@ int main(int argc, char *argv[]) {
   TRACE("loaded %s: %ld bytes\n", filename, r);
   WasmModule module = parse_bytecode(start, end);
   unload_file(&start, &end);
+
+  /* Instrument */
+  GlobalDecl global = { 
+    .type = WASM_TYPE_I32, 
+    .is_mutable = true,
+    .init_expr_bytes = INIT_EXPR (I32_CONST, 5)
+  };
+  module.add_global(global, false);
+  /* Encode instrumented module */
   bytedeque bq = module.encode_module();
   return 0;
 }

@@ -61,7 +61,7 @@ struct SigDecl {
 };
 
 
-struct FuncDecl: public IEIdx {
+struct FuncDecl {
   /* From func/import section */
   SigDecl* sig;
   /* From code section */
@@ -73,16 +73,16 @@ struct FuncDecl: public IEIdx {
   /* CFG for function */
 };
 
-struct MemoryDecl: public IEIdx {
+struct MemoryDecl {
   wasm_limits_t limits;
 };
 
-struct TableDecl: public IEIdx {
+struct TableDecl {
   wasm_type_t reftype;
   wasm_limits_t limits;
 };
 
-struct GlobalDecl: public IEIdx {
+struct GlobalDecl {
   wasm_type_t type;
   unsigned is_mutable : 1;
   bytearr init_expr_bytes;
@@ -234,6 +234,10 @@ class WasmModule {
     void decode_buffer (buffer_t &buf);
     /* Encode module into wasm format */
     bytedeque encode_module ();
+
+
+    /* Instrumentation methods */
+    GlobalDecl& add_global (GlobalDecl &global, bool is_import);
 };
 
 

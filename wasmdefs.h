@@ -24,15 +24,6 @@ typedef enum {
   WASM_SECT_DATACOUNT
 } wasm_section_t;
 
-/* Type decoding */
-#define WASM_TYPE_I32 0x7F
-#define WASM_TYPE_I64 0x7E
-#define WASM_TYPE_F32 0x7D
-#define WASM_TYPE_F64 0x7C
-#define WASM_TYPE_V128 0x7B 
-#define WASM_TYPE_FUNCREF 0x70
-#define WASM_TYPE_EXTERNREF 0x6F
-#define WASM_TYPE_FUNC 0x60
 
 /* Import/export desc kind decoding */
 #define WASM_DESC_FUNC 0x00
@@ -40,16 +31,19 @@ typedef enum {
 #define WASM_DESC_MEM 0x02
 #define WASM_DESC_GLOBAL 0x03
 
+/* Type decoding */
 typedef enum {
-  I32 = WASM_TYPE_I32, 
-  I64 = WASM_TYPE_I64,
-  F32 = WASM_TYPE_F32,
-  F64 = WASM_TYPE_F64, 
-  V128 = WASM_TYPE_V128,
-  EXTERNREF = WASM_TYPE_EXTERNREF,
-  FUNCREF = WASM_TYPE_FUNCREF
+  WASM_TYPE_I32 = 0x7F, 
+  WASM_TYPE_I64 = 0x7E,
+  WASM_TYPE_F32 = 0x7D,
+  WASM_TYPE_F64 = 0x7C, 
+  WASM_TYPE_V128 = 0x7B,
+  WASM_TYPE_FUNCREF = 0x70,
+  WASM_TYPE_EXTERNREF = 0x6F,
+  WASM_TYPE_FUNC = 0x60
 } wasm_type_t;
 
+/* Kind decoding */
 typedef enum {
   KIND_FUNC = WASM_DESC_FUNC, 
   KIND_TABLE = WASM_DESC_TABLE, 
@@ -61,3 +55,7 @@ static inline bool isReftype(wasm_type_t type) {
   return (type == WASM_TYPE_EXTERNREF) || (type == WASM_TYPE_FUNCREF);
 }
 
+/* Other common defines/expressions */
+#define INIT_EXPR(type, val) ({  \
+  bytearr { WASM_OP_##type, val, WASM_OP_END }; \
+})
