@@ -15,15 +15,16 @@ GlobalDecl& WasmModule::add_global (GlobalDecl &global) {
     .kind = kd  \
   };
 
+
 #define IMPORT_ADD(field, decl) { \
   auto &field##s = this->field##s;  \
   auto &imports = this->imports;  \
-  /* Add to import list and count */  \
-  import.desc.field = &field##s.front();  \
-  imports.list.push_front(import);  \
-  this->imports.num_##field##s++;  \
   /* Add to field */  \
   field##s.push_front(decl);  \
+  /* Add to import list and count */  \
+  import.desc.field = &field##s.front();  \
+  this->imports.num_##field##s++;  \
+  imports.list.push_front(import);  \
   return imports.list.front(); \
 }
 
@@ -51,10 +52,20 @@ ImportDecl& WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
   IMPORT_INST (KIND_FUNC);
 
   auto &sigs = this->sigs;
-  auto &funcs = this->funcs;
-  sigs.push_back(sig);
-  FuncDecl fdecl = {
-    .sig = &sigs.back()
-  };
+  /* Check for existing matching sig */
+  SigDecl* sigptr = NULL;
+  for (auto &insig : sigs) {
+    if (insig == sig) {
+      sigptr = &insig;
+      break;
+    }
+  }
+  /* Create new sig if not found */
+  if (sigptr == NULL) {
+    sigs.push_back(sig);
+    sigptr = &sigs.back();
+  }
+
+  FuncDecl fdecl = { .sig = sigptr };
   IMPORT_ADD (func, fdecl);
 }

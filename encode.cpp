@@ -125,7 +125,7 @@ bytedeque WasmModule::encode_import_section() {
     WR_BYTE (import.kind);
     switch(import.kind) {
       case KIND_FUNC: {
-        uint32_t idx = this->getSigIdx(import.desc.func->sig);
+        uint32_t idx = this->getSigIdx((import.desc.func)->sig);
         WR_U32 (idx);
         break;
       }

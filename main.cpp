@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
   unload_file(&start, &end);
 
   /* Instrument */
+  /* Global inmodule */
   GlobalDecl global = { 
     .type = WASM_TYPE_I32, 
     .is_mutable = true,
@@ -67,6 +68,7 @@ int main(int argc, char *argv[]) {
   };
   module.add_global(global);
 
+  /* Global import */
   ImportInfo iminfo = {
     .mod_name = "instrumentest",
     .member_name = "newglob"
@@ -76,6 +78,14 @@ int main(int argc, char *argv[]) {
     .is_mutable = false
   };
   module.add_import(iminfo, imglob);
+
+  /* Function import */
+  iminfo.member_name = "newfunc";
+  SigDecl imfunc = {
+    .params = {WASM_TYPE_I32},
+    .results = {WASM_TYPE_F64}
+  };
+  module.add_import(iminfo, imfunc);
   /* Encode instrumented module */
   bytedeque bq = module.encode_module();
   return 0;

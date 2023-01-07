@@ -49,6 +49,21 @@ struct CustomDecl {
 struct SigDecl {
   typelist params;
   typelist results;
+
+  bool operator==(const SigDecl sig) {
+    bool parameq = std::equal(this->params.begin(), this->params.end(),
+            sig.params.begin(), sig.params.end());
+    bool resulteq = std::equal(this->results.begin(), this->results.end(),
+            sig.results.begin(), sig.results.end());
+    return parameq && resulteq;
+  }
+  bool operator!=(const SigDecl sig) {
+    bool parameq = std::equal(this->params.begin(), this->params.end(),
+            sig.params.begin(), sig.params.end());
+    bool resulteq = std::equal(this->results.begin(), this->results.end(),
+            sig.results.begin(), sig.results.end());
+    return !(parameq && resulteq);
+  }
 };
 
 

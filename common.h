@@ -78,6 +78,14 @@ extern int g_disassemble;
   i;  \
 })
 
+#define PRINT_LIST_PTRS(ll) { \
+  uint32_t i = 0; \
+  for (auto &it : ll) { \
+    TRACE ("Idx: %u | Ptr: %p\n", i, &it);  \
+    i++;  \
+  } \
+  TRACE ("\n"); \
+}
 /********************/
 
 
