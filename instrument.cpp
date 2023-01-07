@@ -17,11 +17,14 @@ GlobalDecl& WasmModule::add_global (GlobalDecl &global) {
 
 #define IMPORT_ADD(field, decl) { \
   auto &field##s = this->field##s;  \
-  this->imports.num_##field##s++;  \
-  import.desc.field = &field##s.front();  \
   auto &imports = this->imports;  \
+  /* Add to import list and count */  \
+  import.desc.field = &field##s.front();  \
   imports.list.push_front(import);  \
-  return imports.list.back(); \
+  this->imports.num_##field##s++;  \
+  /* Add to field */  \
+  field##s.push_front(decl);  \
+  return imports.list.front(); \
 }
 
 ImportDecl& WasmModule::add_import (ImportInfo &info, GlobalInfo &global) {

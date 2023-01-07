@@ -66,6 +66,16 @@ int main(int argc, char *argv[]) {
     .init_expr_bytes = INIT_EXPR (I32_CONST, 5)
   };
   module.add_global(global);
+
+  ImportInfo iminfo = {
+    .mod_name = "instrumentest",
+    .member_name = "newglob"
+  };
+  GlobalInfo imglob = {
+    .type = WASM_TYPE_EXTERNREF,
+    .is_mutable = false
+  };
+  module.add_import(iminfo, imglob);
   /* Encode instrumented module */
   bytedeque bq = module.encode_module();
   return 0;
