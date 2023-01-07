@@ -61,7 +61,7 @@ extern int g_disassemble;
 
 
 
-/*** Access macros ***/
+/*** List macros ***/
 #define GET_LIST_ELEM(ll, idx) ({ \
   auto it = std::next(ll.begin(), idx); \
   &(*it);  \
@@ -77,7 +77,7 @@ extern int g_disassemble;
     throw std::runtime_error("Element not found in list!\n"); \
   i;  \
 })
-  
+
 /********************/
 
 

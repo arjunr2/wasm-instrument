@@ -39,10 +39,12 @@ typedef std::list<wasm_localcse_t> wasm_localcsv_t;
 
 
 /* Section Field Declarations */
+
 struct CustomDecl {
   std::string name;
   bytearr bytes;
 };
+
 
 struct SigDecl {
   typelist params;
@@ -62,20 +64,28 @@ struct FuncDecl {
   /* CFG for function */
 };
 
+
 struct MemoryDecl {
   wasm_limits_t limits;
 };
+
 
 struct TableDecl {
   wasm_type_t reftype;
   wasm_limits_t limits;
 };
 
+
+struct GlobalInfo {
+  wasm_type_t type;
+  unsigned is_mutable : 1;
+};
 struct GlobalDecl {
   wasm_type_t type;
   unsigned is_mutable : 1;
   bytearr init_expr_bytes;
 };
+
 
 struct DataDecl {
   uint32_t flag;
@@ -83,6 +93,7 @@ struct DataDecl {
   uint32_t mem_offset;
   bytearr bytes;
 };
+
 
 struct ElemDecl {
   uint32_t flag;
@@ -99,6 +110,10 @@ union Descriptor {
   MemoryDecl* mem;
 };
 
+struct ImportInfo {
+  std::string mod_name;
+  std::string member_name;
+};
 struct ImportDecl {
   std::string mod_name;
   std::string member_name;
@@ -106,6 +121,11 @@ struct ImportDecl {
   Descriptor desc;
 };
 
+
+struct ExportInfo {
+  std::string name;
+  wasm_kind_t kind;
+};
 struct ExportDecl {
   std::string name;
   wasm_kind_t kind;
@@ -113,7 +133,7 @@ struct ExportDecl {
 };
 
 
-struct ImportInfo {
+struct ImportSet {
   std::list <ImportDecl> list;
   uint32_t num_funcs;
   uint32_t num_tables;
@@ -134,7 +154,7 @@ class WasmModule {
 
     std::list <CustomDecl>  customs;
     std::list <SigDecl>     sigs;
-    ImportInfo              imports;
+    ImportSet               imports;
     /* Func space */
     std::list <FuncDecl>    funcs;
     /* Table space */
@@ -229,7 +249,22 @@ class WasmModule {
 
 
     /* Instrumentation methods */
+    
+    /* Addition */
+    /* Module-internal values */
     GlobalDecl& add_global (GlobalDecl &global);
+
+    /* Imported values */
+    ImportDecl& add_import (ImportInfo &info, GlobalInfo &global);
+    ImportDecl& add_import (ImportInfo &info, TableDecl &table);
+    ImportDecl& add_import (ImportInfo &info, MemoryDecl &mem);
+    ImportDecl& add_import (ImportInfo &info, SigDecl &sig);
+
+    /* Exported values */
+    ExportDecl& add_export (ExportInfo &info, GlobalInfo &global);
+    ExportDecl& add_export (ExportInfo &info, TableDecl &table);
+    ExportDecl& add_export (ExportInfo &info, MemoryDecl &mem);
+    ExportDecl& add_export (ExportInfo &info, SigDecl &sig);
 };
 
 
