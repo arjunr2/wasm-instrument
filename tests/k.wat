@@ -135,6 +135,8 @@
     (i32.trunc_f64_u) ;; i32 i32
     (i32.const 33)
     (i32.sub)
+    (i32.add (global.get $aglob) (i32.const 45))
+    (global.set $aglob)
     (return)
   )
   (func $hello_world2 (param i32) (result f64)
@@ -145,6 +147,8 @@
       i32.add
       drop
     end
+    (f64.add (global.get $bglob) (f64.const -72))
+    (drop)
     (i32.add (local.get 0) (i32.const 8))
     (f64.add (local.get 1) (f64.const 9))
     (f64.add (local.get 1) (f64.const 10))
@@ -161,9 +165,9 @@
   (table (;0;) 10 10 funcref)
   (elem (i32.const 6) $hello_world $print_i32 $hello_world2 $print_i32)
   ;;(memory (;0;) 2 4)
-  (global (;0;) (mut i32) (i32.const 22))
-  (global (;1;) f64 (f64.const 3408))
-  (global (;2;) i64 (i64.const -324323243245))
+  (global $aglob (mut i32) (i32.const 22))
+  (global $bglob f64 (f64.const 3408))
+  (global $cglob i64 (i64.const -324323243245))
   (export "memory" (memory 0))
   (export "main" (func $hello_world))
   (export "main2" (func $hello_world2))

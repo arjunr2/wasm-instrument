@@ -1,13 +1,14 @@
 #include "ir.h"
 
 /*** Instrumentation Functions ***/
+
 /* Add a global to a module */
 GlobalDecl& WasmModule::add_global (GlobalDecl &global) {
   this->globals.push_back(global);
   return this->globals.back();
 }
 
-/* Imports for all declarations */
+
 #define IMPORT_INST(kd) \
   ImportDecl import = { \
     .mod_name = info.mod_name,  \
@@ -28,9 +29,9 @@ GlobalDecl& WasmModule::add_global (GlobalDecl &global) {
   return imports.list.front(); \
 }
 
+/* Imports for all declarations */
 ImportDecl& WasmModule::add_import (ImportInfo &info, GlobalInfo &global) {
   IMPORT_INST (KIND_GLOBAL);
-
   GlobalDecl gdecl = {
     .type = global.type,
     .is_mutable = global.is_mutable
@@ -68,4 +69,42 @@ ImportDecl& WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
 
   FuncDecl fdecl = { .sig = sigptr };
   IMPORT_ADD (func, fdecl);
+}
+
+
+
+#define EXPORT_INST(kd) \
+  ExportDecl exp = { \
+    .name = export_name,  \
+    .kind = kd  \
+  };
+
+
+#define EXPORT_ADD(kd, field) { \
+  /* Add to export list */  \
+  auto &exports = this->exports;  \
+  ExportDecl exp = { \
+    .name = export_name,  \
+    .kind = kd,  \
+    .desc = { .field = &field } \
+  };  \
+  exports.push_back(exp); \
+  return exports.back(); \
+}
+
+/* Exports for all declarations */
+ExportDecl& WasmModule::add_export (std::string export_name, GlobalDecl &global) {
+  EXPORT_ADD (KIND_GLOBAL, global);
+}
+
+ExportDecl& WasmModule::add_export (std::string export_name, TableDecl &table) {
+  EXPORT_ADD (KIND_TABLE, table);
+}
+
+ExportDecl& WasmModule::add_export (std::string export_name, MemoryDecl &mem) {
+  EXPORT_ADD (KIND_MEMORY, mem);
+}
+
+ExportDecl& WasmModule::add_export (std::string export_name, FuncDecl &func) {
+  EXPORT_ADD (KIND_FUNC, func);
 }

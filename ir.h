@@ -137,10 +137,6 @@ struct ImportDecl {
 };
 
 
-struct ExportInfo {
-  std::string name;
-  wasm_kind_t kind;
-};
 struct ExportDecl {
   std::string name;
   wasm_kind_t kind;
@@ -266,8 +262,11 @@ class WasmModule {
     /* Instrumentation methods */
     
     /* Addition */
-    /* Module-internal values */
-    GlobalDecl& add_global (GlobalDecl &global);
+    /* Module-internal values with optional export */
+    GlobalDecl& add_global  (GlobalDecl &global, const char* export_name = NULL);
+    TableDecl&  add_table   (TableDecl &table, const char* export_name = NULL);
+    MemoryDecl& add_memory  (MemoryDecl &mem, const char* export_name = NULL);
+    FuncDecl&   add_func    (FuncDecl &func, const char* export_name = NULL);
 
     /* Imported values */
     ImportDecl& add_import (ImportInfo &info, GlobalInfo &global);
@@ -276,10 +275,10 @@ class WasmModule {
     ImportDecl& add_import (ImportInfo &info, SigDecl &sig);
 
     /* Exported values */
-    ExportDecl& add_export (ExportInfo &info, GlobalInfo &global);
-    ExportDecl& add_export (ExportInfo &info, TableDecl &table);
-    ExportDecl& add_export (ExportInfo &info, MemoryDecl &mem);
-    ExportDecl& add_export (ExportInfo &info, SigDecl &sig);
+    ExportDecl& add_export (std::string export_name, GlobalDecl &global);
+    ExportDecl& add_export (std::string export_name, TableDecl &table);
+    ExportDecl& add_export (std::string export_name, MemoryDecl &mem);
+    ExportDecl& add_export (std::string export_name, FuncDecl &func);
 };
 
 

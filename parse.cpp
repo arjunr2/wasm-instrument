@@ -164,9 +164,7 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
       case KIND_FUNC: {
         info.num_funcs++;
         uint32_t idx = RD_U32();
-        FuncDecl func = {
-          .sig = this->getSig(idx)
-        };
+        FuncDecl func = { .sig = this->getSig(idx) };
         funcs.push_back(func);
         import.desc.func = &funcs.back();
         break;

@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     .is_mutable = true,
     .init_expr_bytes = INIT_EXPR (I32_CONST, 5)
   };
-  module.add_global(global);
+  auto &fiveglob = module.add_global(global);
 
   /* Global import */
   ImportInfo iminfo = {
@@ -86,6 +86,10 @@ int main(int argc, char *argv[]) {
     .results = {WASM_TYPE_F64}
   };
   module.add_import(iminfo, imfunc);
+
+  /* Export add */
+  module.add_export("inmodule_global", fiveglob);
+
   /* Encode instrumented module */
   bytedeque bq = module.encode_module();
   return 0;
