@@ -1,29 +1,66 @@
 #include "ir.h"
 
+#define FIND_OR_CREATE_SIG(sig) ({ \
+  auto &sigs = this->sigs;  \
+  /* Check for existing matching sig */ \
+  SigDecl* sigptr = NULL; \
+  for (auto &insig : sigs) {  \
+    if (insig == sig) { \
+      sigptr = &insig;  \
+      break;  \
+    } \
+  } \
+  /* Create new sig if not found */ \
+  if (sigptr == NULL) { \
+    sigs.push_back(sig);  \
+    sigptr = &sigs.back();  \
+  } \
+  sigptr; \
+})
+
 /*** Instrumentation Functions ***/
 
-/* Add a global to a module */
-GlobalDecl& WasmModule::add_global (GlobalDecl &global) {
-  this->globals.push_back(global);
-  return this->globals.back();
+#define ADD_FIELD(field) { \
+  this->field##s.push_back(field);  \
+  auto &ref = this->field##s.back();  \
+  if (export_name) {  \
+    add_export(export_name, ref); \
+  } \
+  return ref; \
 }
 
+/* Add a global to a module */
+GlobalDecl& WasmModule::add_global (GlobalDecl &global, const char* export_name) {
+  ADD_FIELD (global);
+}
 
-#define IMPORT_INST(kd) \
-  ImportDecl import = { \
-    .mod_name = info.mod_name,  \
-    .member_name = info.member_name, \
-    .kind = kd  \
-  };
+TableDecl& WasmModule::add_table (TableDecl &table, const char* export_name) {
+  ADD_FIELD (table);
+}
 
+MemoryDecl& WasmModule::add_memory (MemoryDecl &mem, const char* export_name) {
+  ADD_FIELD (mem); 
+}
 
-#define IMPORT_ADD(field, decl) { \
+FuncDecl& WasmModule::add_func (FuncDecl &func, const char* export_name) {
+  SigDecl &sig = *(func.sig);
+  SigDecl* sigptr = FIND_OR_CREATE_SIG(sig);
+  func.sig = sigptr;
+  ADD_FIELD (func);
+}
+
+#define IMPORT_ADD(kd, field, decl) { \
   auto &field##s = this->field##s;  \
   auto &imports = this->imports;  \
   /* Add to field */  \
   field##s.push_front(decl);  \
   /* Add to import list and count */  \
-  import.desc.field = &field##s.front();  \
+  ImportDecl import = { \
+    .mod_name = info.mod_name,  \
+    .member_name = info.member_name, \
+    .kind = kd,  \
+    .desc = { .field = &field##s.front() } \
+  };  \
   this->imports.num_##field##s++;  \
   imports.list.push_front(import);  \
   return imports.list.front(); \
@@ -31,44 +68,26 @@ GlobalDecl& WasmModule::add_global (GlobalDecl &global) {
 
 /* Imports for all declarations */
 ImportDecl& WasmModule::add_import (ImportInfo &info, GlobalInfo &global) {
-  IMPORT_INST (KIND_GLOBAL);
   GlobalDecl gdecl = {
     .type = global.type,
     .is_mutable = global.is_mutable
   };
-  IMPORT_ADD(global, gdecl);
+  IMPORT_ADD(KIND_GLOBAL, global, gdecl);
 }
 
 ImportDecl& WasmModule::add_import (ImportInfo &info, TableDecl &table) {
-  IMPORT_INST (KIND_TABLE);
-  IMPORT_ADD (table, table);
+  IMPORT_ADD (KIND_TABLE, table, table);
 }
 
 ImportDecl& WasmModule::add_import (ImportInfo &info, MemoryDecl &mem) {
-  IMPORT_INST (KIND_MEMORY);
-  IMPORT_ADD (mem, mem);
+  IMPORT_ADD (KIND_MEMORY, mem, mem);
 }
 
+
 ImportDecl& WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
-  IMPORT_INST (KIND_FUNC);
-
-  auto &sigs = this->sigs;
-  /* Check for existing matching sig */
-  SigDecl* sigptr = NULL;
-  for (auto &insig : sigs) {
-    if (insig == sig) {
-      sigptr = &insig;
-      break;
-    }
-  }
-  /* Create new sig if not found */
-  if (sigptr == NULL) {
-    sigs.push_back(sig);
-    sigptr = &sigs.back();
-  }
-
+  SigDecl* sigptr = FIND_OR_CREATE_SIG(sig);
   FuncDecl fdecl = { .sig = sigptr };
-  IMPORT_ADD (func, fdecl);
+  IMPORT_ADD (KIND_FUNC, func, fdecl);
 }
 
 
