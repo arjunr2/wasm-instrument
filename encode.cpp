@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 
 #include "ir.h"
 #include "inst_internal.h"
@@ -19,16 +20,13 @@ typedef enum {
   datacount_id
 } section_id;
 
-static void dump_bytedeque(bytedeque &bdeq) {
-  uint32_t i = 0;
-  for (auto &it: bdeq) {
-    std::cout << it;
-    //printf("%02x ", it);
-    //i++;
-    //if (!(i & 7)) { printf(" "); }
-    //if (!(i & 15)) { printf("\n"); }
-  }
-  //printf("\n");
+static void dump_bytedeque(bytedeque &bdeq, char* outfile) {
+  //for (auto &it: bdeq) {
+  //  std::cout << it;
+  //}
+  std::ofstream FILE(outfile, std::ios::out | std::ofstream::binary);
+  std::copy(bdeq.begin(), bdeq.end(), std::ostreambuf_iterator<char>(FILE));
+  FILE.flush();
 }
 
 /* Write LimitsType */
@@ -437,7 +435,7 @@ bytedeque WasmModule::encode_custom_section(CustomDecl &custom) {
 
 
 /* Main Encoder routine */
-bytedeque WasmModule::encode_module() {
+bytedeque WasmModule::encode_module(char* outfile) {
   bytedeque bdeq;
 
   WR_U32_RAW (this->magic);
@@ -470,6 +468,6 @@ bytedeque WasmModule::encode_module() {
     ENCODE_CALL (custom, custom);
   }
 
-  dump_bytedeque(bdeq);
+  dump_bytedeque(bdeq, outfile);
   return bdeq;
 }

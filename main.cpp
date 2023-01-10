@@ -15,47 +15,61 @@
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
   {"dis", no_argument, &g_disassemble, 1},
+  {"out", required_argument, NULL, 'o'},
   {"help", no_argument, NULL, 'h'}
 };
 
-char* parse_args(int argc, char* argv[]) {
+typedef struct {
+  char* infile;
+  char* outfile;
+} args_t;
+
+args_t parse_args(int argc, char* argv[]) {
   int opt;
+  args_t args = {0};
   optind = 0;
-  while ((opt = getopt_long_only(argc, argv, "h", long_options, NULL)) != -1) {
+  while ((opt = getopt_long_only(argc, argv, "o:h", long_options, NULL)) != -1) {
     switch(opt) {
       case 0: break;
+      case 'o': args.outfile = strdup(optarg); break;
       case 'h':
       default:
-        ERR("Usage: %s [--trace] [--dis] <filename>\n", argv[0]);
+        ERR("Usage: %s [--trace] [--out OUTFILE] <infile>\n", argv[0]);
         exit(opt != 'h');
     }
   }
 
-  if ((optind + 1) != argc) {
-    ERR("Executable takes one positional argument \"filename\"\n");
+  if ( ((optind + 1) != argc)) {
+    ERR("Executable takes one one positional argument \"filename\"\n");
+    exit(1);
+  }
+
+  if (!args.outfile) {
+    ERR("Executable requires outfile \"--out\"\n");
     exit(1);
   }
   
   //printf("Trace: %d | Dis: %d\n", g_trace, g_disassemble);
-  return argv[optind];
+  args.infile = argv[optind];
+  return args;
 }
 
 // Main function.
 // Parses arguments and either runs a file with arguments.
 //  -trace: enable tracing to stderr
 int main(int argc, char *argv[]) {
-  char* filename = parse_args(argc, argv);
+  args_t args = parse_args(argc, argv);
     
   byte* start = NULL;
   byte* end = NULL;
 
-  ssize_t r = load_file(filename, &start, &end);
+  ssize_t r = load_file(args.infile, &start, &end);
   if (r < 0) {
-    ERR("failed to load: %s\n", filename);
+    ERR("failed to load: %s\n", args.infile);
     return 1;
   }
 
-  TRACE("loaded %s: %ld bytes\n", filename, r);
+  TRACE("loaded %s: %ld bytes\n", args.infile, r);
   WasmModule module = parse_bytecode(start, end);
   unload_file(&start, &end);
 
@@ -66,7 +80,7 @@ int main(int argc, char *argv[]) {
     .is_mutable = true,
     .init_expr_bytes = INIT_EXPR (I32_CONST, 5)
   };
-  auto *fv  = module.add_global(global, "inmodule_global");
+  module.add_global(global, "inmodule_global");
 
   /* Global import */
   ImportInfo iminfo = {
@@ -94,7 +108,7 @@ int main(int argc, char *argv[]) {
   }
 
   /* Encode instrumented module */
-  bytedeque bq = module.encode_module();
+  bytedeque bq = module.encode_module(args.outfile);
   return 0;
 }
 
