@@ -176,9 +176,11 @@ void ImmMemoryInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 /* UNIMPLEMENTED */
 /* ImmTagInst  */
 ImmTagInst::ImmTagInst (WasmModule &module, byte opcode, buffer_t &buf)
-    : InstBase(opcode) {}
+    : InstBase(opcode) { 
+  throw std::runtime_error ("Unimplemeted TAG opcode"); 
+}
 
-void ImmTagInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {}
+//void ImmTagInst::encode_imm (WasmModule &module, bytedeque &bdeq) const { } 
 
 
 /* ImmI64Inst  */

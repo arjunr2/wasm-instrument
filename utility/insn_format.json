@@ -1,0 +1,20 @@
+{
+  "ImmNoneInst": [],
+  "ImmBlocktInst": ["int64_t type"],
+  "ImmLabelInst": ["uint32_t idx"],
+  "ImmLabelsInst": ["std::list<uint32_t> idxs", "uint32_t def_idx"],
+  "ImmFuncInst": ["FuncDecl* func"],
+  "ImmSigTableInst": ["SigDecl* sig", "FuncDecl* func"],
+  "ImmLocalInst": ["uint32_t idx"],
+  "ImmGlobalInst": ["GlobalDecl* global"],
+  "ImmTableInst": ["TableDecl* table"],
+  "ImmMemargInst": ["uint32_t align", "uint32_t offset"],
+  "ImmI32Inst": ["uint32_t value"],
+  "ImmF64Inst": ["double value"],
+  "ImmMemoryInst": ["MemoryDecl* mem"],
+  "ImmTagInst": [],
+  "ImmI64Inst": ["int64_t value"],
+  "ImmF32Inst": ["float value"],
+  "ImmRefnulltInst": ["wasm_type_t type"],
+  "ImmValtsInst": ["std::list<wasm_type_t> types"]
+}
