@@ -76,14 +76,14 @@ void ImmFuncInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 ImmSigTableInst::ImmSigTableInst (WasmModule &module, byte opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->sig = module.getSig (RD_U32());
-  this->func = module.getFunc (RD_U32());
+  this->table = module.getTable (RD_U32());
 }
 
 void ImmSigTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t sig_idx = module.getSigIdx (this->sig);
-  uint32_t func_idx = module.getFuncIdx (this->func);
+  uint32_t table_idx = module.getTableIdx (this->table);
   WR_U32 (sig_idx);
-  WR_U32 (func_idx);
+  WR_U32 (table_idx);
 }
 
 

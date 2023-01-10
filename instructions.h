@@ -62,7 +62,7 @@ class CallInst: public ImmFuncInst {
 
 class CallIndirectInst: public ImmSigTableInst {
 	public:
-	CallIndirectInst(SigDecl* sig,FuncDecl* func) : ImmSigTableInst(WASM_OP_CALL_INDIRECT, sig,func) { }
+	CallIndirectInst(SigDecl* sig,TableDecl* table) : ImmSigTableInst(WASM_OP_CALL_INDIRECT, sig,table) { }
 };
 
 class DropInst: public ImmNoneInst {
@@ -887,7 +887,7 @@ class ReturnCallInst: public ImmFuncInst {
 
 class ReturnCallIndirectInst: public ImmSigTableInst {
 	public:
-	ReturnCallIndirectInst(SigDecl* sig,FuncDecl* func) : ImmSigTableInst(WASM_OP_RETURN_CALL_INDIRECT, sig,func) { }
+	ReturnCallIndirectInst(SigDecl* sig,TableDecl* table) : ImmSigTableInst(WASM_OP_RETURN_CALL_INDIRECT, sig,table) { }
 };
 
 class CallRefInst: public ImmNoneInst {

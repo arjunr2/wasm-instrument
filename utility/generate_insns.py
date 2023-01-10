@@ -28,7 +28,6 @@ def _main():
     script_dir = Path(__file__).parent;
     with open(script_dir / "insn_format.json") as f:
         insn_format = json.load(f)
-    print(insn_format)
 
     with open(script_dir / ".." / "opcode_table.c") as f:
         print("#include \"inst_internal.h\"\n")

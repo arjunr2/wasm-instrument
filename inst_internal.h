@@ -80,11 +80,11 @@ class ImmFuncInst: public InstBase {
 
 class ImmSigTableInst: public InstBase {
   SigDecl* sig;
-  FuncDecl* func;
+  TableDecl* table;
   public:
     ImmSigTableInst (WasmModule &module, byte opcode, buffer_t &buf);
-    ImmSigTableInst (byte opcode, SigDecl *sig, FuncDecl *func) : 
-      InstBase(opcode), sig(sig), func(func) { }
+    ImmSigTableInst (byte opcode, SigDecl *sig, TableDecl *table) : 
+      InstBase(opcode), sig(sig), table(table) { }
 
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
