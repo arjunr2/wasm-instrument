@@ -173,6 +173,8 @@ class ImmTagInst: public InstBase {
 
   public:
     ImmTagInst (WasmModule &module, byte opcode, buffer_t &buf);
+    ImmTagInst (byte opcode) :
+      InstBase(opcode) { }
     //void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
 

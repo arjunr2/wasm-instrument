@@ -10,6 +10,7 @@
 #include "common.h"
 #include "parse.h"
 #include "ir.h"
+#include "instructions.h"
 
 
 static struct option long_options[] = {
@@ -99,7 +100,7 @@ int main(int argc, char *argv[]) {
     .params = {WASM_TYPE_I32},
     .results = {WASM_TYPE_F64}
   };
-  module.add_import(iminfo, imfunc);
+  ImportDecl* func_imp = module.add_import(iminfo, imfunc);
 
   /* Export find */
   ExportDecl* exp = module.find_export("printf");
@@ -109,6 +110,7 @@ int main(int argc, char *argv[]) {
 
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);
+  CallInst call(func_imp->desc.func);
   return 0;
 }
 
