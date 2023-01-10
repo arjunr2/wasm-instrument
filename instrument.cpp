@@ -26,23 +26,23 @@
   if (export_name) {  \
     add_export(export_name, ref); \
   } \
-  return ref; \
+  return &ref; \
 }
 
 /* Add a global to a module */
-GlobalDecl& WasmModule::add_global (GlobalDecl &global, const char* export_name) {
+GlobalDecl* WasmModule::add_global (GlobalDecl &global, const char* export_name) {
   ADD_FIELD (global);
 }
 
-TableDecl& WasmModule::add_table (TableDecl &table, const char* export_name) {
+TableDecl* WasmModule::add_table (TableDecl &table, const char* export_name) {
   ADD_FIELD (table);
 }
 
-MemoryDecl& WasmModule::add_memory (MemoryDecl &mem, const char* export_name) {
+MemoryDecl* WasmModule::add_memory (MemoryDecl &mem, const char* export_name) {
   ADD_FIELD (mem); 
 }
 
-FuncDecl& WasmModule::add_func (FuncDecl &func, const char* export_name) {
+FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name) {
   SigDecl &sig = *(func.sig);
   SigDecl* sigptr = FIND_OR_CREATE_SIG(sig);
   func.sig = sigptr;
@@ -63,11 +63,11 @@ FuncDecl& WasmModule::add_func (FuncDecl &func, const char* export_name) {
   };  \
   this->imports.num_##field##s++;  \
   imports.list.push_front(import);  \
-  return imports.list.front(); \
+  return &imports.list.front(); \
 }
 
 /* Imports for all declarations */
-ImportDecl& WasmModule::add_import (ImportInfo &info, GlobalInfo &global) {
+ImportDecl* WasmModule::add_import (ImportInfo &info, GlobalInfo &global) {
   GlobalDecl gdecl = {
     .type = global.type,
     .is_mutable = global.is_mutable
@@ -75,28 +75,21 @@ ImportDecl& WasmModule::add_import (ImportInfo &info, GlobalInfo &global) {
   IMPORT_ADD(KIND_GLOBAL, global, gdecl);
 }
 
-ImportDecl& WasmModule::add_import (ImportInfo &info, TableDecl &table) {
+ImportDecl* WasmModule::add_import (ImportInfo &info, TableDecl &table) {
   IMPORT_ADD (KIND_TABLE, table, table);
 }
 
-ImportDecl& WasmModule::add_import (ImportInfo &info, MemoryDecl &mem) {
+ImportDecl* WasmModule::add_import (ImportInfo &info, MemoryDecl &mem) {
   IMPORT_ADD (KIND_MEMORY, mem, mem);
 }
 
 
-ImportDecl& WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
+ImportDecl* WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
   SigDecl* sigptr = FIND_OR_CREATE_SIG(sig);
   FuncDecl fdecl = { .sig = sigptr };
   IMPORT_ADD (KIND_FUNC, func, fdecl);
 }
 
-
-
-#define EXPORT_INST(kd) \
-  ExportDecl exp = { \
-    .name = export_name,  \
-    .kind = kd  \
-  };
 
 
 #define EXPORT_ADD(kd, field) { \
@@ -108,22 +101,31 @@ ImportDecl& WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
     .desc = { .field = &field } \
   };  \
   exports.push_back(exp); \
-  return exports.back(); \
+  return &exports.back(); \
 }
 
 /* Exports for all declarations */
-ExportDecl& WasmModule::add_export (std::string export_name, GlobalDecl &global) {
+ExportDecl* WasmModule::add_export (std::string export_name, GlobalDecl &global) {
   EXPORT_ADD (KIND_GLOBAL, global);
 }
 
-ExportDecl& WasmModule::add_export (std::string export_name, TableDecl &table) {
+ExportDecl* WasmModule::add_export (std::string export_name, TableDecl &table) {
   EXPORT_ADD (KIND_TABLE, table);
 }
 
-ExportDecl& WasmModule::add_export (std::string export_name, MemoryDecl &mem) {
+ExportDecl* WasmModule::add_export (std::string export_name, MemoryDecl &mem) {
   EXPORT_ADD (KIND_MEMORY, mem);
 }
 
-ExportDecl& WasmModule::add_export (std::string export_name, FuncDecl &func) {
+ExportDecl* WasmModule::add_export (std::string export_name, FuncDecl &func) {
   EXPORT_ADD (KIND_FUNC, func);
+}
+
+
+/* Find methods */
+ExportDecl* WasmModule::find_export (std::string export_name) {
+  for (auto &exp : this->exports) {
+    if (exp.name == export_name) { return &exp; }
+  }
+  return NULL;
 }

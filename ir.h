@@ -263,22 +263,25 @@ class WasmModule {
     
     /* Addition */
     /* Module-internal values with optional export */
-    GlobalDecl& add_global  (GlobalDecl &global, const char* export_name = NULL);
-    TableDecl&  add_table   (TableDecl &table, const char* export_name = NULL);
-    MemoryDecl& add_memory  (MemoryDecl &mem, const char* export_name = NULL);
-    FuncDecl&   add_func    (FuncDecl &func, const char* export_name = NULL);
+    GlobalDecl* add_global  (GlobalDecl &global, const char* export_name = NULL);
+    TableDecl*  add_table   (TableDecl &table, const char* export_name = NULL);
+    MemoryDecl* add_memory  (MemoryDecl &mem, const char* export_name = NULL);
+    FuncDecl*   add_func    (FuncDecl &func, const char* export_name = NULL);
 
     /* Imported values */
-    ImportDecl& add_import (ImportInfo &info, GlobalInfo &global);
-    ImportDecl& add_import (ImportInfo &info, TableDecl &table);
-    ImportDecl& add_import (ImportInfo &info, MemoryDecl &mem);
-    ImportDecl& add_import (ImportInfo &info, SigDecl &sig);
+    ImportDecl* add_import (ImportInfo &info, GlobalInfo &global);
+    ImportDecl* add_import (ImportInfo &info, TableDecl &table);
+    ImportDecl* add_import (ImportInfo &info, MemoryDecl &mem);
+    ImportDecl* add_import (ImportInfo &info, SigDecl &sig);
 
     /* Exported values */
-    ExportDecl& add_export (std::string export_name, GlobalDecl &global);
-    ExportDecl& add_export (std::string export_name, TableDecl &table);
-    ExportDecl& add_export (std::string export_name, MemoryDecl &mem);
-    ExportDecl& add_export (std::string export_name, FuncDecl &func);
+    ExportDecl* add_export (std::string export_name, GlobalDecl &global);
+    ExportDecl* add_export (std::string export_name, TableDecl &table);
+    ExportDecl* add_export (std::string export_name, MemoryDecl &mem);
+    ExportDecl* add_export (std::string export_name, FuncDecl &func);
+
+    /* Find */
+    ExportDecl* find_export (std::string export_name);
 };
 
 
