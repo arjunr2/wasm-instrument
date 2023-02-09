@@ -108,6 +108,18 @@ int main(int argc, char *argv[]) {
     TRACE("Printf not found\n");
   }
 
+  /* Insert NOP before every call in main */
+  ExportDecl* main_exp = module.find_export("_start");
+  FuncDecl* main_fn = main_exp->desc.func;
+  InstList &insts = main_fn->instructions;
+  for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
+    InstBasePtr &instruction = *institr;
+    if (instruction->is(WASM_OP_CALL)) {
+      insts.insert(institr, InstBasePtr(new I32ConstInst(0xDEADBEEF)));
+      insts.insert(institr, InstBasePtr(new DropInst()));
+    }
+  }
+
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);
   CallInst call(func_imp->desc.func);

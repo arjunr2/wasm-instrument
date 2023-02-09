@@ -187,8 +187,8 @@ class WasmModule {
     int has_datacount;
 
     /* Decode functions */
-    #define DECODE_DECL(sec)  \
-      void decode_##sec##_section (buffer_t &buf, uint32_t len);
+    #define DECODE_DECL(sec,...)  \
+      void decode_##sec##_section (buffer_t &buf, uint32_t len __VA_OPT__(,) __VA_ARGS__);
     DECODE_DECL(type);
     DECODE_DECL(import);
     DECODE_DECL(function);
@@ -198,7 +198,7 @@ class WasmModule {
     DECODE_DECL(export);
     DECODE_DECL(start);
     DECODE_DECL(element);
-    DECODE_DECL(code);
+    DECODE_DECL(code, bool gen_cfg);
     DECODE_DECL(data);
     DECODE_DECL(datacount);
     DECODE_DECL(custom);
@@ -221,7 +221,7 @@ class WasmModule {
     ENCODE_DECL(custom, CustomDecl &custom);
 
     /* Code decoding for instructions */
-    InstList decode_expr_to_insts (buffer_t &buf);
+    InstList decode_expr_to_insts (buffer_t &buf, bool gen_cfg);
     /* Code encoding for instructions */
     void encode_expr_to_insts (bytedeque &bdeq, InstList &instlist, bytearr &bytes);
     /* Code + local encoding for instructions */
@@ -254,7 +254,7 @@ class WasmModule {
     inline uint32_t get_num_customs() { return this->customs.size(); }
 
     /* Decode wasm file from buffer */
-    void decode_buffer (buffer_t &buf);
+    void decode_buffer (buffer_t &buf, bool gen_cfg);
     /* Encode module into wasm format */
     bytedeque encode_module (char* outfile);
 
@@ -282,6 +282,12 @@ class WasmModule {
 
     /* Find */
     ExportDecl* find_export (std::string export_name);
+
+    /* Replace uses */
+    void replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst);
+    void replace_all_uses (TableDecl* old_inst, TableDecl* new_inst);
+    void replace_all_uses (MemoryDecl* old_inst, MemoryDecl* new_inst);
+    void replace_all_uses (FuncDecl* old_inst, FuncDecl* new_inst);
 };
 
 

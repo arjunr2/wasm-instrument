@@ -337,7 +337,7 @@ static wasm_localcsv_t decode_locals(buffer_t &buf, uint32_t &num_locals) {
 
 
 /* Code decoding for instructions: Calls internal instructions */
-InstList WasmModule::decode_expr_to_insts (buffer_t &buf) {
+InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
   InstList ilist = { };
   while (buf.ptr < buf.end) {
     byte opcode = RD_BYTE();
@@ -387,7 +387,7 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf) {
 }
 
 /* Gets run after function section; in order */
-void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
+void WasmModule::decode_code_section (buffer_t &buf, uint32_t len, bool gen_cfg) {
   uint32_t num_fn = RD_U32();
   
   uint32_t num_imports = this->imports.num_funcs;
@@ -406,7 +406,7 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len) {
     /* Fn body bytes and expr */
     func.code_bytes = RD_BYTESTR(end_insts - start_insts);
     buffer_t cbuf = { start_insts, start_insts, end_insts };
-    func.instructions = decode_expr_to_insts(cbuf);
+    func.instructions = this->decode_expr_to_insts(cbuf, gen_cfg);
   }
 }
 
@@ -480,8 +480,8 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
 }
 
 
-
-void WasmModule::decode_buffer(buffer_t &buf) {
+/* Wasm Module parser from buffer bytecode */
+void WasmModule::decode_buffer(buffer_t &buf, bool gen_cfg) {
 
   /* Magic number & Version */
   uint32_t magic = RD_U32_RAW();
@@ -505,7 +505,7 @@ void WasmModule::decode_buffer(buffer_t &buf) {
     TRACE("Found section \"%s\", len: %d\n", wasm_section_name(section_id), len);
 
     buffer_t cbuf = {buf.ptr, buf.ptr, buf.ptr + len};
-    #define DECODE_CALL(sec)  this->decode_##sec##_section (cbuf, len); break;
+    #define DECODE_CALL(sec,...)  this->decode_##sec##_section (cbuf, len __VA_OPT__(,) __VA_ARGS__); break;
     switch (section_id) {
       case WASM_SECT_TYPE:      DECODE_CALL(type); 
       case WASM_SECT_IMPORT:    DECODE_CALL(import); 
@@ -516,7 +516,7 @@ void WasmModule::decode_buffer(buffer_t &buf) {
       case WASM_SECT_EXPORT:    DECODE_CALL(export); 
       case WASM_SECT_START:     DECODE_CALL(start); 
       case WASM_SECT_ELEMENT:   DECODE_CALL(element);  
-      case WASM_SECT_CODE:      DECODE_CALL(code); 
+      case WASM_SECT_CODE:      DECODE_CALL(code, gen_cfg); 
       case WASM_SECT_DATA:      DECODE_CALL(data); 
       case WASM_SECT_DATACOUNT: DECODE_CALL(datacount); 
       case WASM_SECT_CUSTOM:    DECODE_CALL(custom); 
@@ -539,6 +539,7 @@ void WasmModule::decode_buffer(buffer_t &buf) {
 }
 
 
+
 /* Main Parse routine */
 WasmModule parse_bytecode(const byte* start, const byte* end, bool gen_cfg = true) {
   
@@ -553,7 +554,7 @@ WasmModule parse_bytecode(const byte* start, const byte* end, bool gen_cfg = tru
   }
 
   /* Decode entire module elements */
-  module.decode_buffer(buf);
+  module.decode_buffer(buf, gen_cfg);
   
   /* Has to match exactly */
   if (buf.ptr != buf.end) {
