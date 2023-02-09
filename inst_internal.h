@@ -3,13 +3,38 @@
 #include "wasmdefs.h"
 #include "ir.h"
 
-/* All these should never be instantiated explicitly, only by parser */
+class BasicBlock {
+  std::list<InstBasePtr>::iterator start;
+  std::list<InstBasePtr>::iterator end;
+  std::list<BasicBlock*> succs;
+  std::list<BasicBlock*> preds;
 
+  public:
+  BasicBlock(std::list<InstBasePtr>::iterator start, 
+              std::list<InstBasePtr>::iterator end): start(start), end(end) { }
+  void add_successor(BasicBlock* succ) { this->succs.push_back(succ); }
+  void add_predecessor(BasicBlock* pred) { this->preds.push_back(pred); }
+};
+
+struct ScopeMeta {
+  InstBasePtr start;
+  InstBasePtr end;
+};
+
+class CFG {
+  std::list<BasicBlock> basic_blocks;
+  std::vector<ScopeMeta> scope_meta;
+};
+
+/* All these should never be instantiated explicitly, only by parser */
 class InstBase {
   private:
     byte opcode;
+    opcode_imm_type imm_type;
   public:
-    InstBase (byte opcode) : opcode(opcode) {};
+    InstBase (byte opcode) : opcode(opcode) {
+      this->imm_type = opcode_table[opcode].imm_type;
+    }
     
     inline byte getOpcode() { return opcode; }
     inline bool is(byte opc) { return (this->opcode == opc); } 

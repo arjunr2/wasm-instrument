@@ -55,26 +55,9 @@ args_t parse_args(int argc, char* argv[]) {
   return args;
 }
 
-// Main function.
-// Parses arguments and either runs a file with arguments.
-//  -trace: enable tracing to stderr
-int main(int argc, char *argv[]) {
-  args_t args = parse_args(argc, argv);
-    
-  byte* start = NULL;
-  byte* end = NULL;
 
-  ssize_t r = load_file(args.infile, &start, &end);
-  if (r < 0) {
-    ERR("failed to load: %s\n", args.infile);
-    return 1;
-  }
 
-  TRACE("loaded %s: %ld bytes\n", args.infile, r);
-  WasmModule module = parse_bytecode(start, end);
-  unload_file(&start, &end);
-
-  /* Instrument */
+void sample_instrument (WasmModule& module) {
   /* Global inmodule */
   GlobalDecl global = { 
     .type = WASM_TYPE_I32, 
@@ -119,10 +102,60 @@ int main(int argc, char *argv[]) {
       insts.insert(institr, InstBasePtr(new DropInst()));
     }
   }
+}
+
+
+
+void loop_instrument (WasmModule &module) {
+  uint64_t num_loops = 0;
+  for (auto &func : module.Funcs()) {
+    InstList &insts = func.instructions;
+    for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
+      InstBasePtr &instruction = *institr;
+      // Increment global after loop
+      if (instruction->is(WASM_OP_LOOP)) {
+        GlobalDecl global = {
+          .type = WASM_TYPE_I64, 
+          .is_mutable = true,
+          .init_expr_bytes = INIT_EXPR (I64_CONST, 0)
+        };
+        GlobalDecl *gref = module.add_global(global, 
+                              (std::string("lpcnt_") + std::to_string(num_loops++)).c_str());
+        auto loc = std::next(institr);
+        insts.insert(loc, InstBasePtr(new GlobalGetInst(gref)));
+        insts.insert(loc, InstBasePtr(new I64ConstInst(1)));
+        insts.insert(loc, InstBasePtr(new I64AddInst()));
+        insts.insert(loc, InstBasePtr(new GlobalSetInst(gref)));
+      }
+    }
+  }
+}
+
+// Main function.
+// Parses arguments and either runs a file with arguments.
+//  -trace: enable tracing to stderr
+int main(int argc, char *argv[]) {
+  args_t args = parse_args(argc, argv);
+    
+  byte* start = NULL;
+  byte* end = NULL;
+
+  ssize_t r = load_file(args.infile, &start, &end);
+  if (r < 0) {
+    ERR("failed to load: %s\n", args.infile);
+    return 1;
+  }
+
+  TRACE("loaded %s: %ld bytes\n", args.infile, r);
+  WasmModule module = parse_bytecode(start, end);
+  unload_file(&start, &end);
+
+  /* Instrument */
+  //sample_instrument(module);
+  loop_instrument(module);
 
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);
-  CallInst call(func_imp->desc.func);
   return 0;
 }
 

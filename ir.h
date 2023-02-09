@@ -77,6 +77,7 @@ struct FuncDecl {
   /* Code: Raw static instructions */ 
   InstList instructions;
   /* CFG for function */
+  
 };
 
 
@@ -250,6 +251,10 @@ class WasmModule {
       return idx;
     }
     inline uint32_t getImportIdx(ImportDecl *import)     { return GET_LIST_IDX(this->imports.list, import); }
+
+    /* Section Accessors */
+    inline std::list <FuncDecl> &Funcs() { return this->funcs; }
+    inline std::list <GlobalDecl> &Globals() { return this->globals; }
 
     inline uint32_t get_num_customs() { return this->customs.size(); }
 

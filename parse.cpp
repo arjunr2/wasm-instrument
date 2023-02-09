@@ -336,6 +336,8 @@ static wasm_localcsv_t decode_locals(buffer_t &buf, uint32_t &num_locals) {
 }
 
 
+
+
 /* Code decoding for instructions: Calls internal instructions */
 InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
   InstList ilist = { };

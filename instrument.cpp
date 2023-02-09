@@ -129,3 +129,13 @@ ExportDecl* WasmModule::find_export (std::string export_name) {
   }
   return NULL;
 }
+
+
+/* Replace methods */
+void WasmModule::replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst) {}
+
+void WasmModule::replace_all_uses (TableDecl* old_inst, TableDecl* new_inst) {}
+
+void WasmModule::replace_all_uses (MemoryDecl* old_inst, MemoryDecl* new_inst) {}
+
+void WasmModule::replace_all_uses (FuncDecl* old_inst, FuncDecl* new_inst) {}
