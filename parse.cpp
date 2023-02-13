@@ -337,7 +337,6 @@ static wasm_localcsv_t decode_locals(buffer_t &buf, uint32_t &num_locals) {
 
 
 
-
 /* Code decoding for instructions: Calls internal instructions */
 InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
   InstList ilist = { };
@@ -379,7 +378,7 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
         throw std::runtime_error("Unknown imm");
     }
     ilist.push_back(instptr);
-    TRACE("O: %s\n", op_entry.mnemonic);
+    //TRACE("O: %s\n", op_entry.mnemonic);
   }
   if (buf.ptr != buf.end) {
     throw std::runtime_error("Unaligned end for instruction parsing\n");
@@ -387,6 +386,7 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
   TRACE("=== Function Parsed Successfully ===\n");
   return ilist;
 }
+
 
 /* Gets run after function section; in order */
 void WasmModule::decode_code_section (buffer_t &buf, uint32_t len, bool gen_cfg) {
@@ -539,7 +539,6 @@ void WasmModule::decode_buffer(buffer_t &buf, bool gen_cfg) {
     buf.ptr = cbuf.ptr;
   }
 }
-
 
 
 /* Main Parse routine */

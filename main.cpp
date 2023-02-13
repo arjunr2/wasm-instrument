@@ -9,6 +9,7 @@
 
 #include "common.h"
 #include "parse.h"
+#include "views.h"
 #include "ir.h"
 #include "instructions.h"
 
@@ -120,12 +121,14 @@ void loop_instrument (WasmModule &module) {
           .init_expr_bytes = INIT_EXPR (I64_CONST, 0)
         };
         GlobalDecl *gref = module.add_global(global, 
-                              (std::string("lpcnt_") + std::to_string(num_loops++)).c_str());
+                              (std::string("__slinstrument_lpcnt_") + std::to_string(num_loops++)).c_str());
         auto loc = std::next(institr);
-        insts.insert(loc, InstBasePtr(new GlobalGetInst(gref)));
-        insts.insert(loc, InstBasePtr(new I64ConstInst(1)));
-        insts.insert(loc, InstBasePtr(new I64AddInst()));
-        insts.insert(loc, InstBasePtr(new GlobalSetInst(gref)));
+        InstList addinst;
+        addinst.push_back(InstBasePtr(new GlobalGetInst(gref)));
+        addinst.push_back(InstBasePtr(new I64ConstInst(1)));
+        addinst.push_back(InstBasePtr(new I64AddInst()));
+        addinst.push_back(InstBasePtr(new GlobalSetInst(gref)));
+        insts.insert(loc, addinst.begin(), addinst.end());
       }
     }
   }
@@ -153,6 +156,10 @@ int main(int argc, char *argv[]) {
   /* Instrument */
   //sample_instrument(module);
   loop_instrument(module);
+  for (auto &func : module.Funcs()) {
+    ScopeList scope_list = module.gen_scopes_from_instructions(&func);
+    TRACE("Size of scope list: %ld\n", scope_list.size());
+  }
 
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);

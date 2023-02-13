@@ -11,11 +11,17 @@
 #include "common.h"
 #include "wasmdefs.h"
 
+
 class InstBase;
 typedef std::shared_ptr<InstBase> InstBasePtr;
 typedef std::list<InstBasePtr> InstList;
 
+typedef std::list<InstBasePtr>::iterator InstItr;
+
 typedef std::list<wasm_type_t> typelist;
+
+struct ScopeBlock;
+typedef std::list<ScopeBlock> ScopeList;
 
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
@@ -76,8 +82,6 @@ struct FuncDecl {
   bytearr code_bytes;
   /* Code: Raw static instructions */ 
   InstList instructions;
-  /* CFG for function */
-  
 };
 
 
@@ -252,11 +256,21 @@ class WasmModule {
     }
     inline uint32_t getImportIdx(ImportDecl *import)     { return GET_LIST_IDX(this->imports.list, import); }
 
+    /* Import accessors */
+    inline bool isImport(FuncDecl *func)      { return getFuncIdx(func)     < this->imports.num_funcs; }
+    inline bool isImport(GlobalDecl *global)  { return getGlobalIdx(global) < this->imports.num_globals; }
+    inline bool isImport(TableDecl *table)    { return getTableIdx(table)   < this->imports.num_tables; }
+    inline bool isImport(MemoryDecl *mem)     { return getMemoryIdx(mem)    < this->imports.num_mems; }
+
     /* Section Accessors */
     inline std::list <FuncDecl> &Funcs() { return this->funcs; }
     inline std::list <GlobalDecl> &Globals() { return this->globals; }
 
     inline uint32_t get_num_customs() { return this->customs.size(); }
+
+
+    /* Scope view of function code */
+    ScopeList gen_scopes_from_instructions(FuncDecl *func);
 
     /* Decode wasm file from buffer */
     void decode_buffer (buffer_t &buf, bool gen_cfg);

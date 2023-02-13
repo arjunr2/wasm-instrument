@@ -16,17 +16,8 @@ class BasicBlock {
   void add_predecessor(BasicBlock* pred) { this->preds.push_back(pred); }
 };
 
-struct ScopeMeta {
-  InstBasePtr start;
-  InstBasePtr end;
-};
 
-class CFG {
-  std::list<BasicBlock> basic_blocks;
-  std::vector<ScopeMeta> scope_meta;
-};
-
-/* All these should never be instantiated explicitly, only by parser */
+/* All the following instructions should never be instantiated explicitly, only by parser */
 class InstBase {
   private:
     byte opcode;

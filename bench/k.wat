@@ -140,6 +140,12 @@
       i32.const 2
       i32.const 3
       i32.add
+      loop
+        i32.const 5
+        i32.const 3
+        i32.div_u
+        br_if 0
+      end
       drop
     end
     (i32.add (local.get 0) (i32.const 8))
