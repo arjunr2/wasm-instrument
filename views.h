@@ -16,6 +16,8 @@ typedef enum {
 struct ScopeBlock {
   InstItr start;
   InstItr end;
+
+  std::list<ScopeBlock*> subscopes;
   
   ScopeBlock () { };
   ScopeBlock (InstItr start) { this->start = start; }

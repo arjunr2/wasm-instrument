@@ -1,7 +1,13 @@
 #include "views.h"
 
-#define ADD_SCOPE(scopeblock) ({  \
+#define ADD_SCOPE(startitr) ({  \
+  ScopeBlock scopeblock(startitr);  \
   static_scopes.push_back(scopeblock);  \
+  /* Add as subscope to all parent scopes */  \
+  for (auto &par : dynamic_scopes) {  \
+    par->subscopes.push_back(&static_scopes.back()); \
+  } \
+  /* */   \
   dynamic_scopes.push_back(&static_scopes.back()); \
 })
 
@@ -33,7 +39,7 @@ ScopeList WasmModule::gen_scopes_from_instructions(FuncDecl *func) {
       case WASM_OP_LOOP:
       case WASM_OP_BLOCK:
       case WASM_OP_IF: {
-          ADD_SCOPE(ScopeBlock(institr));
+          ADD_SCOPE(institr);
           break;
       }
       /* Scope end instructions */

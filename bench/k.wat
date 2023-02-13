@@ -146,6 +146,14 @@
         i32.div_u
         br_if 0
       end
+      i32.const 45
+      block
+        i32.const 0
+        br_if 0
+        local.get 2
+        drop
+      end
+      drop
       drop
     end
     (i32.add (local.get 0) (i32.const 8))
