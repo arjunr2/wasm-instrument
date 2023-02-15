@@ -158,12 +158,11 @@ int main(int argc, char *argv[]) {
   loop_instrument(module);
   for (auto &func : module.Funcs()) {
     ScopeList scope_list = module.gen_scopes_from_instructions(&func);
-    TRACE("== Scope list: %ld ==\n", scope_list.size());
     int i = 0;
     for (auto &scope : scope_list) {
-      TRACE("Scope %d -- Subscopes: %ld\n", i++, scope.subscopes.size());
+      TRACE("Scope %d -- Outer Subscopes(Total): %ld(%ld)\n", 
+              i++, scope.outer_subscopes.size(), scope.subscopes.size());
     }
-    TRACE("===========\n");
   }
 
   /* Encode instrumented module */

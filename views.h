@@ -17,7 +17,10 @@ struct ScopeBlock {
   InstItr start;
   InstItr end;
 
+  /* N-level subscope depth */
   std::list<ScopeBlock*> subscopes;
+  /* One level subscope-depth: this is a subset of subscopes above */
+  std::list<ScopeBlock*> outer_subscopes;
   
   ScopeBlock () { };
   ScopeBlock (InstItr start) { this->start = start; }

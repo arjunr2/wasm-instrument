@@ -3,10 +3,12 @@
 #define ADD_SCOPE(startitr) ({  \
   ScopeBlock scopeblock(startitr);  \
   static_scopes.push_back(scopeblock);  \
+  ScopeBlock* scp = &static_scopes.back();  \
   /* Add as subscope to all parent scopes */  \
   for (auto &par : dynamic_scopes) {  \
-    par->subscopes.push_back(&static_scopes.back()); \
+    par->subscopes.push_back(scp); \
   } \
+  dynamic_scopes.back()->outer_subscopes.push_back(scp);  \
   /* */   \
   dynamic_scopes.push_back(&static_scopes.back()); \
 })
@@ -28,7 +30,9 @@ ScopeList WasmModule::gen_scopes_from_instructions(FuncDecl *func) {
   InstList &instructions = func->instructions;
 
   /* First instruction starts scope */
-  ADD_SCOPE(ScopeBlock(instructions.begin()));
+  ScopeBlock scopeblock(instructions.begin());
+  static_scopes.push_back(scopeblock);
+  dynamic_scopes.push_back(&static_scopes.back());
 
   auto last_institr = instructions.begin();
   for (auto institr = instructions.begin(); institr != instructions.end(); ++institr) {
