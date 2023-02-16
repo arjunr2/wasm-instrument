@@ -91,6 +91,8 @@ class ImmFuncInst: public InstBase {
     ImmFuncInst (byte opcode, FuncDecl* func) :
       InstBase(opcode), func(func) { }
 
+    FuncDecl* getFunc() { return this->func; }
+
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
 

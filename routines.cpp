@@ -10,6 +10,7 @@
 #include "ir.h"
 #include "instructions.h"
 
+/************************************************/
 void sample_instrument (WasmModule& module) {
   /* Global inmodule */
   GlobalDecl global = { 
@@ -56,9 +57,11 @@ void sample_instrument (WasmModule& module) {
     }
   }
 }
+/************************************************/
 
 
 
+/************************************************/
 void loop_instrument (WasmModule &module) {
   uint64_t num_loops = 0;
   for (auto &func : module.Funcs()) {
@@ -85,3 +88,9 @@ void loop_instrument (WasmModule &module) {
     }
   }
 }
+/************************************************/
+
+
+
+/************************************************/
+/************************************************/
