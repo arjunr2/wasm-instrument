@@ -6,12 +6,14 @@
 #include <getopt.h>
 #include <math.h>
 #include <limits.h>
+#include <map>
 
 #include "common.h"
 #include "parse.h"
 #include "views.h"
 #include "ir.h"
 #include "instructions.h"
+#include "routines.h"
 
 
 static struct option long_options[] = {
@@ -56,83 +58,56 @@ args_t parse_args(int argc, char* argv[]) {
   return args;
 }
 
+#define MAX(A, B) ({ ((A > B) ? (A) : (B)); })
 
-
-void sample_instrument (WasmModule& module) {
-  /* Global inmodule */
-  GlobalDecl global = { 
-    .type = WASM_TYPE_I32, 
-    .is_mutable = true,
-    .init_expr_bytes = INIT_EXPR (I32_CONST, 5)
-  };
-  module.add_global(global, "inmodule_global");
-
-  /* Global import */
-  ImportInfo iminfo = {
-    .mod_name = "instrumentest",
-    .member_name = "newglob"
-  };
-  GlobalInfo imglob = {
-    .type = WASM_TYPE_EXTERNREF,
-    .is_mutable = false
-  };
-  module.add_import(iminfo, imglob);
-
-  /* Function import */
-  iminfo.member_name = "newfunc";
-  SigDecl imfunc = {
-    .params = {WASM_TYPE_I32},
-    .results = {WASM_TYPE_F64}
-  };
-  ImportDecl* func_imp = module.add_import(iminfo, imfunc);
-
-  /* Export find */
-  ExportDecl* exp = module.find_export("printf");
-  if (exp == NULL) {
-    TRACE("Printf not found\n");
-  }
-
-  /* Insert NOP before every call in main */
-  ExportDecl* main_exp = module.find_export("_start");
-  FuncDecl* main_fn = main_exp->desc.func;
-  InstList &insts = main_fn->instructions;
-  for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
-    InstBasePtr &instruction = *institr;
-    if (instruction->is(WASM_OP_CALL)) {
-      insts.insert(institr, InstBasePtr(new I32ConstInst(0xDEADBEEF)));
-      insts.insert(institr, InstBasePtr(new DropInst()));
+uint64_t scope_weight_instrument (WasmModule &module, ScopeBlock* scope) {
+  uint64_t weight = 0;
+  auto next_outer_subscope = scope->outer_subscopes.begin();
+  for (auto institr = scope->start; institr != scope->end; ++institr) {
+    InstBasePtr instptr = *institr;
+    ScopeBlock* outer_subscope = *next_outer_subscope;
+    TRACE("O: %s\n", opcode_table[instptr->getOpcode()].mnemonic);
+    // For scope instructions, get scope weight and advance past scope if found
+    if ( (next_outer_subscope != scope->outer_subscopes.end()) && 
+          (institr == outer_subscope->start) ) {
+      switch (outer_subscope->get_scope_type()) {
+        case BLOCK:
+        case LOOP:  
+        case IF:  {
+          weight += scope_weight_instrument (module, outer_subscope);
+          institr = outer_subscope->end;
+          std::advance(next_outer_subscope, 1);
+          break;
+        }
+        case IFWELSE: {
+          uint64_t ifweight = scope_weight_instrument(module, outer_subscope);
+          outer_subscope = *std::next(next_outer_subscope);
+          uint64_t elseweight = scope_weight_instrument(module, outer_subscope);
+          std::advance(next_outer_subscope, 2);
+          weight += MAX (ifweight, elseweight);
+        }
+        case INVALID: { ERR("Invalid scope type\n"); break;}
+        // Must never encounter ELSE; handled within IFWELSE
+      } 
     }
+    // For return, just end
+    else if (instptr->is(WASM_OP_RETURN)) { return weight; }
+    // Other instructions, weight=1
+    else { weight++; }
   }
+  TRACE("Scope weight: %lu\n", weight);
+  return weight;
 }
 
 
-
-void loop_instrument (WasmModule &module) {
-  uint64_t num_loops = 0;
-  for (auto &func : module.Funcs()) {
-    InstList &insts = func.instructions;
-    for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
-      InstBasePtr &instruction = *institr;
-      // Increment global after loop
-      if (instruction->is(WASM_OP_LOOP)) {
-        GlobalDecl global = {
-          .type = WASM_TYPE_I64, 
-          .is_mutable = true,
-          .init_expr_bytes = INIT_EXPR (I64_CONST, 0)
-        };
-        GlobalDecl *gref = module.add_global(global, 
-                              (std::string("__slinstrument_lpcnt_") + std::to_string(num_loops++)).c_str());
-        auto loc = std::next(institr);
-        InstList addinst;
-        addinst.push_back(InstBasePtr(new GlobalGetInst(gref)));
-        addinst.push_back(InstBasePtr(new I64ConstInst(1)));
-        addinst.push_back(InstBasePtr(new I64AddInst()));
-        addinst.push_back(InstBasePtr(new GlobalSetInst(gref)));
-        insts.insert(loc, addinst.begin(), addinst.end());
-      }
-    }
-  }
+void func_weight_instrument (WasmModule &module, FuncDecl &func, std::map<FuncDecl*, uint64_t> &func_weights) {
+    ScopeList scope_list = module.gen_scopes_from_instructions(&func);
+    //printf("Scope init ptr: %p\n", &(*(scope_list.front().start)));
+    uint64_t func_weight = scope_weight_instrument (module, &(scope_list.front()));
+    TRACE("<====>\n");
+    func_weights[&func] = func_weight;
 }
+
 
 // Main function.
 // Parses arguments and either runs a file with arguments.
@@ -155,14 +130,17 @@ int main(int argc, char *argv[]) {
 
   /* Instrument */
   //sample_instrument(module);
-  loop_instrument(module);
+  //loop_instrument(module);
+  std::map<FuncDecl*, uint64_t> func_weights;
   for (auto &func : module.Funcs()) {
-    ScopeList scope_list = module.gen_scopes_from_instructions(&func);
-    int i = 0;
-    for (auto &scope : scope_list) {
-      TRACE("Scope %d -- Outer Subscopes(Total): %ld(%ld)\n", 
-              i++, scope.outer_subscopes.size(), scope.subscopes.size());
+    if (!func_weights.contains(&func)) {
+      func_weight_instrument (module, func, func_weights);
     }
+  }
+
+  int i = 0;
+  for (auto &func : module.Funcs()) {
+    TRACE("Func %d: %lu\n", i++, func_weights[&func]);
   }
 
   /* Encode instrumented module */

@@ -9,7 +9,8 @@ typedef enum {
   BLOCK,
   IF,
   IFWELSE,
-  ELSE
+  ELSE,
+  INVALID
 } scope_type_t;
 
 /* Scope view of a function code */
@@ -38,5 +39,6 @@ struct ScopeBlock {
       }
       case WASM_OP_ELSE: return ELSE;
     }
+    return INVALID;
   }
 };
