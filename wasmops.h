@@ -202,6 +202,89 @@
 #define WASM_OP_REF_EQ			0xD5 /* "ref.eq", ImmSigs.NONE */
 #define WASM_OP_BR_ON_NON_NULL		0xD6 /* "br_on_non_null", ImmSigs.LABEL */
 
+/* Multibyte opcode classes */
+#define WASM_EX1_GCREF 0xFB
+#define WASM_EX1_FC 0xFC
+#define WASM_EX1_SIMD 0xFD
+#define WASM_EX1_THREADS  0xFE
+
+/* Threads/Atomics: 0xFE class */
+#define WASM_OP_MEMORY_ATOMIC_NOTIFY  0xFE00 /* "memory.atomic.notify", ImmSigs.MEMARG */
+#define WASM_OP_MEMORY_ATOMIC_WAIT32  0xFE01 /* "memory.atomic.wait32", ImmSigs.MEMARG */
+#define WASM_OP_MEMORY_ATOMIC_WAIT64  0xFE02 /* "memory.atomic.wait64", ImmSigs.MEMARG */
+#define WASM_OP_ATOMIC_FENCE  0xFE03 /* "memory.atomic.fence", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_LOAD 0xFE10 /* "i32.atomic.load", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_LOAD 0xFE11 /* "i64.atomic.load", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_LOAD8_U 0xFE12 /* "i32.atomic.load8_u", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_LOAD16_U 0xFE13 /* "i32.atomic.load16_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_LOAD8_U 0xFE14 /* "i64.atomic.load8_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_LOAD16_U 0xFE15 /* "i64.atomic.load16_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_LOAD32_U 0xFE16 /* "i64.atomic.load32_u", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_STORE 0xFE17 /* "i32.atomic.store", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_STORE 0xFE18 /* "i64.atomic.store", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_STORE8 0xFE19 /* "i32.atomic.store8", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_STORE16 0xFE1A /* "i32.atomic.store16", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_STORE8 0xFE1B /* "i64.atomic.store8", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_STORE16 0xFE1C /* "i64.atomic.store16", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_STORE32 0xFE1D /* "i64.atomic.store32", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_RMW_ADD 0xFE1E /* "i32.atomic.rmw.add", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW_ADD 0xFE1F /* "i64.atomic.rmw.add", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW8_ADD_U 0xFE20 /* "i32.atomic.rmw8.add_u", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW16_ADD_U 0xFE21 /* "i32.atomic.rmw16.add_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW8_ADD_U 0xFE22 /* "i64.atomic.rmw8.add_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW16_ADD_U 0xFE23 /* "i64.atomic.rmw16.add_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW32_ADD_U 0xFE24 /* "i64.atomic.rmw32.add_u", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_RMW_SUB 0xFE25 /* "i32.atomic.rmw.sub", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW_SUB 0xFE26 /* "i64.atomic.rmw.sub", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW8_SUB_U 0xFE27 /* "i32.atomic.rmw8.sub_u", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW16_SUB_U 0xFE28 /* "i32.atomic.rmw16.sub_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW8_SUB_U 0xFE29 /* "i64.atomic.rmw8.sub_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW16_SUB_U 0xFE2A /* "i64.atomic.rmw16.sub_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW32_SUB_U 0xFE2B /* "i64.atomic.rmw32.sub_u", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_RMW_AND 0xFE2C /* "i32.atomic.rmw.and", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW_AND 0xFE2D /* "i64.atomic.rmw.and", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW8_AND_U 0xFE2E /* "i32.atomic.rmw8.and_u", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW16_AND_U 0xFE2F /* "i32.atomic.rmw16.and_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW8_AND_U 0xFE30 /* "i64.atomic.rmw8.and_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW16_AND_U 0xFE31 /* "i64.atomic.rmw16.and_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW32_AND_U 0xFE32 /* "i64.atomic.rmw32.and_u", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_RMW_OR 0xFE33 /* "i32.atomic.rmw.or", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW_OR 0xFE34 /* "i64.atomic.rmw.or", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW8_OR_U 0xFE35 /* "i32.atomic.rmw8.or_u", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW16_OR_U 0xFE36 /* "i32.atomic.rmw16.or_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW8_OR_U 0xFE37 /* "i64.atomic.rmw8.or_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW16_OR_U 0xFE38 /* "i64.atomic.rmw16.or_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW32_OR_U 0xFE39 /* "i64.atomic.rmw32.or_u", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_RMW_XOR 0xFE3A /* "i32.atomic.rmw.xor", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW_XOR 0xFE3B /* "i64.atomic.rmw.xor", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW8_XOR_U 0xFE3C /* "i32.atomic.rmw8.xor_u", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW16_XOR_U 0xFE3D /* "i32.atomic.rmw16.xor_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW8_XOR_U 0xFE3E /* "i64.atomic.rmw8.xor_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW16_XOR_U 0xFE3F /* "i64.atomic.rmw16.xor_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW32_XOR_U 0xFE40 /* "i64.atomic.rmw32.xor_u", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_RMW_XCHG 0xFE41 /* "i32.atomic.rmw.xchg", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW_XCHG 0xFE42 /* "i64.atomic.rmw.xchg", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW8_XCHG_U 0xFE43 /* "i32.atomic.rmw8.xchg_u", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW16_XCHG_U 0xFE44 /* "i32.atomic.rmw16.xchg_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW8_XCHG_U 0xFE45 /* "i64.atomic.rmw8.xchg_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW16_XCHG_U 0xFE46 /* "i64.atomic.rmw16.xchg_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW32_XCHG_U 0xFE47 /* "i64.atomic.rmw32.xchg_u", ImmSigs.MEMARG */
+
+#define WASM_OP_I32_ATOMIC_RMW_CMPXCHG 0xFE48 /* "i32.atomic.rmw.cmpxchg", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW_CMPXCHG 0xFE49 /* "i64.atomic.rmw.cmpxchg", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U 0xFE4A /* "i32.atomic.rmw8.cmpxchg_u", ImmSigs.MEMARG */
+#define WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U 0xFE4B /* "i32.atomic.rmw16.cmpxchg_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U 0xFE4C /* "i64.atomic.rmw8.cmpxchg_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U 0xFE4D /* "i64.atomic.rmw16.cmpxchg_u", ImmSigs.MEMARG */
+#define WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U 0xFE4E /* "i64.atomic.rmw32.cmpxchg_u", ImmSigs.MEMARG */
 
 /* Opcode immediate types */
 typedef enum {
@@ -233,5 +316,5 @@ typedef struct {
 } opcode_entry_t;
 
 /* Defined in C file so we can use designated initializers */
-extern opcode_entry_t opcode_table[256];
+extern opcode_entry_t opcode_table[];
 
