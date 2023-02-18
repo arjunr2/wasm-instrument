@@ -44,7 +44,7 @@ extern int g_disassemble;
 
 #define VALIDATE_OP(b) {  \
   opcode_entry_t op_entry = opcode_table[b]; \
-  if (op_entry.invalid || (op_entry.mnenonic == 0)) { \
+  if (op_entry.invalid || (op_entry.mnemonic == 0)) { \
     ERR("Unimplemented opcode %d: %s\n", b, op_entry.mnemonic);  \
     throw std::runtime_error("Unimplemented");  \
   } \
