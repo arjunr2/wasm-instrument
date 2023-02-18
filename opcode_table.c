@@ -1,8 +1,9 @@
 /* C file for designated initializers */
 #include "wasmops.h"
 
-/* Table of one-byte opcode */
-opcode_entry_t opcode_table[256] = {
+/* Table of opcode information */
+opcode_entry_t opcode_table[] = {
+  // One-byte opcodes
   [WASM_OP_UNREACHABLE]		= {"unreachable" },
   [WASM_OP_NOP]			= {"nop" },
   [WASM_OP_BLOCK]		= {"block", IMM_BLOCKT },
@@ -202,5 +203,81 @@ opcode_entry_t opcode_table[256] = {
   [WASM_OP_BR_ON_NULL]		= {"br_on_null", IMM_LABEL, -1},
   [WASM_OP_REF_EQ]		= {"ref.eq", IMM_NONE, -1},
   [WASM_OP_BR_ON_NON_NULL]	= {"br_on_non_null", IMM_LABEL, -1},
+
+
+  // Multibyte opcode: first byte (only threads legal right now)
+  [WASM_EXT1_GCREF] = {"gc extension", IMM_NONE, -1},
+  [WASM_EXT1_FC] = {"fc extension", IMM_NONE, -1},
+  [WASM_EXT1_SIMD] = {"simd extension", IMM_NONE, -1},
+  [WASM_EXT1_THREADS] = {"threads extension", IMM_NONE},
+
+  // Threads Extension: 0xFE
+  [WASM_OP_MEMORY_ATOMIC_NOTIFY] = {"memory.atomic.notify", IMM_MEMARG },
+  [WASM_OP_MEMORY_ATOMIC_WAIT32] = {"memory.atomic.wait32", IMM_MEMARG },
+  [WASM_OP_MEMORY_ATOMIC_WAIT64] = {"memory.atomic.wait64", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_LOAD] = {"i32.atomic.load", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_LOAD] = {"i64.atomic.load", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_LOAD8_U] = {"i32.atomic.load8_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_LOAD16_U] = {"i32.atomic.load16_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_LOAD8_U] = {"i64.atomic.load8_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_LOAD16_U] = {"i64.atomic.load16_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_LOAD32_U] = {"i64.atomic.load32_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_STORE] = {"i32.atomic.store", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_STORE] = {"i64.atomic.store", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_STORE8] = {"i32.atomic.store8", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_STORE16] = {"i32.atomic.store16", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_STORE8] = {"i64.atomic.store8", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_STORE16] = {"i64.atomic.store16", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_STORE32] = {"i64.atomic.store32", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW_ADD] = {"i32.atomic.rmw.add", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW_ADD] = {"i64.atomic.rmw.add", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW8_ADD_U] = {"i32.atomic.rmw8.add_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW16_ADD_U] = {"i32.atomic.rmw16.add_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW8_ADD_U] = {"i64.atomic.rmw8.add_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW16_ADD_U] = {"i64.atomic.rmw16.add_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW32_ADD_U] = {"i64.atomic.rmw32.add_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW_SUB] = {"i32.atomic.rmw.sub", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW_SUB] = {"i64.atomic.rmw.sub", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW8_SUB_U] = {"i32.atomic.rmw8.sub_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW16_SUB_U] = {"i32.atomic.rmw16.sub_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW8_SUB_U] = {"i64.atomic.rmw8.sub_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW16_SUB_U] = {"i64.atomic.rmw16.sub_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW32_SUB_U] = {"i64.atomic.rmw32.sub_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW_AND] = {"i32.atomic.rmw.and", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW_AND] = {"i64.atomic.rmw.and", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW8_AND_U] = {"i32.atomic.rmw8.and_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW16_AND_U] = {"i32.atomic.rmw16.and_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW8_AND_U] = {"i64.atomic.rmw8.and_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW16_AND_U] = {"i64.atomic.rmw16.and_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW32_AND_U] = {"i64.atomic.rmw32.and_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW_OR] = {"i32.atomic.rmw.or", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW_OR] = {"i64.atomic.rmw.or", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW8_OR_U] = {"i32.atomic.rmw8.or_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW16_OR_U] = {"i32.atomic.rmw16.or_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW8_OR_U] = {"i64.atomic.rmw8.or_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW16_OR_U] = {"i64.atomic.rmw16.or_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW32_OR_U] = {"i64.atomic.rmw32.or_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW_XOR] = {"i32.atomic.rmw.xor", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW_XOR] = {"i64.atomic.rmw.xor", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW8_XOR_U] = {"i32.atomic.rmw8.xor_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW16_XOR_U] = {"i32.atomic.rmw16.xor_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW8_XOR_U] = {"i64.atomic.rmw8.xor_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW16_XOR_U] = {"i64.atomic.rmw16.xor_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW32_XOR_U] = {"i64.atomic.rmw32.xor_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW_XCHG] = {"i32.atomic.rmw.xchg", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW_XCHG] = {"i64.atomic.rmw.xchg", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW8_XCHG_U] = {"i32.atomic.rmw8.xchg_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW16_XCHG_U] = {"i32.atomic.rmw16.xchg_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW8_XCHG_U] = {"i64.atomic.rmw8.xchg_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW16_XCHG_U] = {"i64.atomic.rmw16.xchg_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW32_XCHG_U] = {"i64.atomic.rmw32.xchg_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW_CMPXCHG] = {"i32.atomic.rmw.cmpxchg", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW_CMPXCHG] = {"i64.atomic.rmw.cmpxchg", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U] = {"i32.atomic.rmw8.cmpxchg_u", IMM_MEMARG },
+  [WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U] = {"i32.atomic.rmw16.cmpxchg_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U] = {"i64.atomic.rmw8.cmpxchg_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U] = {"i64.atomic.rmw16.cmpxchg_u", IMM_MEMARG },
+  [WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U] = {"i64.atomic.rmw32.cmpxchg_u", IMM_MEMARG }
+
 };
 

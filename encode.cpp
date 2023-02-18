@@ -61,7 +61,7 @@ static void write_type_list (bytedeque &bdeq, typelist &tlist) {
     WR_BYTE(type);
 }
 
-static void encode_const_off_expr(bytedeque &bdeq, uint16_t &opc, uint32_t offset) {
+static void encode_const_off_expr(bytedeque &bdeq, uint16_t opc, uint32_t offset) {
   WR_OPCODE (opc);
   switch (opc) {
     case WASM_OP_I32_CONST: {
@@ -326,11 +326,6 @@ void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytea
   #if USE_INSTLIST
   for (auto &instruction : instlist) {
     uint16_t opcode = instruction->getOpcode();
-    opcode_entry_t op_entry = opcode_table[opcode];
-    if (op_entry.invalid) {
-      ERR("Unimplemented opcode generated %u: %s\n", opcode, op_entry.mnemonic); 
-      throw std::runtime_error("Unimplemented");
-    }
     //TRACE("O: %s\n", op_entry.mnemonic);
     /* Write instruction opcode and immediate */
     WR_OPCODE (opcode);
@@ -439,6 +434,7 @@ bytedeque WasmModule::encode_custom_section(CustomDecl &custom) {
 bytedeque WasmModule::encode_module(char* outfile) {
   bytedeque bdeq;
 
+  TRACE("<=== Encoding module ===>\n");
   WR_U32_RAW (this->magic);
   WR_U32_RAW (this->version);
 

@@ -42,11 +42,22 @@ extern int g_disassemble;
 #define RD_U32_RAW()    read_u32(&buf)
 #define RD_U64_RAW()    read_u64(&buf)
 
+#define VALIDATE_OP(b) {  \
+  opcode_entry_t op_entry = opcode_table[b]; \
+  if (op_entry.invalid || (op_entry.mnenonic == 0)) { \
+    ERR("Unimplemented opcode %d: %s\n", b, op_entry.mnemonic);  \
+    throw std::runtime_error("Unimplemented");  \
+  } \
+}
+
 #define RD_OPCODE() ({  \
-  uint16_t b0 = RD_BYTE();  \
-  ((b0 >= 0xFB) && (b0 <= 0xFE)) ?  \
-      ((b0 << 8) + RD_BYTE()) :   \
-      b0;  \
+  uint16_t lb = RD_BYTE();  \
+  VALIDATE_OP(lb); \
+  if ((lb >= 0xFB) && (lb <= 0xFE)) {  \
+    lb = ((lb << 8) + RD_BYTE()); \
+    VALIDATE_OP(lb); \
+  } \
+  lb; \
 })
 /********************/
 
@@ -65,10 +76,15 @@ extern int g_disassemble;
 #define WR_SECBYTE_PRE(val)   preencode_u8(secdeq, val)
 #define WR_SECLEN_PRE()       preencode_u32leb(secdeq, secdeq.size())
 
-#define WR_OPCODE(val) {  \
-  byte opclass = (val >> 8);  \
-  if (opclass) WR_BYTE(opclass);  \
-  WR_BYTE(val & 0xff);  \
+#define WR_OPCODE(op_in) {  \
+  uint16_t lb = op_in;  \
+  byte opclass = ((lb >> 8) & 0xff);  \
+  if (opclass)  { \
+    VALIDATE_OP(opclass);  \
+    WR_BYTE(opclass);  \
+  } \
+  VALIDATE_OP(lb); \
+  WR_BYTE(lb & 0xff);  \
 }
 /********************/
 

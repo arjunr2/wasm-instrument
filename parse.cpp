@@ -342,11 +342,6 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
   InstList ilist = { };
   while (buf.ptr < buf.end) {
     uint16_t opcode = RD_OPCODE();
-    opcode_entry_t op_entry = opcode_table[opcode];
-    if (op_entry.invalid) {
-      ERR("Unimplemented opcode %d: %s\n", opcode, op_entry.mnemonic);
-      throw std::runtime_error("Unimplemented");
-    }
 
     opcode_imm_type imm_type = opcode_table[opcode].imm_type;
 
@@ -378,7 +373,7 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
         throw std::runtime_error("Unknown imm");
     }
     ilist.push_back(instptr);
-    TRACE("O: %s\n", op_entry.mnemonic);
+    TRACE("O: %s\n", opcode_table[opcode].mnemonic);
   }
   if (buf.ptr != buf.end) {
     throw std::runtime_error("Unaligned end for instruction parsing\n");

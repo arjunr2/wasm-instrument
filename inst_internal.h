@@ -242,3 +242,38 @@ class ImmValtsInst: public InstBase {
 };
 
 
+class ImmDataMemoryInst: public InstBase {
+  DataDecl* data;
+  MemoryDecl* mem;
+  public:
+    ImmDataMemoryInst (WasmModule &module, uint16_t opcode, buffer_t &buf);
+    ImmDataMemoryInst (uint16_t opcode, DataDecl* data, MemoryDecl* mem) : 
+      InstBase(opcode), data(data), mem(mem) { }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
+
+class ImmDataMemoryInst: public InstBase {
+  DataDecl* data;
+  MemoryDecl* mem;
+  public:
+    ImmDataMemoryInst (WasmModule &module, uint16_t opcode, buffer_t &buf);
+    ImmDataMemoryInst (uint16_t opcode, DataDecl* data, MemoryDecl* mem) : 
+      InstBase(opcode), data(data), mem(mem) { }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
+
+class ImmMemoryInst: public InstBase {
+  MemoryDecl* mem;
+  public:
+    ImmMemoryInst (WasmModule &module, uint16_t opcode, buffer_t &buf);
+    ImmMemoryInst (uint16_t opcode, MemoryDecl* mem) : 
+      InstBase(opcode), mem(mem) { }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
+

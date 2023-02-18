@@ -203,16 +203,19 @@
 #define WASM_OP_BR_ON_NON_NULL		0xD6 /* "br_on_non_null", ImmSigs.LABEL */
 
 /* Multibyte opcode classes */
-#define WASM_EX1_GCREF 0xFB
-#define WASM_EX1_FC 0xFC
-#define WASM_EX1_SIMD 0xFD
-#define WASM_EX1_THREADS  0xFE
+#define WASM_EXT1_GCREF 0xFB
+#define WASM_EXT1_FC 0xFC
+#define WASM_EXT1_SIMD 0xFD
+#define WASM_EXT1_THREADS  0xFE
 
-/* Threads/Atomics: 0xFE class */
-#define WASM_OP_MEMORY_ATOMIC_NOTIFY  0xFE00 /* "memory.atomic.notify", ImmSigs.MEMARG */
-#define WASM_OP_MEMORY_ATOMIC_WAIT32  0xFE01 /* "memory.atomic.wait32", ImmSigs.MEMARG */
-#define WASM_OP_MEMORY_ATOMIC_WAIT64  0xFE02 /* "memory.atomic.wait64", ImmSigs.MEMARG */
-#define WASM_OP_ATOMIC_FENCE  0xFE03 /* "memory.atomic.fence", ImmSigs.MEMARG */
+/* 0xFC extensions: UNIMPLEMENTED */
+#define WASM_OP_MEMORY_INIT 0xFC08 /* "memory.init", ImmSigs.DATA_MEMORY */
+#define WASM_OP_DATA_DROP 0xFC09 /* "data.drop", ImmSigs.DATA */
+
+/* Threads/Atomics: 0xFE extensions */
+#define WASM_OP_MEMORY_ATOMIC_NOTIFY 0xFE00 /* "memory.atomic.notify", ImmSigs.MEMARG */
+#define WASM_OP_MEMORY_ATOMIC_WAIT32 0xFE01 /* "memory.atomic.wait32", ImmSigs.MEMARG */
+#define WASM_OP_MEMORY_ATOMIC_WAIT64 0xFE02 /* "memory.atomic.wait64", ImmSigs.MEMARG */
 
 #define WASM_OP_I32_ATOMIC_LOAD 0xFE10 /* "i32.atomic.load", ImmSigs.MEMARG */
 #define WASM_OP_I64_ATOMIC_LOAD 0xFE11 /* "i64.atomic.load", ImmSigs.MEMARG */
@@ -305,7 +308,13 @@ typedef enum {
   IMM_I64,
   IMM_F32,
   IMM_REFNULLT,
-  IMM_VALTS
+  IMM_VALTS,
+  // Extension immediates
+  IMM_DATA_MEMORY,
+  IMM_DATA,
+  IMM_MEMORY_CP,
+  IMM_DATA_TABLE,
+  IMM_TABLE_CP
 } opcode_imm_type;
 
 /* Information associated with each opcode */
