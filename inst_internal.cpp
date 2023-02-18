@@ -8,14 +8,14 @@ void InstBase::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 }
 
 /* ImmNoneInst  */
-ImmNoneInst::ImmNoneInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmNoneInst::ImmNoneInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
                           : InstBase(opcode) { }
 
 void ImmNoneInst::encode_imm (WasmModule &module, bytedeque &bdeq) const { }
 
 
 /* ImmBlocktInst  */
-ImmBlocktInst::ImmBlocktInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmBlocktInst::ImmBlocktInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   int64_t value_type = RD_I64();
   if (value_type != -64) {
@@ -31,7 +31,7 @@ void ImmBlocktInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmLabelInst  */
-ImmLabelInst::ImmLabelInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmLabelInst::ImmLabelInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->idx = RD_U32();  
 }
@@ -42,7 +42,7 @@ void ImmLabelInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmLabelsInst  */
-ImmLabelsInst::ImmLabelsInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmLabelsInst::ImmLabelsInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   uint32_t num_labels = RD_U32();
   for (uint32_t i = 0; i < num_labels; i++) {
@@ -61,7 +61,7 @@ void ImmLabelsInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmFuncInst  */
-ImmFuncInst::ImmFuncInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmFuncInst::ImmFuncInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->func = module.getFunc (RD_U32());
 }
@@ -73,7 +73,7 @@ void ImmFuncInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmSigTableInst  */
-ImmSigTableInst::ImmSigTableInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmSigTableInst::ImmSigTableInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->sig = module.getSig (RD_U32());
   this->table = module.getTable (RD_U32());
@@ -88,7 +88,7 @@ void ImmSigTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmLocalInst  */
-ImmLocalInst::ImmLocalInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmLocalInst::ImmLocalInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->idx = RD_U32();
 }
@@ -99,7 +99,7 @@ void ImmLocalInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmGlobalInst  */
-ImmGlobalInst::ImmGlobalInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmGlobalInst::ImmGlobalInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->global = module.getGlobal (RD_U32());
 }
@@ -111,7 +111,7 @@ void ImmGlobalInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmTableInst  */
-ImmTableInst::ImmTableInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmTableInst::ImmTableInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->table = module.getTable (RD_U32());
 }
@@ -123,7 +123,7 @@ void ImmTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmMemargInst  */
-ImmMemargInst::ImmMemargInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmMemargInst::ImmMemargInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->align = RD_U32();
   this->offset = RD_U32();
@@ -136,7 +136,7 @@ void ImmMemargInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmI32Inst  */
-ImmI32Inst::ImmI32Inst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmI32Inst::ImmI32Inst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->value = RD_I32();
 }
@@ -147,7 +147,7 @@ void ImmI32Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmF64Inst  */
-ImmF64Inst::ImmF64Inst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmF64Inst::ImmF64Inst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   uint64_t rawbits = RD_U64_RAW();
   memcpy(&this->value, &rawbits, sizeof(double));
@@ -161,7 +161,7 @@ void ImmF64Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmMemoryInst  */
-ImmMemoryInst::ImmMemoryInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmMemoryInst::ImmMemoryInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->mem = module.getMemory (RD_U32());
 }
@@ -175,7 +175,7 @@ void ImmMemoryInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 /* UNIMPLEMENTED */
 /* ImmTagInst  */
-ImmTagInst::ImmTagInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmTagInst::ImmTagInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) { 
   throw std::runtime_error ("Unimplemeted TAG opcode"); 
 }
@@ -184,7 +184,7 @@ ImmTagInst::ImmTagInst (WasmModule &module, byte opcode, buffer_t &buf)
 
 
 /* ImmI64Inst  */
-ImmI64Inst::ImmI64Inst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmI64Inst::ImmI64Inst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   this->value = RD_I64();
 }
@@ -195,7 +195,7 @@ void ImmI64Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmF32Inst  */
-ImmF32Inst::ImmF32Inst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmF32Inst::ImmF32Inst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   uint32_t rawbits = RD_U32_RAW();
   memcpy(&this->value, &rawbits, sizeof(float));
@@ -209,7 +209,7 @@ void ImmF32Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmRefnulltInst  */
-ImmRefnulltInst::ImmRefnulltInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmRefnulltInst::ImmRefnulltInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   wasm_type_t type = (wasm_type_t) RD_BYTE();
   if (!isReftype(type)) {
@@ -224,7 +224,7 @@ void ImmRefnulltInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 
 
 /* ImmValtsInst  */
-ImmValtsInst::ImmValtsInst (WasmModule &module, byte opcode, buffer_t &buf)
+ImmValtsInst::ImmValtsInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   uint32_t num_vals = RD_U32();
   for (uint32_t i = 0; i < num_vals; i++) {

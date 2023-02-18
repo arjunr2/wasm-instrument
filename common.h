@@ -41,6 +41,13 @@ extern int g_disassemble;
 #define RD_BYTE()       read_u8(&buf)
 #define RD_U32_RAW()    read_u32(&buf)
 #define RD_U64_RAW()    read_u64(&buf)
+
+#define RD_OPCODE() ({  \
+  uint16_t b0 = RD_BYTE();  \
+  ((b0 >= 0xFB) && (b0 <= 0xFE)) ?  \
+      ((b0 << 8) + RD_BYTE()) :   \
+      b0;  \
+})
 /********************/
 
 /*** Encoding macros ***/
@@ -57,6 +64,12 @@ extern int g_disassemble;
 
 #define WR_SECBYTE_PRE(val)   preencode_u8(secdeq, val)
 #define WR_SECLEN_PRE()       preencode_u32leb(secdeq, secdeq.size())
+
+#define WR_OPCODE(val) {  \
+  byte opclass = (val >> 8);  \
+  if (opclass) WR_BYTE(opclass);  \
+  WR_BYTE(val & 0xff);  \
+}
 /********************/
 
 

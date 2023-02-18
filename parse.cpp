@@ -60,9 +60,9 @@ inline static typelist read_type_list(uint32_t num, buffer_t &buf) {
 
 
 /* Function to read const offset expression i32.const offset for elem/data */
-static uint32_t decode_const_off_expr(buffer_t &buf, byte &opcode) {
+static uint32_t decode_const_off_expr(buffer_t &buf, uint16_t &opcode) {
   // Has to be i32.const or i64.const offset for this
-  byte opc = RD_BYTE();
+  uint16_t opc = RD_OPCODE();
   uint64_t offset = -1;
   switch (opc) {
     case WASM_OP_I32_CONST: {
@@ -78,7 +78,7 @@ static uint32_t decode_const_off_expr(buffer_t &buf, byte &opcode) {
       throw std::runtime_error("Opcode error");
   }
   
-  byte end = RD_BYTE();
+  uint16_t end = RD_OPCODE();
   if (end != WASM_OP_END) {
     throw std::runtime_error("Malformed end in offset expr");
   }
@@ -89,7 +89,7 @@ static uint32_t decode_const_off_expr(buffer_t &buf, byte &opcode) {
 // TODO: Init exprs (just return bytes right now)
 static bytearr decode_init_expr(buffer_t &buf) {
   const byte* startp = buf.ptr;
-  byte opcode = RD_BYTE();
+  uint16_t opcode = RD_OPCODE();
   switch (opcode) {
     case WASM_OP_I32_CONST: {
       RD_I32();
@@ -113,7 +113,7 @@ static bytearr decode_init_expr(buffer_t &buf) {
       throw std::runtime_error("Opcode error");
   }
 
-  byte end = RD_BYTE();
+  uint16_t end = RD_OPCODE();
   if (end != WASM_OP_END) {
     throw std::runtime_error("Malformed end in init_expr");
   }
@@ -281,7 +281,7 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
 void WasmModule::decode_start_section (buffer_t &buf, uint32_t len) {
   this->has_start = true;
   this->start_idx = RD_U32();
-  throw std::runtime_error("Start section not implemented");
+  ERR("NOTE: Start section not fully complete\n");
 }
 
 
@@ -341,7 +341,7 @@ static wasm_localcsv_t decode_locals(buffer_t &buf, uint32_t &num_locals) {
 InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
   InstList ilist = { };
   while (buf.ptr < buf.end) {
-    byte opcode = RD_BYTE();
+    uint16_t opcode = RD_OPCODE();
     opcode_entry_t op_entry = opcode_table[opcode];
     if (op_entry.invalid) {
       ERR("Unimplemented opcode %d: %s\n", opcode, op_entry.mnemonic);
@@ -378,7 +378,7 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
         throw std::runtime_error("Unknown imm");
     }
     ilist.push_back(instptr);
-    //TRACE("O: %s\n", op_entry.mnemonic);
+    TRACE("O: %s\n", op_entry.mnemonic);
   }
   if (buf.ptr != buf.end) {
     throw std::runtime_error("Unaligned end for instruction parsing\n");

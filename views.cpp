@@ -37,8 +37,7 @@ ScopeList WasmModule::gen_scopes_from_instructions(FuncDecl *func) {
   auto last_institr = instructions.begin();
   for (auto institr = instructions.begin(); institr != instructions.end(); ++institr) {
     InstBasePtr inst = *institr;
-    byte opcode = inst->getOpcode();
-    switch (opcode) {
+    switch (inst->getOpcode()) {
       /* Scope begin instructions */
       case WASM_OP_LOOP:
       case WASM_OP_BLOCK:

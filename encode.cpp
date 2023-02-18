@@ -61,8 +61,8 @@ static void write_type_list (bytedeque &bdeq, typelist &tlist) {
     WR_BYTE(type);
 }
 
-static void encode_const_off_expr(bytedeque &bdeq, byte &opc, uint32_t offset) {
-  WR_BYTE (opc);
+static void encode_const_off_expr(bytedeque &bdeq, uint16_t &opc, uint32_t offset) {
+  WR_OPCODE (opc);
   switch (opc) {
     case WASM_OP_I32_CONST: {
       WR_I32 (offset); break;
@@ -74,7 +74,7 @@ static void encode_const_off_expr(bytedeque &bdeq, byte &opc, uint32_t offset) {
       ERR("Unknown opcode in offset expr (%d): Must be i32/64 const\n", opc);
       throw std::runtime_error("Opcode error");
   }
-  WR_BYTE (WASM_OP_END);
+  WR_OPCODE (WASM_OP_END);
 }
 
 // TODO: Only init expr bytes now
@@ -276,7 +276,8 @@ bytedeque WasmModule::encode_export_section() {
 bytedeque WasmModule::encode_start_section() {
   bytedeque bdeq;
   if (this->has_start) {
-    throw std::runtime_error ("Start section not implemented");
+    ERR("NOTE: Start section not fully complete\n");
+    WR_U32(this->start_idx);
   }
   return bdeq;
 }
@@ -324,7 +325,7 @@ static void encode_locals(bytedeque &bdeq, wasm_localcsv_t &pure_locals) {
 void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytearr &code_bytes) {
   #if USE_INSTLIST
   for (auto &instruction : instlist) {
-    byte opcode = instruction->getOpcode();
+    uint16_t opcode = instruction->getOpcode();
     opcode_entry_t op_entry = opcode_table[opcode];
     if (op_entry.invalid) {
       ERR("Unimplemented opcode generated %u: %s\n", opcode, op_entry.mnemonic); 
@@ -332,7 +333,7 @@ void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytea
     }
     //TRACE("O: %s\n", op_entry.mnemonic);
     /* Write instruction opcode and immediate */
-    WR_BYTE (opcode);
+    WR_OPCODE (opcode);
     instruction->encode_imm(*this, bdeq);
   }
   TRACE("=== Function encoded successfully ===\n");
