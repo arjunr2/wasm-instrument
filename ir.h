@@ -212,7 +212,7 @@ class WasmModule {
     int num_datas_datacount;
 
     /* Custom name section debug reference */
-    DebugNameDecl* name_debug;
+    CustomDecl *name_custom;
 
     /* Decode functions */
     #define DECODE_DECL(sec,...)  \

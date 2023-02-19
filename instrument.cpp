@@ -54,10 +54,9 @@ FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name) {
 #define IMPORT_INJ_KIND_MEMORY(objref)
 /* Debug Info only for Func Kind if it has info */
 #define IMPORT_INJ_KIND_FUNC(objref) {  \
-  if (this->name_debug) {  \
-    std::list <DebugNameAssoc> &func_assoc = this->name_debug->func_assoc; \
-    DebugNameAssoc dname = { .func = &objref, .name = info.member_name };  \
-    func_assoc.push_front (dname);  \
+  if (this->name_custom) {  \
+    DebugNameAssoc dname = { .func = &this->funcs.front(), .name = info.member_name };  \
+    this->name_custom->debug.func_assoc.push_front (dname); \
   } \
 }
 
@@ -75,7 +74,7 @@ FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name) {
   };  \
   this->imports.num_##field##s++;  \
   imports.list.push_front(import);  \
-  /* IMPORT_INJ_##kd (field##s.front()); */ \
+  IMPORT_INJ_##kd (field##s.front());  \
   return &imports.list.front(); \
 }
 

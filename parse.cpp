@@ -500,6 +500,7 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
         SubsecBytes subsec = { .id = id, .bytes = RD_BYTESTR(len) };
         debug.subsections.push_back(subsec);
       }
+      /* Function subsection */
       else {
         const byte* start_subsec = buf.ptr;
         const byte* end_subsec = buf.ptr + len;
@@ -520,7 +521,6 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
         }
       }
     }
-    this->name_debug = &debug;
   }
   /* Non-name sections: Just get bytes */
   else {
@@ -528,7 +528,9 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
   }
 
   this->customs.push_back(custom);
-
+  if (custom.name == "name") {
+    this->name_custom = &this->customs.back();
+  }
 }
 
 
