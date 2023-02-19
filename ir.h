@@ -45,12 +45,14 @@ struct wasm_localcse_t {
 typedef std::list<wasm_localcse_t> wasm_localcsv_t;
 
 
+struct FuncDecl;
+
 struct SubsecBytes {
   byte id;
   bytearr bytes;
 };
 struct DebugNameAssoc {
-  uint32_t idx;
+  FuncDecl* func;
   std::string name;
 };
 struct DebugNameDecl {
@@ -204,9 +206,13 @@ class WasmModule {
     uint32_t start_idx;
     int has_start;
 
+    /* Datacount section */ 
     int has_datacount;
     /* For decode validation only, don't use otherwise */
     int num_datas_datacount;
+
+    /* Custom name section debug reference */
+    DebugNameDecl* name_debug;
 
     /* Decode functions */
     #define DECODE_DECL(sec,...)  \

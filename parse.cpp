@@ -491,8 +491,8 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
   uint32_t num_bytes = end_sec - buf.ptr;
 
   if (custom.name == "name") {
+    DebugNameDecl &debug = custom.debug;
     while (buf.ptr != end_sec) {
-      DebugNameDecl &debug = custom.debug;
       byte id = RD_BYTE();
       uint32_t len = RD_U32();
       /* Non-function subsections in name: Just record section info */
@@ -506,7 +506,8 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
 
         uint32_t num_names = RD_U32();
         for (uint32_t i = 0; i < num_names; i++) {
-          DebugNameAssoc d = { .idx = RD_U32(), .name = RD_NAME() };
+          uint32_t idx = RD_U32();
+          DebugNameAssoc d = { .func = this->getFunc(idx), .name = RD_NAME() };
           debug.func_assoc.push_back(d);
         }
 
@@ -519,6 +520,7 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
         }
       }
     }
+    this->name_debug = &debug;
   }
   /* Non-name sections: Just get bytes */
   else {
@@ -526,6 +528,7 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
   }
 
   this->customs.push_back(custom);
+
 }
 
 

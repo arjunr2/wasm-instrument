@@ -429,7 +429,8 @@ bytedeque WasmModule::encode_custom_section(CustomDecl &custom) {
         bytedeque bdeq;
         WR_U32 (debug.func_assoc.size());
         for (auto &name_asc : debug.func_assoc) {
-          WR_U32 (name_asc.idx);
+          uint32_t idx = this->getFuncIdx(name_asc.func);
+          WR_U32 (idx);
           WR_NAME (name_asc.name);
         }
         secdeq = bdeq;
