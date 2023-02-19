@@ -54,9 +54,9 @@ FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name) {
 #define IMPORT_INJ_KIND_MEMORY(objref)
 /* Debug Info only for Func Kind if it has info */
 #define IMPORT_INJ_KIND_FUNC(objref) {  \
-  if (this->name_custom) {  \
+  if (this->fn_names_debug) {  \
     DebugNameAssoc dname = { .func = &this->funcs.front(), .name = info.member_name };  \
-    this->name_custom->debug.func_assoc.push_front (dname); \
+    this->fn_names_debug->push_front (dname); \
   } \
 }
 

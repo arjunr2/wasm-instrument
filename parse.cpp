@@ -529,7 +529,7 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
 
   this->customs.push_back(custom);
   if (custom.name == "name") {
-    this->name_custom = &this->customs.back();
+    this->fn_names_debug = &this->customs.back().debug.func_assoc;
   }
 }
 
