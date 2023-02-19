@@ -203,8 +203,8 @@ class WasmModule {
     std::list <DataDecl>    datas;
 
     /* Start section */
-    uint32_t start_idx;
     int has_start;
+    FuncDecl* start_fn;
 
     /* Datacount section */ 
     int has_datacount;

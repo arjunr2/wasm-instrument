@@ -277,7 +277,8 @@ bytedeque WasmModule::encode_start_section() {
   bytedeque bdeq;
   if (this->has_start) {
     ERR("NOTE: Start section not fully complete\n");
-    WR_U32(this->start_idx);
+    uint32_t start_idx = this->getFuncIdx(this->start_fn);
+    WR_U32(start_idx);
   }
   return bdeq;
 }
