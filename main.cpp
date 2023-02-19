@@ -81,12 +81,7 @@ int main(int argc, char *argv[]) {
   unload_file(&start, &end);
 
   /* Instrument */
-  std::map<FuncDecl*, uint64_t> func_weights = all_funcs_weight_instrument (module);
-
-  int i = 0;
-  for (auto &func : module.Funcs()) {
-    TRACE("Func %d: %lu\n", i++, func_weights[&func]);
-  }
+  memaccess_instrument(module);
 
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);

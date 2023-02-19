@@ -204,3 +204,30 @@ std::map<FuncDecl*, uint64_t> all_funcs_weight_instrument (WasmModule &module) {
   return func_weights;
 }
 /************************************************/
+
+/************************************************/
+void memaccess_instrument (WasmModule &module) {
+  /* Instrument function import */
+  ImportInfo iminfo = {
+    .mod_name = "instrument",
+    .member_name = "logaccess"
+  };
+  SigDecl imfunc = {
+    .params = {},
+    .results = {}
+  };
+  ImportDecl* func_import_decl = module.add_import(iminfo, imfunc);
+  FuncDecl* func_import = func_import_decl->desc.func;
+
+  for (auto &func : module.Funcs()) {
+    InstList &insts = func.instructions;
+    for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
+      InstBasePtr &instruction = *institr;
+      // Call foreign function after memarg
+      if (instruction->getImmType() == IMM_MEMARG) {
+        auto loc = std::next(institr);
+        insts.insert(loc, InstBasePtr(new CallInst(func_import)));
+      }
+    }
+  }
+}
