@@ -35,6 +35,7 @@ struct wasm_limits_t {
   uint32_t initial;
   uint32_t max;
   unsigned has_max : 1;
+  unsigned flag : 1;
 };
 
 struct wasm_localcse_t {
@@ -187,9 +188,9 @@ class WasmModule {
     uint32_t start_idx;
     int has_start;
 
-    /* Only for validation */
-    uint32_t num_datas;
     int has_datacount;
+    /* For decode validation only, don't use otherwise */
+    int num_datas_datacount;
 
     /* Decode functions */
     #define DECODE_DECL(sec,...)  \

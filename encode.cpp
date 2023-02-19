@@ -31,7 +31,7 @@ static void dump_bytedeque(bytedeque &bdeq, char* outfile) {
 
 /* Write LimitsType */
 inline static void write_limits(bytedeque &bdeq, wasm_limits_t &limits) {
-  WR_BYTE (limits.has_max);
+  WR_BYTE ((limits.flag << 1) | limits.has_max);
   WR_U32 (limits.initial);
   if (limits.has_max) {
     WR_U32 (limits.max);
@@ -372,10 +372,6 @@ bytedeque WasmModule::encode_data_section() {
 
   auto &datas = this->datas;
   uint32_t num_datas = datas.size();
-  if (this->has_datacount && (num_datas != this->num_datas)) {
-    throw std::runtime_error ("Datacount section and data section vector "
-        "size don't match");
-  }
 
   if (num_datas == 0) {
     return {};
@@ -409,10 +405,7 @@ bytedeque WasmModule::encode_data_section() {
 bytedeque WasmModule::encode_datacount_section() {
   bytedeque bdeq;
   if (this->has_datacount) {
-    if (this->num_datas != this->datas.size()) {
-      throw std::runtime_error ("Data size and datacount do not match");
-    }
-    WR_U32(this->num_datas);
+    WR_U32(this->datas.size());
   }
   return bdeq;
 }
@@ -448,18 +441,18 @@ bytedeque WasmModule::encode_module(char* outfile) {
       bdeq.insert(bdeq.end(), secdeq.begin(), secdeq.end()); \
     } \
   }
-  ENCODE_CALL (type); 
-  ENCODE_CALL (import); 
-  ENCODE_CALL (function); 
-  ENCODE_CALL (table); 
-  ENCODE_CALL (memory); 
-  ENCODE_CALL (global); 
-  ENCODE_CALL (export); 
-  ENCODE_CALL (start); 
+  ENCODE_CALL (type);
+  ENCODE_CALL (import);
+  ENCODE_CALL (function);
+  ENCODE_CALL (table);
+  ENCODE_CALL (memory);
+  ENCODE_CALL (global);
+  ENCODE_CALL (export);
+  ENCODE_CALL (start);
   ENCODE_CALL (element);
-  ENCODE_CALL (code); 
-  ENCODE_CALL (data); 
-  ENCODE_CALL (datacount); 
+  ENCODE_CALL (datacount);
+  ENCODE_CALL (code);
+  ENCODE_CALL (data);
   /* Write all the customs at the end */
   for (auto &custom : this->customs) {
     ENCODE_CALL (custom, custom);

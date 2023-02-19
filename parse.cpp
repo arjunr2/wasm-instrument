@@ -12,12 +12,16 @@
 
 /* Read LimitsType */
 inline static wasm_limits_t read_limits(buffer_t &buf) {
-  byte max_provided = RD_BYTE();
+  byte lb = RD_BYTE();
+  byte max_provided = lb & 0x01;
+  byte flag = (lb >> 1);
+
   uint32_t min = RD_U32();
   wasm_limits_t limits = {
     .initial = min,
     .max = (max_provided ? RD_U32() : 0),
-    .has_max = max_provided
+    .has_max = max_provided,
+    .flag = flag
   };
   return limits;
 }
@@ -428,13 +432,21 @@ void WasmModule::decode_global_section(buffer_t &buf, uint32_t len) {
 
 void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
   uint32_t num_datas = RD_U32();
-  if (this->has_datacount && (num_datas != this->num_datas)) {
-    throw std::runtime_error ("Datacount section and data section vector "
-        "size don't match");
+  if (this->has_datacount) {
+    if (num_datas != this->num_datas_datacount) {
+      ERR("Num datas: %u | Num datacount: %u\n", num_datas, this->num_datas_datacount);
+      throw std::runtime_error ("Datacount section and data section vector "
+                                "size don't match");
+    }
+  }
+  /* Create datas if datacount wasn't present to do so */
+  else {
+    for (int i = 0; i < num_datas; i++)
+      this->datas.push_back(DataDecl());
   }
 
-  for (uint32_t i = 0; i < num_datas; i++) {
-    DataDecl data;
+
+  for (auto &data : this->datas) {
     /* Flag */
     uint32_t flag = RD_U32();
     data.flag = flag;
@@ -458,14 +470,17 @@ void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
     /* Size val */
     uint32_t num_bytes = RD_U32();
     data.bytes = RD_BYTESTR(num_bytes);
-
-    this->datas.push_back(data);
   }
 }
 
 void WasmModule::decode_datacount_section(buffer_t &buf, uint32_t len) {
   this->has_datacount = true;
-  this->num_datas = RD_U32();
+  uint32_t num_datas = RD_U32();
+  this->num_datas_datacount = num_datas;
+  /* Create data list so instructions in code can decode accessors correctly */
+  for (int i = 0; i < num_datas; i++) {
+    this->datas.push_back(DataDecl());
+  }
 }
 
 void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
