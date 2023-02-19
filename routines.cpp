@@ -8,6 +8,8 @@
 #include "views.h"
 #include "instructions.h"
 
+#include <climits>
+
 #define MAX(A, B) ({ ((A > B) ? (A) : (B)); })
 
 /************************************************/
@@ -206,35 +208,221 @@ std::map<FuncDecl*, uint64_t> all_funcs_weight_instrument (WasmModule &module) {
 /************************************************/
 
 /************************************************/
+InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr, 
+    uint32_t local_idxs[7], FuncDecl *logaccess_import) {
+  uint32_t local_f64 = local_idxs[0];
+  uint32_t local_f32 = local_idxs[1];
+  uint32_t local_i64_1 = local_idxs[2];
+  uint32_t local_i64_2 = local_idxs[3];
+  uint32_t local_i32_1 = local_idxs[4];
+  uint32_t local_i32_2 = local_idxs[5];
+  uint32_t local_addr = local_idxs[6];
+
+  InstBasePtr instruction = (*itr);
+  std::shared_ptr<ImmMemargInst> mem_inst = static_pointer_cast<ImmMemargInst>(instruction);
+  
+  InstList addinst;
+  #define PUSH_INST(inv)   addinst.push_back(InstBasePtr(new inv));
+  #define SAVE_TOP(var) { \
+    PUSH_INST (LocalTeeInst(var)); \
+    PUSH_INST (DropInst());  \
+  }
+  #define RESTORE_TOP(var) { \
+    PUSH_INST (LocalGetInst(var)); \
+  }
+  #define IC_ROUTINE() {  \
+    PUSH_INST (LocalTeeInst(local_addr));  \
+    PUSH_INST (LocalGetInst(local_addr));  \
+    PUSH_INST (I32ConstInst(mem_inst->getOffset())); \
+    PUSH_INST (I32AddInst());  \
+    /* Get opcode of mem access */ \
+    PUSH_INST (I32ConstInst(instruction->getOpcode()));  \
+    PUSH_INST (CallInst(logaccess_import)); \
+  }
+
+  switch ((*itr)->getOpcode()) {
+    /* Addr */
+    case WASM_OP_I32_LOAD:
+    case WASM_OP_I64_LOAD:
+    case WASM_OP_F32_LOAD:
+    case WASM_OP_F64_LOAD:
+    case WASM_OP_I32_LOAD8_S:
+    case WASM_OP_I32_LOAD8_U:
+    case WASM_OP_I32_LOAD16_S:
+    case WASM_OP_I32_LOAD16_U:
+    case WASM_OP_I64_LOAD8_S:
+    case WASM_OP_I64_LOAD8_U:
+    case WASM_OP_I64_LOAD16_S:
+    case WASM_OP_I64_LOAD16_U:
+    case WASM_OP_I64_LOAD32_S:
+    case WASM_OP_I64_LOAD32_U:
+    case WASM_OP_I32_ATOMIC_LOAD:
+    case WASM_OP_I64_ATOMIC_LOAD:
+    case WASM_OP_I32_ATOMIC_LOAD8_U:
+    case WASM_OP_I32_ATOMIC_LOAD16_U:
+    case WASM_OP_I64_ATOMIC_LOAD8_U:
+    case WASM_OP_I64_ATOMIC_LOAD16_U:
+    case WASM_OP_I64_ATOMIC_LOAD32_U: {
+                                        IC_ROUTINE();
+                                        break;
+                                      }
+
+    /* Addr | I32 */
+    case WASM_OP_I32_STORE:
+    case WASM_OP_I32_STORE8:
+    case WASM_OP_I32_STORE16:
+    case WASM_OP_I32_ATOMIC_STORE:
+    case WASM_OP_I32_ATOMIC_STORE8:
+    case WASM_OP_I32_ATOMIC_STORE16:
+    case WASM_OP_I32_ATOMIC_RMW_ADD:
+    case WASM_OP_I32_ATOMIC_RMW8_ADD_U:
+    case WASM_OP_I32_ATOMIC_RMW16_ADD_U:
+    case WASM_OP_I32_ATOMIC_RMW_SUB:
+    case WASM_OP_I32_ATOMIC_RMW8_SUB_U:
+    case WASM_OP_I32_ATOMIC_RMW16_SUB_U:
+    case WASM_OP_I32_ATOMIC_RMW_AND:
+    case WASM_OP_I32_ATOMIC_RMW8_AND_U:
+    case WASM_OP_I32_ATOMIC_RMW16_AND_U:
+    case WASM_OP_I32_ATOMIC_RMW_OR:
+    case WASM_OP_I32_ATOMIC_RMW8_OR_U:
+    case WASM_OP_I32_ATOMIC_RMW16_OR_U:
+    case WASM_OP_I32_ATOMIC_RMW_XOR:
+    case WASM_OP_I32_ATOMIC_RMW8_XOR_U:
+    case WASM_OP_I32_ATOMIC_RMW16_XOR_U:
+    case WASM_OP_I32_ATOMIC_RMW_XCHG:
+    case WASM_OP_I32_ATOMIC_RMW8_XCHG_U:
+    case WASM_OP_I32_ATOMIC_RMW16_XCHG_U: {
+                                            SAVE_TOP (local_i32_1);
+                                            IC_ROUTINE();
+                                            RESTORE_TOP (local_i32_1);
+                                            break;
+                                          }
+
+    /* Addr | I64 */
+    case WASM_OP_I64_STORE:
+    case WASM_OP_I64_STORE8:
+    case WASM_OP_I64_STORE16:
+    case WASM_OP_I64_STORE32:
+    case WASM_OP_I64_ATOMIC_STORE:
+    case WASM_OP_I64_ATOMIC_STORE8:
+    case WASM_OP_I64_ATOMIC_STORE16:
+    case WASM_OP_I64_ATOMIC_STORE32:
+    case WASM_OP_I64_ATOMIC_RMW_ADD:
+    case WASM_OP_I64_ATOMIC_RMW8_ADD_U:
+    case WASM_OP_I64_ATOMIC_RMW16_ADD_U:
+    case WASM_OP_I64_ATOMIC_RMW32_ADD_U:
+    case WASM_OP_I64_ATOMIC_RMW_SUB:
+    case WASM_OP_I64_ATOMIC_RMW8_SUB_U:
+    case WASM_OP_I64_ATOMIC_RMW16_SUB_U:
+    case WASM_OP_I64_ATOMIC_RMW32_SUB_U:
+    case WASM_OP_I64_ATOMIC_RMW_AND:
+    case WASM_OP_I64_ATOMIC_RMW8_AND_U:
+    case WASM_OP_I64_ATOMIC_RMW16_AND_U:
+    case WASM_OP_I64_ATOMIC_RMW32_AND_U:
+    case WASM_OP_I64_ATOMIC_RMW_OR:
+    case WASM_OP_I64_ATOMIC_RMW8_OR_U:
+    case WASM_OP_I64_ATOMIC_RMW16_OR_U:
+    case WASM_OP_I64_ATOMIC_RMW32_OR_U:
+    case WASM_OP_I64_ATOMIC_RMW_XOR:
+    case WASM_OP_I64_ATOMIC_RMW8_XOR_U:
+    case WASM_OP_I64_ATOMIC_RMW16_XOR_U:
+    case WASM_OP_I64_ATOMIC_RMW32_XOR_U:
+    case WASM_OP_I64_ATOMIC_RMW_XCHG:
+    case WASM_OP_I64_ATOMIC_RMW8_XCHG_U:
+    case WASM_OP_I64_ATOMIC_RMW16_XCHG_U:
+    case WASM_OP_I64_ATOMIC_RMW32_XCHG_U: {
+                                            SAVE_TOP (local_i64_1);
+                                            IC_ROUTINE();
+                                            RESTORE_TOP (local_i64_1);
+                                            break;
+                                          }
+
+    /* Addr | F32 */
+    case WASM_OP_F32_STORE: {
+                              SAVE_TOP (local_f32);
+                              IC_ROUTINE();
+                              RESTORE_TOP (local_f32);
+                              break;
+                            }
+
+    /* Addr | F64 */
+    case WASM_OP_F64_STORE: {
+                              SAVE_TOP (local_f64);
+                              IC_ROUTINE();
+                              RESTORE_TOP (local_f64);
+                              break;
+                            }
+
+    /* Addr | I32 | I32 */
+    case WASM_OP_I32_ATOMIC_RMW_CMPXCHG:
+    case WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U:
+    case WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U: {
+                                               SAVE_TOP (local_i32_1);
+                                               SAVE_TOP (local_i32_2);
+                                               IC_ROUTINE();
+                                               RESTORE_TOP (local_i32_1);
+                                               RESTORE_TOP (local_i32_2);
+                                               break;
+                                             }
+
+    /* Addr | I64 | I64 */
+    case WASM_OP_I64_ATOMIC_RMW_CMPXCHG:
+    case WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U:
+    case WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U:
+    case WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U: {
+                                               SAVE_TOP (local_i64_1);
+                                               SAVE_TOP (local_i64_2);
+                                               IC_ROUTINE();
+                                               RESTORE_TOP (local_i64_1);
+                                               RESTORE_TOP (local_i64_2);
+                                               break;
+                                             }
+  }
+  return addinst;
+}
+
+
+
+
 void memaccess_instrument (WasmModule &module) {
   /* Instrument function import */
   ImportInfo iminfo = {
     .mod_name = "instrument",
     .member_name = "logaccess"
   };
-  SigDecl imfunc = {
-    .params = {},
-    .results = {}
-  };
-  ImportDecl* logaccess_import_decl = module.add_import(iminfo, imfunc);
+  SigDecl logaccess_sig = {
+    .params = {WASM_TYPE_I32, WASM_TYPE_I32}, .results = {} };
+  ImportDecl* logaccess_import_decl = module.add_import(iminfo, logaccess_sig);
   FuncDecl* logaccess_import = logaccess_import_decl->desc.func;
 
   iminfo.member_name = "logend";
-  ImportDecl* logend_import_decl = module.add_import(iminfo, imfunc);
+  SigDecl logend_sig = { .params = {}, .results = {} };
+  ImportDecl* logend_import_decl = module.add_import(iminfo, logend_sig);
   FuncDecl* logend_import = logend_import_decl->desc.func;
 
   /* for memory access */
   for (auto &func : module.Funcs()) {
+    uint32_t local_indices[7] = {
+      func.add_local(WASM_TYPE_F64),
+      func.add_local(WASM_TYPE_F32),
+      func.add_local(WASM_TYPE_I64),
+      func.add_local(WASM_TYPE_I64),
+      func.add_local(WASM_TYPE_I32),
+      func.add_local(WASM_TYPE_I32),
+      func.add_local(WASM_TYPE_I32)
+    };
+
     InstList &insts = func.instructions;
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
       InstBasePtr &instruction = *institr;
       // Call foreign function after memarg
       if (instruction->getImmType() == IMM_MEMARG) {
-        auto loc = std::next(institr);
-        insts.insert(loc, InstBasePtr(new CallInst(logaccess_import)));
+        InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import);
+        insts.insert(institr, addinst.begin(), addinst.end());
       }
     }
   }
+
   /* dump the log */
   ExportDecl* main_exp = module.find_export("main");
   if (!main_exp) {
