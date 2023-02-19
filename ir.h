@@ -101,6 +101,18 @@ struct FuncDecl {
   bytearr code_bytes;
   /* Code: Raw static instructions */ 
   InstList instructions;
+
+  uint32_t add_local(wasm_type_t new_type) {
+    wasm_localcse_t &last = this->pure_locals.back();
+    if (last.type == new_type) {
+      last.count++;
+    } else {
+      this->pure_locals.push_back( { .count = 1, .type = new_type } );
+    }
+    uint32_t idx = this->sig->params.size() + num_pure_locals;
+    num_pure_locals++;
+    return idx;
+  }
 };
 
 

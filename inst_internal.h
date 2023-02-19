@@ -150,6 +150,9 @@ class ImmMemargInst: public InstBase {
     ImmMemargInst (uint16_t opcode, uint32_t align, uint32_t offset) : 
       InstBase(opcode), align(align), offset(offset) { }
 
+    uint32_t getOffset()  { return this->offset; }
+    uint32_t getAlign()   { return this->align; }
+
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
 
