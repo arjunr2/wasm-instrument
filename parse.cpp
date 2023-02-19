@@ -489,7 +489,41 @@ void WasmModule::decode_custom_section(buffer_t &buf, uint32_t len) {
   CustomDecl custom;
   custom.name = RD_NAME();
   uint32_t num_bytes = end_sec - buf.ptr;
-  custom.bytes = RD_BYTESTR(num_bytes);
+
+  if (custom.name == "name") {
+    while (buf.ptr != end_sec) {
+      DebugNameDecl &debug = custom.debug;
+      byte id = RD_BYTE();
+      uint32_t len = RD_U32();
+      /* Non-function subsections in name: Just record section info */
+      if (id != 1) {
+        SubsecBytes subsec = { .id = id, .bytes = RD_BYTESTR(len) };
+        debug.subsections.push_back(subsec);
+      }
+      else {
+        const byte* start_subsec = buf.ptr;
+        const byte* end_subsec = buf.ptr + len;
+
+        uint32_t num_names = RD_U32();
+        for (uint32_t i = 0; i < num_names; i++) {
+          DebugNameAssoc d = { .idx = RD_U32(), .name = RD_NAME() };
+          debug.func_assoc.push_back(d);
+        }
+
+        if (buf.ptr != end_subsec) {
+          ERR("Custom name section not aligned after parsing -- start:%lu, ptr:%lu, end:%lu\n",
+              buf.ptr - start_subsec,
+              buf.ptr - start_subsec,
+              buf.end - start_subsec);
+          throw std::runtime_error("Subsection parsing error");
+        }
+      }
+    }
+  }
+  /* Non-name sections: Just get bytes */
+  else {
+    custom.bytes = RD_BYTESTR(num_bytes);
+  }
 
   this->customs.push_back(custom);
 }

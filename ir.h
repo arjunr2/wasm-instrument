@@ -45,11 +45,27 @@ struct wasm_localcse_t {
 typedef std::list<wasm_localcse_t> wasm_localcsv_t;
 
 
-/* Section Field Declarations */
+struct SubsecBytes {
+  byte id;
+  bytearr bytes;
+};
+struct DebugNameAssoc {
+  uint32_t idx;
+  std::string name;
+};
+struct DebugNameDecl {
+  // Everything except function subsection
+  std::list <SubsecBytes> subsections;
+  // Function subsection: Id 1
+  std::list <DebugNameAssoc> func_assoc;
+};
 
+/* Section Field Declarations */
 struct CustomDecl {
   std::string name;
   bytearr bytes;
+  /* Only populated for 'name' section */
+  DebugNameDecl debug;
 };
 
 

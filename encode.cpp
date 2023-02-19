@@ -418,7 +418,37 @@ bytedeque WasmModule::encode_custom_section(CustomDecl &custom) {
     return {};
   }
   WR_NAME (custom.name);
-  WR_BYTESTR (custom.bytes);
+
+  if (custom.name == "name") {
+    DebugNameDecl &debug = custom.debug;
+
+    /* Function subsection */
+    if (!debug.func_assoc.empty()) {
+      bytedeque secdeq;
+      {
+        bytedeque bdeq;
+        WR_U32 (debug.func_assoc.size());
+        for (auto &name_asc : debug.func_assoc) {
+          WR_U32 (name_asc.idx);
+          WR_NAME (name_asc.name);
+        }
+        secdeq = bdeq;
+      }
+      WR_SECLEN_PRE ();
+      WR_SECBYTE_PRE (0x01);  \
+      bdeq.insert(bdeq.end(), secdeq.begin(), secdeq.end());
+    }
+    /* Non-function subsections: Just write section info */
+    for (auto &subsec : debug.subsections) {
+      WR_BYTE(subsec.id);
+      WR_U32 (subsec.bytes.size());
+      WR_BYTESTR (subsec.bytes);
+    }
+  }
+  /* Non-name sections: Just write bytes */
+  else {
+    WR_BYTESTR (custom.bytes);
+  }
   return bdeq;
 }
 
