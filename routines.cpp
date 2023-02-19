@@ -216,9 +216,14 @@ void memaccess_instrument (WasmModule &module) {
     .params = {},
     .results = {}
   };
-  ImportDecl* func_import_decl = module.add_import(iminfo, imfunc);
-  FuncDecl* func_import = func_import_decl->desc.func;
+  ImportDecl* logaccess_import_decl = module.add_import(iminfo, imfunc);
+  FuncDecl* logaccess_import = logaccess_import_decl->desc.func;
 
+  iminfo.member_name = "logend";
+  ImportDecl* logend_import_decl = module.add_import(iminfo, imfunc);
+  FuncDecl* logend_import = logend_import_decl->desc.func;
+
+  /* for memory access */
   for (auto &func : module.Funcs()) {
     InstList &insts = func.instructions;
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
@@ -226,8 +231,27 @@ void memaccess_instrument (WasmModule &module) {
       // Call foreign function after memarg
       if (instruction->getImmType() == IMM_MEMARG) {
         auto loc = std::next(institr);
-        insts.insert(loc, InstBasePtr(new CallInst(func_import)));
+        insts.insert(loc, InstBasePtr(new CallInst(logaccess_import)));
       }
     }
   }
+  /* dump the log */
+  ExportDecl* main_exp = module.find_export("main");
+  if (!main_exp) {
+    throw std::runtime_error("Could not find export \"main\"!");
+  }
+  FuncDecl* main_fn = main_exp->desc.func;
+  InstList &main_insts = main_fn->instructions;
+  /* Insert after every return in main */
+  for (auto institr = main_insts.begin(); institr != main_insts.end(); ++institr) {
+    InstBasePtr &instruction = *institr;
+    if (instruction->is(WASM_OP_RETURN)) {
+      main_insts.insert(institr, InstBasePtr(new CallInst(logend_import)));
+    }
+  }
+  /* Insert at the end of main */
+  auto end_inst = main_insts.end();
+  auto finish_loc = std::prev(end_inst, 1);
+  main_insts.insert(finish_loc, InstBasePtr(new CallInst(logend_import)));
+
 }
