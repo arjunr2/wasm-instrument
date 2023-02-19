@@ -205,11 +205,15 @@ opcode_entry_t opcode_table[] = {
   [WASM_OP_BR_ON_NON_NULL]	= {"br_on_non_null", IMM_LABEL, -1},
 
 
-  // Multibyte opcode: first byte (only threads legal right now)
+  // Multibyte opcode: first byte (only threads, fc legal right now)
   [WASM_EXT1_GCREF] = {"gc extension", IMM_NONE, -1},
-  [WASM_EXT1_FC] = {"fc extension", IMM_NONE, -1},
+  [WASM_EXT1_FC] = {"fc extension", IMM_NONE},
   [WASM_EXT1_SIMD] = {"simd extension", IMM_NONE, -1},
   [WASM_EXT1_THREADS] = {"threads extension", IMM_NONE},
+
+  // 0xFC extension
+  [WASM_OP_MEMORY_INIT] = {"memory.init", IMM_DATA_MEMORY},
+  [WASM_OP_DATA_DROP] = {"data.drop", IMM_DATA},
 
   // Threads Extension: 0xFE
   [WASM_OP_MEMORY_ATOMIC_NOTIFY] = {"memory.atomic.notify", IMM_MEMARG },

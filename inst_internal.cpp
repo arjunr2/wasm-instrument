@@ -173,8 +173,7 @@ void ImmMemoryInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 }
 
 
-/* UNIMPLEMENTED */
-/* ImmTagInst  */
+/* ImmTagInst: UNIMPLEMENTED  */
 ImmTagInst::ImmTagInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) { 
   throw std::runtime_error ("Unimplemeted TAG opcode"); 
@@ -240,3 +239,29 @@ void ImmValtsInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   }
 }
 
+
+/* ImmDataMemoryInst  */
+ImmDataMemoryInst::ImmDataMemoryInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  this->data = module.getData (RD_U32());
+  this->mem = module.getMemory (RD_U32());
+}
+
+void ImmDataMemoryInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  uint32_t data_idx = module.getDataIdx(this->data);
+  WR_U32 (data_idx);
+  uint32_t mem_idx = module.getMemoryIdx(this->mem);
+  WR_U32 (mem_idx);
+}
+
+
+/* ImmDataInst  */
+ImmDataInst::ImmDataInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  this->data = module.getData (RD_U32());
+}
+
+void ImmDataInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  uint32_t data_idx = module.getDataIdx(this->data);
+  WR_U32 (data_idx);
+}

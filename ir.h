@@ -242,7 +242,8 @@ class WasmModule {
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
       return GET_LIST_ELEM(this->mems, idx); 
     }
-    inline ImportDecl* getImport(uint32_t idx) { return GET_LIST_ELEM(this->imports.list, idx); }
+    inline DataDecl* getData(uint32_t idx)      { return GET_LIST_ELEM(this->datas, idx); }
+    inline ImportDecl* getImport(uint32_t idx)  { return GET_LIST_ELEM(this->imports.list, idx); }
 
     /* Index Accessors */
     inline uint32_t getSigIdx(SigDecl *sig)           { return GET_LIST_IDX(this->sigs, sig); }
@@ -254,7 +255,8 @@ class WasmModule {
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
       return idx;
     }
-    inline uint32_t getImportIdx(ImportDecl *import)     { return GET_LIST_IDX(this->imports.list, import); }
+    inline uint32_t getDataIdx(DataDecl *data)        { return GET_LIST_IDX(this->datas, data); }
+    inline uint32_t getImportIdx(ImportDecl *import)  { return GET_LIST_IDX(this->imports.list, import); }
 
     /* Import accessors */
     inline bool isImport(FuncDecl *func)      { return getFuncIdx(func)     < this->imports.num_funcs; }

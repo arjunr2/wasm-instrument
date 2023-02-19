@@ -202,6 +202,8 @@
 #define WASM_OP_REF_EQ			0xD5 /* "ref.eq", ImmSigs.NONE */
 #define WASM_OP_BR_ON_NON_NULL		0xD6 /* "br_on_non_null", ImmSigs.LABEL */
 
+
+
 /* Multibyte opcode classes */
 #define WASM_EXT1_GCREF 0xFB
 #define WASM_EXT1_FC 0xFC
