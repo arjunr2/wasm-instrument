@@ -213,6 +213,7 @@
 /* 0xFC extensions: UNIMPLEMENTED */
 #define WASM_OP_MEMORY_INIT 0xFC08 /* "memory.init", ImmSigs.DATA_MEMORY */
 #define WASM_OP_DATA_DROP 0xFC09 /* "data.drop", ImmSigs.DATA */
+#define WASM_OP_MEMORY_FILL 0xFC0B /* "memory.fill", ImmSigs.MEMORY */
 
 /* Threads/Atomics: 0xFE extensions */
 #define WASM_OP_MEMORY_ATOMIC_NOTIFY 0xFE00 /* "memory.atomic.notify", ImmSigs.MEMARG */
