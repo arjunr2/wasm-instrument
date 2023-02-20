@@ -67,24 +67,24 @@ void sample_instrument (WasmModule& module) {
 
 ## API Methods
 
-Webassembly has the following index spaces -- **Global**, **Table**, **Memory**, **Func**. The folllowing specifications
-will use *<ispace>* to denote of these. Refer to [ir.h](ir.h) for details
+Webassembly has the following index spaces -- **GlobalDecl**, **TableDecl**, **MemoryDecl**, **FuncDecl**. The folllowing specifications
+will use *[ISD]* to denote these in below APIs. Refer to [ir.h](ir.h) for details
 
 ### Addition Operations
 
 #### Add to Index Space
 ```cpp
-<ispace>Decl* add_<ispace> (<ispace>Decl &decl, const char* export_name = NULL);
+[ISD]* add_[ISD] ([ISD]Decl &decl, const char* export_name = NULL);
 ```
 
 #### Add Import
 ```cpp
-ImportDecl* add_import (ImportInfo &info, <ispace>Decl &decl);
+ImportDecl* add_import (ImportInfo &info, [ISD]Decl &decl);
 ```
 
 #### Add Export
 ```cpp
-ExportDecl* add_export (std::string export_name, <ispace>Decl &var);
+ExportDecl* add_export (std::string export_name, [ISD]Decl &var);
 ```
 
 ### Find Operations
