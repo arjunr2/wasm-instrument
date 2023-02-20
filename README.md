@@ -74,17 +74,17 @@ will use *[ISD]* to denote these in below APIs. Refer to [ir.h](ir.h) for detail
 
 #### Add to Index Space
 ```cpp
-[ISD]* add_[ISD] ([ISD]Decl &decl, const char* export_name = NULL);
+[ISD]* add_[ISD] ([ISD] &decl, const char* export_name = NULL);
 ```
 
 #### Add Import
 ```cpp
-ImportDecl* add_import (ImportInfo &info, [ISD]Decl &decl);
+ImportDecl* add_import (ImportInfo &info, [ISD] &decl);
 ```
 
 #### Add Export
 ```cpp
-ExportDecl* add_export (std::string export_name, [ISD]Decl &var);
+ExportDecl* add_export (std::string export_name, [ISD] &var);
 ```
 
 ### Find Operations
