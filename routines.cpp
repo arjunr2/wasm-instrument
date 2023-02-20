@@ -47,8 +47,8 @@ void sample_instrument (WasmModule& module) {
     TRACE("Printf not found\n");
   }
 
-  /* Insert NOP before every call in main */
-  ExportDecl* main_exp = module.find_export("_start");
+  /* Add a I32 Const + Drop before every call in main */
+  ExportDecl* main_exp = module.find_export("main");
   FuncDecl* main_fn = main_exp->desc.func;
   InstList &insts = main_fn->instructions;
   for (auto institr = insts.begin(); institr != insts.end(); ++institr) {

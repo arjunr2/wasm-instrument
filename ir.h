@@ -339,7 +339,7 @@ class WasmModule {
     /* Find */
     ExportDecl* find_export (std::string export_name);
 
-    /* Replace uses */
+    /* Replace uses: UNIMPLEMENTED */
     void replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst);
     void replace_all_uses (TableDecl* old_inst, TableDecl* new_inst);
     void replace_all_uses (MemoryDecl* old_inst, MemoryDecl* new_inst);
