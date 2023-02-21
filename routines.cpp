@@ -210,6 +210,9 @@ std::map<FuncDecl*, uint64_t> all_funcs_weight_instrument (WasmModule &module) {
 /************************************************/
 InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[7], FuncDecl *logaccess_import) {
+
+  static uint32_t access_idx = 0;
+
   uint32_t local_f64 = local_idxs[0];
   uint32_t local_f32 = local_idxs[1];
   uint32_t local_i64_1 = local_idxs[2];
@@ -237,6 +240,8 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     PUSH_INST (I32AddInst());  \
     /* Get opcode of mem access */ \
     PUSH_INST (I32ConstInst(instruction->getOpcode()));  \
+    /* Assign index to access access */ \
+    PUSH_INST (I32ConstInst(access_idx++));  \
     PUSH_INST (CallInst(logaccess_import)); \
   }
 
@@ -391,7 +396,7 @@ void memaccess_instrument (WasmModule &module) {
     .member_name = "logaccess"
   };
   SigDecl logaccess_sig = {
-    .params = {WASM_TYPE_I32, WASM_TYPE_I32}, .results = {} };
+    .params = {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32}, .results = {} };
   ImportDecl* logaccess_import_decl = module.add_import(iminfo, logaccess_sig);
   FuncDecl* logaccess_import = logaccess_import_decl->desc.func;
 
