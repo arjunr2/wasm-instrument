@@ -429,10 +429,14 @@ void memaccess_instrument (WasmModule &module) {
   }
 
   /* dump the log */
-  ExportDecl* main_exp = module.find_export("main");
-  if (!main_exp) {
-    throw std::runtime_error("Could not find export \"main\"!");
+  /* look for either main or _start */
+  ExportDecl* main_fn_exp = module.find_export("main");
+  ExportDecl* start_fn_exp = module.find_export("_start");
+  if (!(main_fn_exp || start_fn_exp)) {
+    throw std::runtime_error("Could not find export \"main\" or \"_start\" function!");
   }
+  ExportDecl* main_exp = (main_fn_exp ? main_fn_exp : start_fn_exp);
+
   FuncDecl* main_fn = main_exp->desc.func;
   InstList &main_insts = main_fn->instructions;
   /* Insert after every return in main */

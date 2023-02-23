@@ -20,12 +20,14 @@
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
   {"dis", no_argument, &g_disassemble, 1},
+  {"scheme", optional_argument, NULL, 's'},
   {"out", required_argument, NULL, 'o'},
   {"help", no_argument, NULL, 'h'}
 };
 
 typedef struct {
   char* infile;
+  char* scheme;
   char* outfile;
 } args_t;
 
@@ -33,13 +35,14 @@ args_t parse_args(int argc, char* argv[]) {
   int opt;
   args_t args = {0};
   optind = 0;
-  while ((opt = getopt_long_only(argc, argv, "o:h", long_options, NULL)) != -1) {
+  while ((opt = getopt_long_only(argc, argv, "o:s:h", long_options, NULL)) != -1) {
     switch(opt) {
       case 0: break;
       case 'o': args.outfile = strdup(optarg); break;
+      case 's': args.scheme = strdup(optarg); break;
       case 'h':
       default:
-        ERR("Usage: %s [--trace] [--out OUTFILE] <infile>\n", argv[0]);
+        ERR("Usage: %s [--trace] [--scheme SCHEME] [--out OUTFILE] <infile>\n", argv[0]);
         exit(opt != 'h');
     }
   }
