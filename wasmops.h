@@ -210,9 +210,10 @@
 #define WASM_EXT1_SIMD 0xFD
 #define WASM_EXT1_THREADS  0xFE
 
-/* 0xFC extensions: UNIMPLEMENTED */
+/* 0xFC extensions: Partially implemented */
 #define WASM_OP_MEMORY_INIT 0xFC08 /* "memory.init", ImmSigs.DATA_MEMORY */
 #define WASM_OP_DATA_DROP 0xFC09 /* "data.drop", ImmSigs.DATA */
+#define WASM_OP_MEMORY_COPY 0xFC0A /* "memory.copy", ImmSigs.MEMORY_CP */
 #define WASM_OP_MEMORY_FILL 0xFC0B /* "memory.fill", ImmSigs.MEMORY */
 
 /* Threads/Atomics: 0xFE extensions */

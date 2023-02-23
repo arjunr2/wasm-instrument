@@ -268,3 +268,13 @@ class ImmDataInst: public InstBase {
 };
 
 
+class ImmMemoryCpInst: public InstBase {
+  MemoryDecl* dst;
+  MemoryDecl* src;
+  public:
+    ImmMemoryCpInst (WasmModule &module, uint16_t opcode, buffer_t &buf);
+    ImmMemoryCpInst (uint16_t opcode, MemoryDecl* dst, MemoryDecl* src) : 
+      InstBase(opcode), dst(dst), src(src) { }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};

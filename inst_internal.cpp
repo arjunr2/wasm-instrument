@@ -265,3 +265,18 @@ void ImmDataInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t data_idx = module.getDataIdx(this->data);
   WR_U32 (data_idx);
 }
+
+
+/* ImmMemoryCpInst  */
+ImmMemoryCpInst::ImmMemoryCpInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  this->dst = module.getMemory (RD_U32());
+  this->src = module.getMemory (RD_U32());
+}
+
+void ImmMemoryCpInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  uint32_t dst_idx = module.getMemoryIdx(this->dst);
+  WR_U32 (dst_idx);
+  uint32_t src_idx = module.getMemoryIdx(this->src);
+  WR_U32 (src_idx);
+}
