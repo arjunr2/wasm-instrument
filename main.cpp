@@ -57,12 +57,25 @@ args_t parse_args(int argc, char* argv[]) {
     exit(1);
   }
   
-  //printf("Trace: %d | Dis: %d\n", g_trace, g_disassemble);
+  // Run sample instrumentation by default
+  if (args.scheme == NULL) {
+    args.scheme = strdup("sample");
+  }
   args.infile = argv[optind];
   return args;
 }
 
 
+void instrument_call (WasmModule &module, std::string routine) {
+  printf("Running instrumentation: %s\n", routine.c_str());
+  if (routine == "memaccess-shared") { memaccess_instrument(module); }
+  else if (routine == "sample") { sample_instrument(module); }
+  else if (routine == "func-weight") { all_funcs_weight_instrument(module); }
+  else if (routine == "loop-count") { loop_instrument(module); }
+  else {
+    printf("Unsupported instrumentation scheme\n");
+  }
+}
 
 // Main function.
 // Parses arguments and either runs a file with arguments.
@@ -84,7 +97,7 @@ int main(int argc, char *argv[]) {
   unload_file(&start, &end);
 
   /* Instrument */
-  memaccess_instrument(module);
+  instrument_call(module, args.scheme);
 
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);

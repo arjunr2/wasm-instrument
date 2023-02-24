@@ -12,6 +12,16 @@
 
 #define MAX(A, B) ({ ((A > B) ? (A) : (B)); })
 
+static ExportDecl* get_main_export(WasmModule &module) {
+  /* look for either main or _start */
+  ExportDecl* main_fn_exp = module.find_export("main");
+  ExportDecl* start_fn_exp = module.find_export("_start");
+  if (!(main_fn_exp || start_fn_exp)) {
+    throw std::runtime_error("Could not find export \"main\" or \"_start\" function!");
+  }
+  return main_fn_exp ? main_fn_exp : start_fn_exp;
+}
+
 /************************************************/
 void sample_instrument (WasmModule& module) {
   /* Global inmodule */
@@ -48,7 +58,7 @@ void sample_instrument (WasmModule& module) {
   }
 
   /* Add a I32 Const + Drop before every call in main */
-  ExportDecl* main_exp = module.find_export("main");
+  ExportDecl* main_exp = get_main_export(module);
   FuncDecl* main_fn = main_exp->desc.func;
   InstList &insts = main_fn->instructions;
   for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
@@ -65,6 +75,7 @@ void sample_instrument (WasmModule& module) {
 
 /************************************************/
 void loop_instrument (WasmModule &module) {
+  printf("IN LOOP\n");
   uint64_t num_loops = 0;
   for (auto &func : module.Funcs()) {
     InstList &insts = func.instructions;
@@ -429,13 +440,7 @@ void memaccess_instrument (WasmModule &module) {
   }
 
   /* dump the log */
-  /* look for either main or _start */
-  ExportDecl* main_fn_exp = module.find_export("main");
-  ExportDecl* start_fn_exp = module.find_export("_start");
-  if (!(main_fn_exp || start_fn_exp)) {
-    throw std::runtime_error("Could not find export \"main\" or \"_start\" function!");
-  }
-  ExportDecl* main_exp = (main_fn_exp ? main_fn_exp : start_fn_exp);
+  ExportDecl* main_exp = get_main_export(module);
 
   FuncDecl* main_fn = main_exp->desc.func;
   InstList &main_insts = main_fn->instructions;
