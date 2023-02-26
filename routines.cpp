@@ -9,6 +9,8 @@
 #include "instructions.h"
 
 #include <climits>
+#include <fstream>
+#include <iostream>
 
 #define MAX(A, B) ({ ((A > B) ? (A) : (B)); })
 
@@ -75,7 +77,6 @@ void sample_instrument (WasmModule& module) {
 
 /************************************************/
 void loop_instrument (WasmModule &module) {
-  printf("IN LOOP\n");
   uint64_t num_loops = 0;
   for (auto &func : module.Funcs()) {
     InstList &insts = func.instructions;
@@ -220,9 +221,7 @@ std::map<FuncDecl*, uint64_t> all_funcs_weight_instrument (WasmModule &module) {
 
 /************************************************/
 InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[7], FuncDecl *logaccess_import) {
-
-  static uint32_t access_idx = 0;
+    uint32_t local_idxs[7], FuncDecl *logaccess_import, uint32_t access_idx) {
 
   uint32_t local_f64 = local_idxs[0];
   uint32_t local_f32 = local_idxs[1];
@@ -238,8 +237,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
   InstList addinst;
   #define PUSH_INST(inv)   addinst.push_back(InstBasePtr(new inv));
   #define SAVE_TOP(var) { \
-    PUSH_INST (LocalTeeInst(var)); \
-    PUSH_INST (DropInst());  \
+    PUSH_INST (LocalSetInst(var)); \
   }
   #define RESTORE_TOP(var) { \
     PUSH_INST (LocalGetInst(var)); \
@@ -252,7 +250,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     /* Get opcode of mem access */ \
     PUSH_INST (I32ConstInst(instruction->getOpcode()));  \
     /* Assign index to access access */ \
-    PUSH_INST (I32ConstInst(access_idx++));  \
+    PUSH_INST (I32ConstInst(access_idx));  \
     PUSH_INST (CallInst(logaccess_import)); \
   }
 
@@ -398,9 +396,43 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
 }
 
 
+std::vector<uint32_t> read_binary_file(const std::string& filename) {
+  std::ifstream input_file(filename, std::ios::binary);
+
+  if (!input_file) {
+    std::cout << "Could not open file, using None\n";
+    return std::vector<uint32_t>();
+  }
+
+  // Get the file size
+  input_file.seekg(0, std::ios::end);
+  size_t file_size = input_file.tellg();
+  input_file.seekg(0, std::ios::beg);
+
+  size_t num_ints = file_size / sizeof(uint32_t);
+  std::vector<uint32_t> integers(num_ints);
+
+  input_file.read(reinterpret_cast<char*>(integers.data()), file_size);
+
+  if (input_file.gcount() != file_size) {
+    throw std::runtime_error("Error reading file");
+  }
 
 
-void memaccess_instrument (WasmModule &module) {
+  return integers;
+}
+
+
+void memaccess_instrument (WasmModule &module, std::string path) {
+  /* If empty, instrument everything */
+  std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
+  for (auto &i : inst_idx_filter) {
+    std::cout << i << " ";
+  }
+  std::cout << "\n";
+  bool filter = !inst_idx_filter.empty();
+  std::vector<uint32_t>::iterator filter_itr = inst_idx_filter.begin();
+
   /* Instrument function import */
   ImportInfo iminfo = {
     .mod_name = "instrument",
@@ -417,6 +449,7 @@ void memaccess_instrument (WasmModule &module) {
   FuncDecl* logend_import = logend_import_decl->desc.func;
 
   /* for memory access */
+  uint32_t access_idx = 1;
   for (auto &func : module.Funcs()) {
     uint32_t local_indices[7] = {
       func.add_local(WASM_TYPE_F64),
@@ -433,8 +466,23 @@ void memaccess_instrument (WasmModule &module) {
       InstBasePtr &instruction = *institr;
       // Call foreign function after memarg
       if (instruction->getImmType() == IMM_MEMARG) {
-        InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import);
-        insts.insert(institr, addinst.begin(), addinst.end());
+        printf("Access Idx: %d\n", access_idx);
+        bool skip_access_inc = false;
+        // For no filtering
+        if (!filter) {
+          InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
+          insts.insert(institr, addinst.begin(), addinst.end());
+          skip_access_inc = addinst.empty();
+        }
+        // For filtering
+        else if (filter_itr == inst_idx_filter.end()) { break; }
+        else if (*filter_itr == access_idx) {
+          InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
+          insts.insert(institr, addinst.begin(), addinst.end());
+          filter_itr++;
+          skip_access_inc = addinst.empty();
+        }
+        if (!skip_access_inc) { access_idx++; };
       }
     }
   }
@@ -457,3 +505,4 @@ void memaccess_instrument (WasmModule &module) {
   main_insts.insert(finish_loc, InstBasePtr(new CallInst(logend_import)));
 
 }
+

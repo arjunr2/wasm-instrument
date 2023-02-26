@@ -22,12 +22,14 @@ static struct option long_options[] = {
   {"dis", no_argument, &g_disassemble, 1},
   {"scheme", optional_argument, NULL, 's'},
   {"out", required_argument, NULL, 'o'},
+  {"args", optional_argument, NULL, 'a'},
   {"help", no_argument, NULL, 'h'}
 };
 
 typedef struct {
   char* infile;
   char* scheme;
+  char* inst_args;
   char* outfile;
 } args_t;
 
@@ -35,11 +37,12 @@ args_t parse_args(int argc, char* argv[]) {
   int opt;
   args_t args = {0};
   optind = 0;
-  while ((opt = getopt_long_only(argc, argv, "o:s:h", long_options, NULL)) != -1) {
+  while ((opt = getopt_long_only(argc, argv, "o:s:a:h", long_options, NULL)) != -1) {
     switch(opt) {
       case 0: break;
       case 'o': args.outfile = strdup(optarg); break;
       case 's': args.scheme = strdup(optarg); break;
+      case 'a': args.inst_args = strdup(optarg); break;
       case 'h':
       default:
         ERR("Usage: %s [--trace] [--scheme SCHEME] [--out OUTFILE] <infile>\n", argv[0]);
@@ -58,17 +61,15 @@ args_t parse_args(int argc, char* argv[]) {
   }
   
   // Run sample instrumentation by default
-  if (args.scheme == NULL) {
-    args.scheme = strdup("sample");
-  }
+  if (!args.scheme) { args.scheme = strdup("sample"); } 
   args.infile = argv[optind];
   return args;
 }
 
 
-void instrument_call (WasmModule &module, std::string routine) {
+void instrument_call (WasmModule &module, std::string routine, std::string args) {
   printf("Running instrumentation: %s\n", routine.c_str());
-  if (routine == "memaccess-shared") { memaccess_instrument(module); }
+  if ((routine == "memaccess") || (routine == "memshared")) { memaccess_instrument(module, args); }
   else if (routine == "sample") { sample_instrument(module); }
   else if (routine == "func-weight") { all_funcs_weight_instrument(module); }
   else if (routine == "loop-count") { loop_instrument(module); }
@@ -97,7 +98,8 @@ int main(int argc, char *argv[]) {
   unload_file(&start, &end);
 
   /* Instrument */
-  instrument_call(module, args.scheme);
+  std::string inst_args = (args.inst_args ? std::string(args.inst_args) : std::string());
+  instrument_call(module, args.scheme, inst_args);
 
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);
