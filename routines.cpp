@@ -466,23 +466,31 @@ void memaccess_instrument (WasmModule &module, std::string path) {
       InstBasePtr &instruction = *institr;
       // Call foreign function after memarg
       if (instruction->getImmType() == IMM_MEMARG) {
-        printf("Access Idx: %d\n", access_idx);
-        bool skip_access_inc = false;
+        /* Add instruction will be empty if we choose to ignore some access instructions
+          * eg: atomic.notify, atomic.wait */
         // For no filtering
         if (!filter) {
           InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
-          insts.insert(institr, addinst.begin(), addinst.end());
-          skip_access_inc = addinst.empty();
+          if (!addinst.empty()) {
+            printf("Inserting Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
+            insts.insert(institr, addinst.begin(), addinst.end());
+            access_idx++;
+          }
         }
-        // For filtering
-        else if (filter_itr == inst_idx_filter.end()) { break; }
-        else if (*filter_itr == access_idx) {
+        // For filtering: Just check when adding instructions whether it 
+        // should be filtered or not
+        else {
+          if (filter_itr == inst_idx_filter.end()) { break; }
           InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
-          insts.insert(institr, addinst.begin(), addinst.end());
-          filter_itr++;
-          skip_access_inc = addinst.empty();
+          if (!addinst.empty()) {
+            if (*filter_itr == access_idx) {
+              printf("Inserting Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
+              insts.insert(institr, addinst.begin(), addinst.end());
+              filter_itr++;
+            }
+            access_idx++;
+          }
         }
-        if (!skip_access_inc) { access_idx++; };
       }
     }
   }
