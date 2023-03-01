@@ -57,5 +57,16 @@ static inline bool isReftype(wasm_type_t type) {
 
 /* Other common defines/expressions */
 #define INIT_EXPR(type, val) ({  \
-  bytearr { WASM_OP_##type, val, WASM_OP_END }; \
+  bytedeque bdeq; \
+  int ty = WASM_OP_##type;  \
+  bdeq.push_back(ty); \
+  switch (ty) { \
+    case WASM_OP_I32_CONST: WR_I32(val); break; \
+    case WASM_OP_I64_CONST: WR_I64(val); break;  \
+    case WASM_OP_F32_CONST: WR_U32_RAW(val); break;  \
+    case WASM_OP_F64_CONST: WR_U64_RAW(val); break; \
+    default: throw std::runtime_error("Invalid initializer expression type\n"); \
+  } \
+  bdeq.push_back(WASM_OP_END);  \
+  bytearr (bdeq.begin(), bdeq.end()); \
 })

@@ -396,44 +396,12 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
 }
 
 
-std::vector<uint32_t> read_binary_file(const std::string& filename) {
-  std::ifstream input_file(filename, std::ios::binary);
-
-  if (!input_file) {
-    std::cout << "Could not open file, using None\n";
-    return std::vector<uint32_t>();
-  }
-
-  // Get the file size
-  input_file.seekg(0, std::ios::end);
-  size_t file_size = input_file.tellg();
-  input_file.seekg(0, std::ios::beg);
-
-  size_t num_ints = file_size / sizeof(uint32_t);
-  std::vector<uint32_t> integers(num_ints);
-
-  input_file.read(reinterpret_cast<char*>(integers.data()), file_size);
-
-  if (input_file.gcount() != file_size) {
-    throw std::runtime_error("Error reading file");
-  }
 
 
-  return integers;
-}
-
-
-void memaccess_instrument (WasmModule &module, std::string path) {
-  /* If empty, instrument everything */
-  std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
-  for (auto &i : inst_idx_filter) {
-    std::cout << i << " ";
-  }
-  std::cout << "\n";
-  bool filter = !inst_idx_filter.empty();
-  std::vector<uint32_t>::iterator filter_itr = inst_idx_filter.begin();
-
-  /* Instrument function import */
+/************************************************/
+/* Instrument all accesses */
+void memaccess_instrument (WasmModule &module) {
+  /* Access Instrument function import */
   ImportInfo iminfo = {
     .mod_name = "instrument",
     .member_name = "logaccess"
@@ -443,12 +411,8 @@ void memaccess_instrument (WasmModule &module, std::string path) {
   ImportDecl* logaccess_import_decl = module.add_import(iminfo, logaccess_sig);
   FuncDecl* logaccess_import = logaccess_import_decl->desc.func;
 
-  iminfo.member_name = "logend";
-  SigDecl logend_sig = { .params = {}, .results = {} };
-  ImportDecl* logend_import_decl = module.add_import(iminfo, logend_sig);
-  FuncDecl* logend_import = logend_import_decl->desc.func;
 
-  /* for memory access */
+  /* For memory access */
   uint32_t access_idx = 1;
   for (auto &func : module.Funcs()) {
     uint32_t local_indices[7] = {
@@ -468,39 +432,26 @@ void memaccess_instrument (WasmModule &module, std::string path) {
       if (instruction->getImmType() == IMM_MEMARG) {
         /* Add instruction will be empty if we choose to ignore some access instructions
           * eg: atomic.notify, atomic.wait */
-        // For no filtering
-        if (!filter) {
-          InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
-          if (!addinst.empty()) {
-            printf("Inserting Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
-            insts.insert(institr, addinst.begin(), addinst.end());
-            access_idx++;
-          }
-        }
-        // For filtering: Just check when adding instructions whether it 
-        // should be filtered or not
-        else {
-          if (filter_itr == inst_idx_filter.end()) { break; }
-          InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
-          if (!addinst.empty()) {
-            if (*filter_itr == access_idx) {
-              printf("Inserting Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
-              insts.insert(institr, addinst.begin(), addinst.end());
-              filter_itr++;
-            }
-            access_idx++;
-          }
+        InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
+        if (!addinst.empty()) {
+          printf("Inserting at Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
+          insts.insert(institr, addinst.begin(), addinst.end());
+          access_idx++;
         }
       }
     }
   }
 
-  /* dump the log */
-  ExportDecl* main_exp = get_main_export(module);
+  /* End function instrument import */
+  iminfo.member_name = "logend";
+  SigDecl logend_sig = { .params = {}, .results = {} };
+  ImportDecl* logend_import_decl = module.add_import(iminfo, logend_sig);
+  FuncDecl* logend_import = logend_import_decl->desc.func;
 
+  /* Insert after every return in main */
+  ExportDecl* main_exp = get_main_export(module);
   FuncDecl* main_fn = main_exp->desc.func;
   InstList &main_insts = main_fn->instructions;
-  /* Insert after every return in main */
   for (auto institr = main_insts.begin(); institr != main_insts.end(); ++institr) {
     InstBasePtr &instruction = *institr;
     if (instruction->is(WASM_OP_RETURN)) {
@@ -511,6 +462,135 @@ void memaccess_instrument (WasmModule &module, std::string path) {
   auto end_inst = main_insts.end();
   auto finish_loc = std::prev(end_inst, 1);
   main_insts.insert(finish_loc, InstBasePtr(new CallInst(logend_import)));
+}
+/************************************************/
 
+
+
+
+static std::vector<uint32_t> read_binary_file(const std::string& filename) {
+  std::ifstream input_file(filename, std::ios::binary);
+
+  if (!input_file) {
+    throw std::runtime_error("Could not open file for instrumentation\n");
+  }
+
+  // Get the file size
+  input_file.seekg(0, std::ios::end);
+  size_t file_size = input_file.tellg();
+  input_file.seekg(0, std::ios::beg);
+
+  size_t num_ints = file_size / sizeof(uint32_t);
+  std::vector<uint32_t> integers(num_ints);
+
+  input_file.read(reinterpret_cast<char*>(integers.data()), file_size);
+
+  if (input_file.gcount() != file_size) {
+    throw std::runtime_error("Error reading file");
+  }
+
+  return integers;
 }
 
+
+/************************************************/
+/* Instrument filtered accesses from path */
+void memshared_instrument (WasmModule &module, std::string path) {
+  /* If empty, instrument everything */
+  std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
+  for (auto &i : inst_idx_filter) {
+    std::cout << i << " ";
+  }
+  std::cout << "\n";
+
+  uint32_t num_shared_accesses = *(inst_idx_filter.begin());
+  std::vector<uint32_t>::iterator filter_itr = inst_idx_filter.begin() + 1;
+
+  /* Access Instrument function import */
+  ImportInfo iminfo = {
+    .mod_name = "instrument",
+  };
+  iminfo.member_name = "logaccess";
+  SigDecl logaccess_sig = {
+    .params = {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32}, .results = {} };
+  ImportDecl* logaccess_import_decl = module.add_import(iminfo, logaccess_sig);
+  FuncDecl* logaccess_import = logaccess_import_decl->desc.func;
+
+  /* For memory access */
+  uint32_t access_idx = 1;
+  for (auto &func : module.Funcs()) {
+    uint32_t local_indices[7] = {
+      func.add_local(WASM_TYPE_F64),
+      func.add_local(WASM_TYPE_F32),
+      func.add_local(WASM_TYPE_I64),
+      func.add_local(WASM_TYPE_I64),
+      func.add_local(WASM_TYPE_I32),
+      func.add_local(WASM_TYPE_I32),
+      func.add_local(WASM_TYPE_I32)
+    };
+
+    InstList &insts = func.instructions;
+    for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
+      InstBasePtr &instruction = *institr;
+      // Call foreign function after memarg
+      if (instruction->getImmType() == IMM_MEMARG) {
+        /* Add instruction will be empty if we choose to ignore some access instructions
+          * eg: atomic.notify, atomic.wait */
+        if (filter_itr == inst_idx_filter.end()) { break; }
+        InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
+        if (!addinst.empty()) {
+          // Just check when adding instructions whether it should be filtered or not
+          if (*filter_itr == access_idx) {
+            printf("Inserting at Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
+            insts.insert(institr, addinst.begin(), addinst.end());
+            filter_itr++;
+          }
+          access_idx++;
+        }
+      }
+    }
+  }
+
+
+  /* Start/End function instrument import */
+  iminfo.member_name = "logend";
+  SigDecl logend_sig = { .params = {}, .results = {} };
+  ImportDecl* logend_import_decl = module.add_import(iminfo, logend_sig);
+  FuncDecl* logend_import = logend_import_decl->desc.func;
+
+  iminfo.member_name = "logstart";
+  SigDecl logstart_sig = { .params = {}, .results = {} };
+  ImportDecl* logstart_import_decl = module.add_import(iminfo, logstart_sig);
+  FuncDecl* logstart_import = logstart_import_decl->desc.func;
+
+  ExportDecl* main_exp = get_main_export(module);
+  FuncDecl* main_fn = main_exp->desc.func;
+
+  /* Logstart insertion: Beginning of start function or main */
+  /* Global to store the number of accesses */
+  GlobalDecl global = { 
+    .type = WASM_TYPE_I32, 
+    .is_mutable = false,
+    .init_expr_bytes = INIT_EXPR (I32_CONST, num_shared_accesses)
+  };
+  module.add_global(global, "__tsv_inst_ct");
+
+  FuncDecl* start_fn = module.get_start_fn();
+  FuncDecl* first_fn = start_fn ? start_fn : main_fn;
+  InstList &first_insts = first_fn->instructions;
+  first_insts.push_front(InstBasePtr(new CallInst(logstart_import)));
+
+  /* Logend insertion: After every return in main & at end of main */
+  InstList &main_insts = main_fn->instructions;
+  for (auto institr = main_insts.begin(); institr != main_insts.end(); ++institr) {
+    InstBasePtr &instruction = *institr;
+    if (instruction->is(WASM_OP_RETURN)) {
+      main_insts.insert(institr, InstBasePtr(new CallInst(logend_import)));
+    }
+  }
+
+  auto end_inst = main_insts.end();
+  auto finish_loc = std::prev(end_inst, 1);
+  main_insts.insert(finish_loc, InstBasePtr(new CallInst(logend_import)));
+}
+/************************************************/

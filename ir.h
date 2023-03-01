@@ -303,6 +303,7 @@ class WasmModule {
     inline std::list <FuncDecl> &Funcs() { return this->funcs; }
     inline std::list <GlobalDecl> &Globals() { return this->globals; }
 
+    inline FuncDecl* get_start_fn() { return this->has_start ? this->start_fn : NULL; }
     inline uint32_t get_num_customs() { return this->customs.size(); }
 
 
