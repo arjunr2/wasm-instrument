@@ -442,15 +442,27 @@ void memaccess_instrument (WasmModule &module) {
     }
   }
 
-  /* End function instrument import */
+  /* Start/End function instrument import */
+  iminfo.member_name = "logstart";
+  SigDecl logstart_sig = { .params = {}, .results = {} };
+  ImportDecl* logstart_import_decl = module.add_import(iminfo, logstart_sig);
+  FuncDecl* logstart_import = logstart_import_decl->desc.func;
+
   iminfo.member_name = "logend";
   SigDecl logend_sig = { .params = {}, .results = {} };
   ImportDecl* logend_import_decl = module.add_import(iminfo, logend_sig);
   FuncDecl* logend_import = logend_import_decl->desc.func;
 
-  /* Insert after every return in main */
   ExportDecl* main_exp = get_main_export(module);
   FuncDecl* main_fn = main_exp->desc.func;
+
+  /* Logstart insertion: Beginning of start function or main */
+  FuncDecl* start_fn = module.get_start_fn();
+  FuncDecl* first_fn = start_fn ? start_fn : main_fn;
+  InstList &first_insts = first_fn->instructions;
+  first_insts.push_front(InstBasePtr(new CallInst(logstart_import)));
+
+  /* Logend insertion: After every return in main & at end of main */
   InstList &main_insts = main_fn->instructions;
   for (auto institr = main_insts.begin(); institr != main_insts.end(); ++institr) {
     InstBasePtr &instruction = *institr;
@@ -553,15 +565,16 @@ void memshared_instrument (WasmModule &module, std::string path) {
 
 
   /* Start/End function instrument import */
+  iminfo.member_name = "logstart";
+  SigDecl logstart_sig = { .params = {WASM_TYPE_I32}, .results = {} };
+  ImportDecl* logstart_import_decl = module.add_import(iminfo, logstart_sig);
+  FuncDecl* logstart_import = logstart_import_decl->desc.func;
+
   iminfo.member_name = "logend";
   SigDecl logend_sig = { .params = {}, .results = {} };
   ImportDecl* logend_import_decl = module.add_import(iminfo, logend_sig);
   FuncDecl* logend_import = logend_import_decl->desc.func;
 
-  iminfo.member_name = "logstart";
-  SigDecl logstart_sig = { .params = {}, .results = {} };
-  ImportDecl* logstart_import_decl = module.add_import(iminfo, logstart_sig);
-  FuncDecl* logstart_import = logstart_import_decl->desc.func;
 
   ExportDecl* main_exp = get_main_export(module);
   FuncDecl* main_fn = main_exp->desc.func;
@@ -573,12 +586,13 @@ void memshared_instrument (WasmModule &module, std::string path) {
     .is_mutable = false,
     .init_expr_bytes = INIT_EXPR (I32_CONST, num_shared_accesses)
   };
-  module.add_global(global, "__tsv_inst_ct");
+  GlobalDecl* num_insts_globref = module.add_global(global, "__tsv_inst_ct");
 
   FuncDecl* start_fn = module.get_start_fn();
   FuncDecl* first_fn = start_fn ? start_fn : main_fn;
   InstList &first_insts = first_fn->instructions;
   first_insts.push_front(InstBasePtr(new CallInst(logstart_import)));
+  first_insts.push_front(InstBasePtr(new GlobalGetInst(num_insts_globref)));
 
   /* Logend insertion: After every return in main & at end of main */
   InstList &main_insts = main_fn->instructions;
