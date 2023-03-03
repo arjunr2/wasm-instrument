@@ -1,11 +1,28 @@
 #pragma once
 
 #include "wasmops.h"
+#include <stdbool.h>
 
 #define WASM_MAGIC 0x6d736100u
 #define WASM_VERSION 1
 
 #define PAGE_SIZE 65536
+
+/* Other common defines/expressions */
+#define INIT_EXPR(type, val) ({  \
+  bytedeque bdeq; \
+  int ty = WASM_OP_##type;  \
+  bdeq.push_back(ty); \
+  switch (ty) { \
+    case WASM_OP_I32_CONST: WR_I32(val); break; \
+    case WASM_OP_I64_CONST: WR_I64(val); break;  \
+    case WASM_OP_F32_CONST: WR_U32_RAW(val); break;  \
+    case WASM_OP_F64_CONST: WR_U64_RAW(val); break; \
+    default: throw std::runtime_error("Invalid initializer expression type\n"); \
+  } \
+  bdeq.push_back(WASM_OP_END);  \
+  bytearr (bdeq.begin(), bdeq.end()); \
+})
 
 /* Section constants */
 typedef enum {
@@ -55,18 +72,41 @@ static inline bool isReftype(wasm_type_t type) {
   return (type == WASM_TYPE_EXTERNREF) || (type == WASM_TYPE_FUNCREF);
 }
 
-/* Other common defines/expressions */
-#define INIT_EXPR(type, val) ({  \
-  bytedeque bdeq; \
-  int ty = WASM_OP_##type;  \
-  bdeq.push_back(ty); \
-  switch (ty) { \
-    case WASM_OP_I32_CONST: WR_I32(val); break; \
-    case WASM_OP_I64_CONST: WR_I64(val); break;  \
-    case WASM_OP_F32_CONST: WR_U32_RAW(val); break;  \
-    case WASM_OP_F64_CONST: WR_U64_RAW(val); break; \
-    default: throw std::runtime_error("Invalid initializer expression type\n"); \
-  } \
-  bdeq.push_back(WASM_OP_END);  \
-  bytearr (bdeq.begin(), bdeq.end()); \
-})
+
+/* Opcode immediate types */
+typedef enum {
+  IMM_NONE = 0,
+  IMM_BLOCKT,
+  IMM_LABEL,
+  IMM_LABELS,
+  IMM_FUNC,
+  IMM_SIG_TABLE,
+  IMM_LOCAL,
+  IMM_GLOBAL,
+  IMM_TABLE,
+  IMM_MEMARG,
+  IMM_I32,
+  IMM_F64,
+  IMM_MEMORY,
+  IMM_TAG,
+  IMM_I64,
+  IMM_F32,
+  IMM_REFNULLT,
+  IMM_VALTS,
+  // Extension immediates
+  IMM_DATA_MEMORY,
+  IMM_DATA,
+  IMM_MEMORY_CP,
+  IMM_DATA_TABLE,
+  IMM_TABLE_CP
+} opcode_imm_type;
+
+/* Information associated with each opcode */
+typedef struct {
+  const char*       mnemonic;
+  opcode_imm_type   imm_type;
+  int               invalid;
+} opcode_entry_t;
+
+/* Defined in C file so we can use designated initializers */
+extern opcode_entry_t opcode_table[];

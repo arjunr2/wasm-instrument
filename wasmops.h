@@ -294,41 +294,4 @@
 #define WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U 0xFE4D /* "i64.atomic.rmw16.cmpxchg_u", ImmSigs.MEMARG */
 #define WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U 0xFE4E /* "i64.atomic.rmw32.cmpxchg_u", ImmSigs.MEMARG */
 
-/* Opcode immediate types */
-typedef enum {
-  IMM_NONE = 0,
-  IMM_BLOCKT,
-  IMM_LABEL,
-  IMM_LABELS,
-  IMM_FUNC,
-  IMM_SIG_TABLE,
-  IMM_LOCAL,
-  IMM_GLOBAL,
-  IMM_TABLE,
-  IMM_MEMARG,
-  IMM_I32,
-  IMM_F64,
-  IMM_MEMORY,
-  IMM_TAG,
-  IMM_I64,
-  IMM_F32,
-  IMM_REFNULLT,
-  IMM_VALTS,
-  // Extension immediates
-  IMM_DATA_MEMORY,
-  IMM_DATA,
-  IMM_MEMORY_CP,
-  IMM_DATA_TABLE,
-  IMM_TABLE_CP
-} opcode_imm_type;
-
-/* Information associated with each opcode */
-typedef struct {
-  const char*       mnemonic;
-  opcode_imm_type   imm_type;
-  int               invalid;
-} opcode_entry_t;
-
-/* Defined in C file so we can use designated initializers */
-extern opcode_entry_t opcode_table[];
 
