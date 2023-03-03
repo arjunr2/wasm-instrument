@@ -69,7 +69,8 @@ args_t parse_args(int argc, char* argv[]) {
 
 void instrument_call (WasmModule &module, std::string routine, std::string args) {
   printf("Running instrumentation: %s\n", routine.c_str());
-  if (routine == "memaccess") { memaccess_instrument(module); }
+  if (routine == "empty") { return; }
+  else if (routine == "memaccess") { memaccess_instrument(module); }
   else if (routine == "memshared") { memshared_instrument(module, args); }
   else if (routine == "sample") { sample_instrument(module); }
   else if (routine == "func-weight") { all_funcs_weight_instrument(module); }

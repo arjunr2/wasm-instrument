@@ -221,6 +221,7 @@ opcode_entry_t opcode_table[] = {
   [WASM_OP_MEMORY_ATOMIC_NOTIFY] = {"memory.atomic.notify", IMM_MEMARG },
   [WASM_OP_MEMORY_ATOMIC_WAIT32] = {"memory.atomic.wait32", IMM_MEMARG },
   [WASM_OP_MEMORY_ATOMIC_WAIT64] = {"memory.atomic.wait64", IMM_MEMARG },
+  [WASM_OP_ATOMIC_FENCE] = {"atomic.fence", IMM_NONE },
   [WASM_OP_I32_ATOMIC_LOAD] = {"i32.atomic.load", IMM_MEMARG },
   [WASM_OP_I64_ATOMIC_LOAD] = {"i64.atomic.load", IMM_MEMARG },
   [WASM_OP_I32_ATOMIC_LOAD8_U] = {"i32.atomic.load8_u", IMM_MEMARG },

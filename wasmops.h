@@ -220,6 +220,7 @@
 #define WASM_OP_MEMORY_ATOMIC_NOTIFY 0xFE00 /* "memory.atomic.notify", ImmSigs.MEMARG */
 #define WASM_OP_MEMORY_ATOMIC_WAIT32 0xFE01 /* "memory.atomic.wait32", ImmSigs.MEMARG */
 #define WASM_OP_MEMORY_ATOMIC_WAIT64 0xFE02 /* "memory.atomic.wait64", ImmSigs.MEMARG */
+#define WASM_OP_ATOMIC_FENCE 0xFE03 /* "atomic.fence", ImmSigs.NONE */
 
 #define WASM_OP_I32_ATOMIC_LOAD 0xFE10 /* "i32.atomic.load", ImmSigs.MEMARG */
 #define WASM_OP_I64_ATOMIC_LOAD 0xFE11 /* "i64.atomic.load", ImmSigs.MEMARG */
