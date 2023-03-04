@@ -374,8 +374,8 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
                                                SAVE_TOP (local_i32_1);
                                                SAVE_TOP (local_i32_2);
                                                IC_ROUTINE();
-                                               RESTORE_TOP (local_i32_1);
                                                RESTORE_TOP (local_i32_2);
+                                               RESTORE_TOP (local_i32_1);
                                                break;
                                              }
 
@@ -387,8 +387,8 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
                                                SAVE_TOP (local_i64_1);
                                                SAVE_TOP (local_i64_2);
                                                IC_ROUTINE();
-                                               RESTORE_TOP (local_i64_1);
                                                RESTORE_TOP (local_i64_2);
+                                               RESTORE_TOP (local_i64_1);
                                                break;
                                              }
   }
