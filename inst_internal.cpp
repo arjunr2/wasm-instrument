@@ -18,9 +18,9 @@ void ImmNoneInst::encode_imm (WasmModule &module, bytedeque &bdeq) const { }
 ImmBlocktInst::ImmBlocktInst (WasmModule &module, uint16_t opcode, buffer_t &buf)
     : InstBase(opcode) {
   int64_t value_type = RD_I64();
-  if (value_type != -64) {
+  if (value_type >= 0) {
     ERR("Block type: %ld\n", value_type);
-    throw std::runtime_error("Block type without 0x40 unsupported");
+    throw std::runtime_error("Block type with type section index unsupported!");
   }
   this->type = value_type;
 }
