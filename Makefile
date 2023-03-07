@@ -3,12 +3,12 @@
 CC=gcc
 CXX=g++
 
-CFLAGS =
-CPPFLAGS = -g -std=c++2a
+CFLAGS = -I./inc -I.
+CPPFLAGS = -g -std=c++2a -I./inc -I.
 
-SRC_C = opcode_table.c
-SRC_CPP = common.cpp ir.cpp main.cpp parse.cpp encode.cpp \
-					inst_internal.cpp instrument.cpp views.cpp routines.cpp
+SRC_C = $(notdir $(wildcard src/*.c))
+SRC_CPP = $(notdir $(wildcard src/*.cpp) main.cpp routines.cpp)
+
 
 SRC_O = $(addprefix build/, $(SRC_C:.c=.o) $(SRC_CPP:.cpp=.o))
 
@@ -17,11 +17,15 @@ all: dir instrument
 dir:
 	mkdir -p build
 
-build/%.o: %.c
+build/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+build/%.o: src/%.cpp
+	$(CXX) $(CPPFLAGS) -c -o $@ $<
 
 build/%.o: %.cpp
 	$(CXX) $(CPPFLAGS) -c -o $@ $<
+
 
 instrument: $(SRC_O)
 	$(CXX) $(CPPFLAGS) -o $@ $^ -lm

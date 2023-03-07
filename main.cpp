@@ -1,4 +1,4 @@
-#include <map>
+#include <sstream>
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -45,7 +45,7 @@ args_t parse_args(int argc, char* argv[]) {
       case 'a': args.inst_args = strdup(optarg); break;
       case 'h':
       default:
-        ERR("Usage: %s [--trace] [--scheme SCHEME] [--out OUTFILE] <infile>\n", argv[0]);
+        ERR("Usage: %s [--trace] [--scheme SCHEME] [--args SCHEME_ARGS (optional)] [--out OUTFILE] <infile>\n", argv[0]);
         exit(opt != 'h');
     }
   }
@@ -67,11 +67,14 @@ args_t parse_args(int argc, char* argv[]) {
 }
 
 
-void instrument_call (WasmModule &module, std::string routine, std::string args) {
+void instrument_call (WasmModule &module, std::string routine, std::vector<std::string> args) {
+
   printf("Running instrumentation: %s\n", routine.c_str());
+  for (auto &a : args)
+    printf("Args: %s\n", a.c_str());
   if (routine == "empty") { return; }
   else if (routine == "memaccess") { memaccess_instrument(module); }
-  else if (routine == "memshared") { memshared_instrument(module, args); }
+  else if (routine == "memshared") { memshared_instrument(module, args[0]); }
   else if (routine == "sample") { sample_instrument(module); }
   else if (routine == "func-weight") { all_funcs_weight_instrument(module); }
   else if (routine == "loop-count") { loop_instrument(module); }
@@ -100,8 +103,15 @@ int main(int argc, char *argv[]) {
   unload_file(&start, &end);
 
   /* Instrument */
+  /* Get argument in vector format */
+  std::vector<std::string> arg_vec;
   std::string inst_args = (args.inst_args ? std::string(args.inst_args) : std::string());
-  instrument_call(module, args.scheme, inst_args);
+  std::stringstream ss(inst_args);
+  std::string s;
+  while (std::getline(ss, s, ' ')) {
+    arg_vec.push_back(s);
+  }
+  instrument_call(module, args.scheme, arg_vec);
 
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);
