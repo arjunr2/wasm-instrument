@@ -73,26 +73,27 @@ void free_args (args_t args) {
 }
 
 
-void instrument_call (WasmModule &module, std::string routine, std::vector<std::string> args) {
+std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, std::vector<std::string> args) {
 
   printf("Running instrumentation: %s\n", routine.c_str());
   for (auto &a : args)
     printf("Args: %s\n", a.c_str());
 
-  if (routine == "empty") { return; }
+  std::vector<WasmModule> out_modules;
+  if (routine == "empty") { }
   else if (routine == "memaccess") { memaccess_instrument(module); }
   else if (routine == "memshared") { memshared_instrument(module, args[0]); }
   else if (routine == "memaccess-stochastic") {
     if (args.size() != 2) { throw std::runtime_error("memacceses stochastic needs 2 args"); }
     int percent = stoi(args[0]);
     int cluster_size = stoi(args[1]);
-    memaccess_stochastic_instrument(module, percent, cluster_size);
+    out_modules = memaccess_stochastic_instrument(module, percent, cluster_size);
   }
   else if (routine == "memshared-stochastic") { 
     if (args.size() != 3) { throw std::runtime_error("memshared stochastic needs 3 args"); }
     int percent = stoi(args[1]);
     int cluster_size = stoi(args[2]);
-    memshared_stochastic_instrument(module, args[0], percent, cluster_size);
+    out_modules = memshared_stochastic_instrument(module, args[0], percent, cluster_size);
   }
   else if (routine == "sample") { sample_instrument(module); }
   else if (routine == "func-weight") { all_funcs_weight_instrument(module); }
@@ -100,6 +101,8 @@ void instrument_call (WasmModule &module, std::string routine, std::vector<std::
   else {
     printf("Unsupported instrumentation scheme\n");
   }
+
+  return out_modules.empty() ? std::vector<WasmModule>(1, module) : out_modules;
 }
 
 // Main function.
@@ -130,10 +133,21 @@ int main(int argc, char *argv[]) {
   while (std::getline(ss, s, ' ')) {
     arg_vec.push_back(s);
   }
-  instrument_call(module, args.scheme, arg_vec);
+
+  std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec);
 
   /* Encode instrumented module */
-  bytedeque bq = module.encode_module(args.outfile);
+  if (out_modules.size() == 1) {
+    bytedeque bq = module.encode_module(args.outfile);
+  }
+  else {
+    int i = 1;
+    for (auto &mod : out_modules) {
+      bytedeque bq = mod.encode_module(
+          (char*)(std::string(args.outfile) + "." + std::to_string(i)).c_str());
+      i++;
+    }
+  }
 
   free_args(args);
   return 0;

@@ -490,6 +490,7 @@ bytedeque WasmModule::encode_module(char* outfile) {
     ENCODE_CALL (custom, custom);
   }
 
+  printf("Writing module to \"%s\"\n", outfile);
   dump_bytedeque(bdeq, outfile);
   return bdeq;
 }

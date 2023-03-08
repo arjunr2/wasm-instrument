@@ -14,8 +14,8 @@ uint32_t memaccess_instrument (WasmModule &module, bool dry_run = false);
 
 void memshared_instrument (WasmModule &module, std::string path);
 
-void memaccess_stochastic_instrument (WasmModule &module, int percent, 
+std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, int percent, 
     int cluster_size);
 
-void memshared_stochastic_instrument (WasmModule &module, std::string path, 
+std::vector<WasmModule> memshared_stochastic_instrument (WasmModule &module, std::string path, 
     int percent, int cluster_size);
