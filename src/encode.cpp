@@ -327,7 +327,7 @@ void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytea
   #if USE_INSTLIST
   for (auto &instruction : instlist) {
     uint16_t opcode = instruction->getOpcode();
-    //TRACE("O: %s\n", op_entry.mnemonic);
+    //TRACE("O: %s\n", opcode_table[opcode].mnemonic);
     /* Write instruction opcode and immediate */
     WR_OPCODE (opcode);
     instruction->encode_imm(*this, bdeq);

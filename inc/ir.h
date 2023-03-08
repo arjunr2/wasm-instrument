@@ -195,6 +195,7 @@ struct ImportSet {
 
 /* Section */
 class WasmModule {
+
   private:
     uint32_t magic;
     uint32_t version;
@@ -267,7 +268,18 @@ class WasmModule {
     /* Code + local encoding for instructions */
     bytedeque encode_code (FuncDecl &func);
 
+    /* Descriptor patching for copy constructor */
+    template<typename T>
+    void DescriptorPatch (std::list<T> &list, WasmModule &mod);
+    /* Function patching for copy constructor */
+    void FunctionPatch (WasmModule &mod);
+    /* Custom section patching */
+    void CustomPatch (WasmModule &mod);
+
   public:
+    WasmModule () = default;
+    WasmModule (WasmModule &mod);
+
     /* Field Accessors */
     inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }
     inline FuncDecl* getFunc(uint32_t idx)      { return GET_LIST_ELEM(this->funcs, idx); }
