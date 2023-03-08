@@ -66,6 +66,12 @@ args_t parse_args(int argc, char* argv[]) {
   return args;
 }
 
+void free_args (args_t args) {
+  free (args.outfile);
+  free (args.scheme);
+  free (args.inst_args);
+}
+
 
 void instrument_call (WasmModule &module, std::string routine, std::vector<std::string> args) {
 
@@ -75,6 +81,11 @@ void instrument_call (WasmModule &module, std::string routine, std::vector<std::
   if (routine == "empty") { return; }
   else if (routine == "memaccess") { memaccess_instrument(module); }
   else if (routine == "memshared") { memshared_instrument(module, args[0]); }
+  else if (routine == "memshared-stochastic") { 
+    int percent = stoi(args[1]);
+    int cluster_size = stoi(args[2]);
+    memshared_stochastic_instrument(module, args[0], percent, cluster_size);
+  }
   else if (routine == "sample") { sample_instrument(module); }
   else if (routine == "func-weight") { all_funcs_weight_instrument(module); }
   else if (routine == "loop-count") { loop_instrument(module); }
@@ -115,6 +126,8 @@ int main(int argc, char *argv[]) {
 
   /* Encode instrumented module */
   bytedeque bq = module.encode_module(args.outfile);
+
+  free_args(args);
   return 0;
 }
 

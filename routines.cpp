@@ -11,6 +11,8 @@
 #include <climits>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
+#include <random>
 
 #define MAX(A, B) ({ ((A > B) ? (A) : (B)); })
 
@@ -541,9 +543,9 @@ static std::vector<uint32_t> read_binary_file(const std::string& filename) {
 
 /************************************************/
 /* Instrument filtered accesses from path */
-void memshared_instrument (WasmModule &module, std::string path) {
-  /* If empty, instrument everything */
-  std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
+void memshared_instrument_internal 
+        (WasmModule &module, std::vector<uint32_t> &inst_idx_filter) {
+
   for (auto &i : inst_idx_filter) {
     std::cout << i << " ";
   }
@@ -612,6 +614,14 @@ void memshared_instrument (WasmModule &module, std::string path) {
   insert_logstart_global_param (module, main_fn, num_insts_globref);
   insert_logend (module, main_fn);
 }
+
+
+
+void memshared_instrument (WasmModule &module, std::string path) {
+  std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
+  memshared_instrument_internal (module, inst_idx_filter);
+}
+
 /************************************************/
 
 /************************************************/
@@ -619,6 +629,21 @@ void memshared_instrument (WasmModule &module, std::string path) {
 * completely random distribution percent across 
 * cluster size */
 void memshared_stochastic_instrument (WasmModule &module, std::string path, 
-    int num_weights, int cluster_size) {
+    int percent, int cluster_size) {
 
+  std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
+  int partition_size = ((inst_idx_filter.size() - 1) * percent) / 100;
+
+  std::vector<WasmModule> module_set(cluster_size, module);
+  for (int i = 0; i < cluster_size; i++) {
+    std::vector<uint32_t> partition(1, 0);
+    /* Get a random sample */
+    std::sample(inst_idx_filter.begin() + 1, inst_idx_filter.end(), 
+                std::back_inserter(partition), partition_size,
+                std::mt19937{std::random_device{}()});
+
+    partition[0] = *std::max_element(partition.begin() + 1, partition.end()) + 1;
+    memshared_instrument_internal (module_set[i], partition);
+    printf("Instrument %d done!\n", i);
+  }
 }

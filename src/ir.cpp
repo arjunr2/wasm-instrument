@@ -51,7 +51,7 @@ const char* wasm_section_name(byte code) {
 #define REASSIGN(val, ispace) ({ \
   this->get##ispace(mod.get##ispace##Idx(val));   \
 })
-WasmModule::WasmModule (WasmModule &mod) {
+WasmModule::WasmModule (const WasmModule &mod) {
   this->magic = mod.magic;
   this->version = mod.version;
 
@@ -96,7 +96,7 @@ WasmModule::WasmModule (WasmModule &mod) {
 
 /* Descriptor patching for copy constructor */
 template<typename T>
-void WasmModule::DescriptorPatch (std::list<T> &list, WasmModule &mod) {
+void WasmModule::DescriptorPatch (std::list<T> &list, const WasmModule &mod) {
   for (auto &v : list) {
     switch (v.kind) {
       case KIND_FUNC: v.desc.func = REASSIGN(v.desc.func, Func); break;
@@ -116,7 +116,7 @@ void WasmModule::DescriptorPatch (std::list<T> &list, WasmModule &mod) {
     auto ispec = static_pointer_cast<clsname>(instptr); \
     instptr.reset(new clsname(instptr->getOpcode() __VA_OPT__(,) __VA_ARGS__ )); break;  \
   }
-void WasmModule::FunctionPatch (WasmModule &mod) {
+void WasmModule::FunctionPatch (const WasmModule &mod) {
   for (auto &func : this->funcs) {
     func.sig = REASSIGN(func.sig, Sig);
     for (auto institr = func.instructions.begin(); institr != func.instructions.end(); ++institr) {
@@ -150,7 +150,7 @@ void WasmModule::FunctionPatch (WasmModule &mod) {
 }
 
 
-void WasmModule::CustomPatch (WasmModule &mod) {
+void WasmModule::CustomPatch (const WasmModule &mod) {
   for (auto &custom : this->customs) {
     if (custom.name == "name") {
       DebugNameDecl &debug = custom.debug;

@@ -4,7 +4,7 @@ CC=gcc
 CXX=g++
 
 CFLAGS = -I./inc -I.
-CPPFLAGS = -g -std=c++2a -I./inc -I.
+CPPFLAGS = -g -std=c++2a -I./inc -I. -fpermissive
 
 SRC_C = $(notdir $(wildcard src/*.c))
 SRC_CPP = $(notdir $(wildcard src/*.cpp) main.cpp routines.cpp)

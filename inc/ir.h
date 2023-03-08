@@ -270,15 +270,16 @@ class WasmModule {
 
     /* Descriptor patching for copy constructor */
     template<typename T>
-    void DescriptorPatch (std::list<T> &list, WasmModule &mod);
+    void DescriptorPatch (std::list<T> &list, const WasmModule &mod);
     /* Function patching for copy constructor */
-    void FunctionPatch (WasmModule &mod);
+    void FunctionPatch (const WasmModule &mod);
     /* Custom section patching */
-    void CustomPatch (WasmModule &mod);
+    void CustomPatch (const WasmModule &mod);
 
   public:
     WasmModule () = default;
-    WasmModule (WasmModule &mod);
+    WasmModule (const WasmModule &mod);
+    ~WasmModule() = default;
 
     /* Field Accessors */
     inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }
@@ -297,7 +298,7 @@ class WasmModule {
     inline uint32_t getFuncIdx(FuncDecl *func)        { return GET_LIST_IDX(this->funcs, func); }
     inline uint32_t getGlobalIdx(GlobalDecl *global)  { return GET_LIST_IDX(this->globals, global); }
     inline uint32_t getTableIdx(TableDecl *table)     { return GET_LIST_IDX(this->tables, table); }
-    inline uint32_t getMemoryIdx(MemoryDecl *mem)  { 
+    inline uint32_t getMemoryIdx(MemoryDecl *mem)     { 
       uint32_t idx = GET_LIST_IDX(this->mems, mem);
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
       return idx;
