@@ -675,7 +675,7 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
                 std::mt19937{std::random_device{}()});
 
     partition[0] = *std::max_element(partition.begin() + 1, partition.end()) + 1;
-    memfiltered_instrument_internal (module_set[i], partition);
+    memfiltered_instrument_internal (module_set[i], partition, false);
   }
   return module_set;
 }
