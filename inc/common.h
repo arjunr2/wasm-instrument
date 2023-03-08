@@ -91,22 +91,6 @@ extern int g_disassemble;
 
 
 /*** List macros ***/
-#define GET_LIST_ELEM(ll, idx) ({ \
-  auto it = std::next(ll.begin(), idx); \
-  &(*it);  \
-})
-
-#define GET_LIST_IDX(ll, ptr) ({  \
-  auto it = ll.begin(); \
-  uint32_t i = 0; \
-  for (auto it = ll.begin(); it != ll.end(); ++it, ++i) {  \
-    if (&(*it) == ptr) { break; } \
-  } \
-  if (it == ll.end()) \
-    throw std::runtime_error("Element not found in list!\n"); \
-  i;  \
-})
-
 #define PRINT_LIST_PTRS(ll) { \
   uint32_t i = 0; \
   for (auto &it : ll) { \
@@ -115,6 +99,26 @@ extern int g_disassemble;
   } \
   TRACE ("\n"); \
 }
+
+
+#define GET_LIST_ELEM(ll, idx) ({ \
+  auto it = std::next(ll.begin(), idx); \
+  &(*it);  \
+})
+
+#define GET_LIST_IDX(ll, ptr) ({  \
+  auto it = ll.begin(); \
+  uint32_t i = 0; \
+  for (it = ll.begin(); it != ll.end(); ++it, ++i) {  \
+    if (&(*it) == ptr) { break; } \
+  } \
+  if (it == ll.end()) { \
+    ERR("Ptr val: %p\n", ptr);  \
+    PRINT_LIST_PTRS(ll); \
+    throw std::runtime_error("Element not found in list!\n"); \
+  } \
+  i;  \
+})
 /********************/
 
 
