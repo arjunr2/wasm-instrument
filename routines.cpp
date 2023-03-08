@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
+#include <numeric>
 #include <random>
 
 #define MAX(A, B) ({ ((A > B) ? (A) : (B)); })
@@ -461,8 +462,9 @@ static void insert_logend(WasmModule &module, FuncDecl *main_fn) {
 
 
 /************************************************/
-/* Instrument all accesses */
-void memaccess_instrument (WasmModule &module) {
+/* Instrument all accesses (or just dry-run it) 
+* Returns number of accesses that are/would be instrumented */
+uint32_t memaccess_instrument (WasmModule &module, bool dry_run) {
   /* Access Instrument function import */
   ImportInfo iminfo = {
     .mod_name = "instrument",
@@ -497,7 +499,7 @@ void memaccess_instrument (WasmModule &module) {
         InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
         if (!addinst.empty()) {
           printf("Inserting at Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
-          insts.insert(institr, addinst.begin(), addinst.end());
+          if (!dry_run) { insts.insert(institr, addinst.begin(), addinst.end()); }
           access_idx++;
         }
       }
@@ -508,10 +510,14 @@ void memaccess_instrument (WasmModule &module) {
   FuncDecl* main_fn = main_exp->desc.func;
 
   /* Start/End function instrument import */
-  insert_logstart_void (module, main_fn);
-  insert_logend (module, main_fn);
+  if (!dry_run) {
+    insert_logstart_void (module, main_fn);
+    insert_logend (module, main_fn);
+  }
+  return access_idx - 1;
 }
 /************************************************/
+
 
 
 
@@ -543,8 +549,8 @@ static std::vector<uint32_t> read_binary_file(const std::string& filename) {
 
 /************************************************/
 /* Instrument filtered accesses from path */
-void memshared_instrument_internal 
-        (WasmModule &module, std::vector<uint32_t> &inst_idx_filter) {
+static void memfiltered_instrument_internal 
+        (WasmModule &module, std::vector<uint32_t> &inst_idx_filter, bool insert_global = true) {
 
   for (auto &i : inst_idx_filter) {
     std::cout << i << " ";
@@ -603,15 +609,20 @@ void memshared_instrument_internal
   FuncDecl* main_fn = main_exp->desc.func;
 
   /* Start/End function instrument import */
-  /* Global to store the number of accesses */
-  GlobalDecl global = {
-    .type = WASM_TYPE_I32,
-    .is_mutable = false,
-    .init_expr_bytes = INIT_EXPR (I32_CONST, num_shared_accesses)
-  };
-  GlobalDecl* num_insts_globref = module.add_global(global, "__tsv_inst_ct");
+  if (insert_global) {
+    /* Global to store the number of accesses */
+    GlobalDecl global = {
+      .type = WASM_TYPE_I32,
+      .is_mutable = false,
+      .init_expr_bytes = INIT_EXPR (I32_CONST, num_shared_accesses)
+    };
+    GlobalDecl* num_insts_globref = module.add_global(global, "__tsv_inst_ct");
+    insert_logstart_global_param (module, main_fn, num_insts_globref);
+  }
+  else {
+    insert_logstart_void (module, main_fn);
+  }
 
-  insert_logstart_global_param (module, main_fn, num_insts_globref);
   insert_logend (module, main_fn);
 }
 
@@ -619,15 +630,41 @@ void memshared_instrument_internal
 
 void memshared_instrument (WasmModule &module, std::string path) {
   std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
-  memshared_instrument_internal (module, inst_idx_filter);
+  memfiltered_instrument_internal (module, inst_idx_filter);
 }
 
 /************************************************/
 
+
 /************************************************/
-/* Instrument filtered access from path, with a 
-* completely random distribution percent across 
-* cluster size */
+/* Instrument random (percent) set of all memory accesses
+* across cluster size */
+void memaccess_stochastic_instrument (WasmModule &module, 
+    int percent, int cluster_size) {
+
+  uint32_t num_accesses = memaccess_instrument (module, true);
+  std::vector<uint32_t> inst_idx_range(num_accesses);
+  std::iota (inst_idx_range.begin(), inst_idx_range.end(), 1);
+  int partition_size = (num_accesses * percent) / 100;
+
+  std::vector<WasmModule> module_set(cluster_size, module);
+  for (int i = 0; i < cluster_size; i++) {
+    std::vector<uint32_t> partition(1, 0);
+    /* Get a random sample */
+    std::sample(inst_idx_range.begin() + 1, inst_idx_range.end(), 
+                std::back_inserter(partition), partition_size,
+                std::mt19937{std::random_device{}()});
+
+    partition[0] = *std::max_element(partition.begin() + 1, partition.end()) + 1;
+    memfiltered_instrument_internal (module_set[i], partition);
+    //printf("Instrument %d done!\n", i);
+  }
+}
+/************************************************/
+
+/************************************************/
+/* Instrument random (percent) set of filtered accesses from path, 
+* with across cluster size */
 void memshared_stochastic_instrument (WasmModule &module, std::string path, 
     int percent, int cluster_size) {
 
@@ -643,7 +680,9 @@ void memshared_stochastic_instrument (WasmModule &module, std::string path,
                 std::mt19937{std::random_device{}()});
 
     partition[0] = *std::max_element(partition.begin() + 1, partition.end()) + 1;
-    memshared_instrument_internal (module_set[i], partition);
+    memfiltered_instrument_internal (module_set[i], partition);
     printf("Instrument %d done!\n", i);
   }
 }
+/************************************************/
+
