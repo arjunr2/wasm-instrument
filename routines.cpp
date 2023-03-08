@@ -257,7 +257,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     PUSH_INST (CallInst(logaccess_import)); \
   }
 
-  switch ((*itr)->getOpcode()) {
+  switch (instruction->getOpcode()) {
     /* Addr */
     case WASM_OP_I32_LOAD:
     case WASM_OP_I64_LOAD:
@@ -462,9 +462,28 @@ static void insert_logend(WasmModule &module, FuncDecl *main_fn) {
 
 
 /************************************************/
-/* Instrument all accesses (or just dry-run it) 
+/* Do not actually instrument; collect number of accesses */
+uint32_t memaccess_dry_run (WasmModule &module) {
+  uint32_t local_indices[7];
+  uint32_t access_idx = 0;
+  for (auto &func : module.Funcs()) {
+    InstList &insts = func.instructions;
+    for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
+      InstBasePtr &instruction = *institr;
+      if (instruction->getImmType() == IMM_MEMARG) {
+        /* Add instruction will be empty if we choose to ignore some access instructions
+          * eg: atomic.notify, atomic.wait */
+        InstList addinst = setup_logappend_args(institr, local_indices, NULL, access_idx);
+        if (!addinst.empty()) { access_idx++; }
+      }
+    }
+  }
+  return access_idx;
+}
+
+/* Instrument all accesses
 * Returns number of accesses that are/would be instrumented */
-uint32_t memaccess_instrument (WasmModule &module, bool dry_run) {
+uint32_t memaccess_instrument (WasmModule &module) {
   /* Access Instrument function import */
   ImportInfo iminfo = {
     .mod_name = "instrument",
@@ -473,20 +492,20 @@ uint32_t memaccess_instrument (WasmModule &module, bool dry_run) {
   SigDecl logaccess_sig = {
     .params = {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32}, .results = {} };
   
-  ImportDecl* logaccess_import_decl = dry_run ? NULL : module.add_import(iminfo, logaccess_sig);
-  FuncDecl* logaccess_import = dry_run ? NULL : logaccess_import_decl->desc.func;
+  ImportDecl* logaccess_import_decl = module.add_import(iminfo, logaccess_sig);
+  FuncDecl* logaccess_import = logaccess_import_decl->desc.func;
 
   /* For memory access */
   uint32_t access_idx = 1;
   for (auto &func : module.Funcs()) {
     uint32_t local_indices[7] = {
-      dry_run ? 0 : func.add_local(WASM_TYPE_F64),
-      dry_run ? 0 : func.add_local(WASM_TYPE_F32),
-      dry_run ? 0 : func.add_local(WASM_TYPE_I64),
-      dry_run ? 0 : func.add_local(WASM_TYPE_I64),
-      dry_run ? 0 : func.add_local(WASM_TYPE_I32),
-      dry_run ? 0 : func.add_local(WASM_TYPE_I32),
-      dry_run ? 0 : func.add_local(WASM_TYPE_I32)
+      func.add_local(WASM_TYPE_F64),
+      func.add_local(WASM_TYPE_F32),
+      func.add_local(WASM_TYPE_I64),
+      func.add_local(WASM_TYPE_I64),
+      func.add_local(WASM_TYPE_I32),
+      func.add_local(WASM_TYPE_I32),
+      func.add_local(WASM_TYPE_I32)
     };
 
     InstList &insts = func.instructions;
@@ -499,7 +518,7 @@ uint32_t memaccess_instrument (WasmModule &module, bool dry_run) {
         InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
         if (!addinst.empty()) {
           printf("Inserting at Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
-          if (!dry_run) { insts.insert(institr, addinst.begin(), addinst.end()); }
+          insts.insert(institr, addinst.begin(), addinst.end());
           access_idx++;
         }
       }
@@ -510,10 +529,9 @@ uint32_t memaccess_instrument (WasmModule &module, bool dry_run) {
   FuncDecl* main_fn = main_exp->desc.func;
 
   /* Start/End function instrument import */
-  if (!dry_run) {
-    insert_logstart_void (module, main_fn);
-    insert_logend (module, main_fn);
-  }
+  insert_logstart_void (module, main_fn);
+  insert_logend (module, main_fn);
+
   return access_idx - 1;
 }
 /************************************************/
@@ -642,7 +660,8 @@ void memshared_instrument (WasmModule &module, std::string path) {
 std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, 
     int percent, int cluster_size) {
 
-  uint32_t num_accesses = memaccess_instrument (module, true);
+  uint32_t num_accesses = memaccess_dry_run (module);
+  printf("Num accesses: %u\n", num_accesses);
   std::vector<uint32_t> inst_idx_range(num_accesses);
   std::iota (inst_idx_range.begin(), inst_idx_range.end(), 1);
   int partition_size = (num_accesses * percent) / 100;
