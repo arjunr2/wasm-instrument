@@ -89,8 +89,6 @@ WasmModule::WasmModule (const WasmModule &mod) {
   }
 
   CustomPatch (mod);
-
-  //this->fn_names_debug = ???;
 }
 
 
@@ -159,6 +157,7 @@ void WasmModule::CustomPatch (const WasmModule &mod) {
           name_asc.func = REASSIGN(name_asc.func, Func);
         }
       }
+      this->fn_names_debug = &debug.func_assoc;
     }
   }
 }
