@@ -82,6 +82,7 @@ void instrument_call (WasmModule &module, std::string routine, std::vector<std::
   else if (routine == "memaccess") { memaccess_instrument(module); }
   else if (routine == "memshared") { memshared_instrument(module, args[0]); }
   else if (routine == "memshared-stochastic") { 
+    if (args.size() != 3) { throw std::runtime_error("memshared stochastic needs 3 args"); }
     int percent = stoi(args[1]);
     int cluster_size = stoi(args[2]);
     memshared_stochastic_instrument(module, args[0], percent, cluster_size);

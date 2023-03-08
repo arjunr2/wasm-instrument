@@ -294,17 +294,17 @@ class WasmModule {
     inline ImportDecl* getImport(uint32_t idx)  { return GET_LIST_ELEM(this->imports.list, idx); }
 
     /* Index Accessors */
-    inline uint32_t getSigIdx(SigDecl *sig)           { return GET_LIST_IDX(this->sigs, sig); }
-    inline uint32_t getFuncIdx(FuncDecl *func)        { return GET_LIST_IDX(this->funcs, func); }
-    inline uint32_t getGlobalIdx(GlobalDecl *global)  { return GET_LIST_IDX(this->globals, global); }
-    inline uint32_t getTableIdx(TableDecl *table)     { return GET_LIST_IDX(this->tables, table); }
-    inline uint32_t getMemoryIdx(MemoryDecl *mem)     { 
+    inline uint32_t getSigIdx(SigDecl *sig)           const { return GET_LIST_IDX(this->sigs, sig); }
+    inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_LIST_IDX(this->funcs, func); }
+    inline uint32_t getGlobalIdx(GlobalDecl *global)  const { return GET_LIST_IDX(this->globals, global); }
+    inline uint32_t getTableIdx(TableDecl *table)     const { return GET_LIST_IDX(this->tables, table); }
+    inline uint32_t getMemoryIdx(MemoryDecl *mem)     const {
       uint32_t idx = GET_LIST_IDX(this->mems, mem);
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
       return idx;
     }
-    inline uint32_t getDataIdx(DataDecl *data)        { return GET_LIST_IDX(this->datas, data); }
-    inline uint32_t getImportIdx(ImportDecl *import)  { return GET_LIST_IDX(this->imports.list, import); }
+    inline uint32_t getDataIdx(DataDecl *data)        const { return GET_LIST_IDX(this->datas, data); }
+    inline uint32_t getImportIdx(ImportDecl *import)  const { return GET_LIST_IDX(this->imports.list, import); }
 
     /* Import accessors */
     inline bool isImport(FuncDecl *func)      { return getFuncIdx(func)     < this->imports.num_funcs; }
