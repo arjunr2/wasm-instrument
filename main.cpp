@@ -1,8 +1,9 @@
 #include <sstream>
+#include <iostream>
+#include <cstdio>
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 #include <getopt.h>
@@ -141,10 +142,15 @@ int main(int argc, char *argv[]) {
     bytedeque bq = module.encode_module(args.outfile);
   }
   else {
+    std::string outfile_template(args.outfile);
+    std::size_t splitidx = outfile_template.find_last_of("/");
+    outfile_template.insert(splitidx + 1, "p%d.");
+
     int i = 1;
     for (auto &mod : out_modules) {
-      bytedeque bq = mod.encode_module(
-          (char*)(std::string(args.outfile) + "." + std::to_string(i)).c_str());
+      char outfile[200];
+      sprintf(outfile, outfile_template.data(), i);
+      bytedeque bq = mod.encode_module(outfile);
       i++;
     }
   }

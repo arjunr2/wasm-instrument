@@ -24,7 +24,11 @@ static void dump_bytedeque(bytedeque &bdeq, char* outfile) {
   //for (auto &it: bdeq) {
   //  std::cout << it;
   //}
+  printf("Writing module to \"%s\"\n", outfile);
   std::ofstream FILE(outfile, std::ios::out | std::ofstream::binary);
+  if (!FILE) {
+    throw std::runtime_error("Unable to open file-path");
+  }
   std::copy(bdeq.begin(), bdeq.end(), std::ostreambuf_iterator<char>(FILE));
   FILE.flush();
 }
@@ -490,7 +494,6 @@ bytedeque WasmModule::encode_module(char* outfile) {
     ENCODE_CALL (custom, custom);
   }
 
-  printf("Writing module to \"%s\"\n", outfile);
   dump_bytedeque(bdeq, outfile);
   return bdeq;
 }

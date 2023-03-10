@@ -625,13 +625,12 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
 
   std::vector<WasmModule> module_set(cluster_size, module);
   for (int i = 0; i < cluster_size; i++) {
-    std::vector<uint32_t> partition(1, 0);
+    std::vector<uint32_t> partition;
     /* Get a random sample */
-    std::sample(inst_idx_range.begin() + 1, inst_idx_range.end(), 
+    std::sample(inst_idx_range.begin(), inst_idx_range.end(), 
                 std::back_inserter(partition), partition_size,
                 std::mt19937{std::random_device{}()});
 
-    partition[0] = *std::max_element(partition.begin() + 1, partition.end()) + 1;
     memfiltered_instrument_internal (module_set[i], partition, false);
   }
   return module_set;
@@ -645,17 +644,17 @@ std::vector<WasmModule> memshared_stochastic_instrument (WasmModule &module,
     std::string path, int percent, int cluster_size) {
 
   std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
-  int partition_size = ((inst_idx_filter.size() - 1) * percent) / 100;
+  printf("Num accesses: %lu\n", inst_idx_filter.size());
+  int partition_size = inst_idx_filter.size() * percent / 100;
 
   std::vector<WasmModule> module_set(cluster_size, module);
   for (int i = 0; i < cluster_size; i++) {
-    std::vector<uint32_t> partition(1, 0);
+    std::vector<uint32_t> partition;
     /* Get a random sample */
-    std::sample(inst_idx_filter.begin() + 1, inst_idx_filter.end(), 
+    std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
                 std::back_inserter(partition), partition_size,
                 std::mt19937{std::random_device{}()});
 
-    partition[0] = *std::max_element(partition.begin() + 1, partition.end()) + 1;
     memfiltered_instrument_internal (module_set[i], partition);
     printf("Instrument %d done!\n", i);
   }
