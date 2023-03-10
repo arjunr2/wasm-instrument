@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
   else {
     std::string outfile_template(args.outfile);
     std::size_t splitidx = outfile_template.find_last_of("/");
-    outfile_template.insert(splitidx + 1, "p%d.");
+    outfile_template.insert(splitidx + 1, "part%d.");
 
     int i = 1;
     for (auto &mod : out_modules) {
