@@ -74,13 +74,15 @@ void free_args (args_t args) {
 }
 
 
-std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, std::vector<std::string> args) {
+std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, std::vector<std::string> args, bool &is_batch) {
 
   printf("Running instrumentation: %s\n", routine.c_str());
   for (auto &a : args)
     printf("Args: %s\n", a.c_str());
 
   std::vector<WasmModule> out_modules;
+  is_batch = false;
+
   if (routine == "empty") { }
   else if (routine == "memaccess") { memaccess_instrument(module); }
   else if (routine == "memshared") { memshared_instrument(module, args[0]); }
@@ -89,12 +91,14 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
     int percent = stoi(args[0]);
     int cluster_size = stoi(args[1]);
     out_modules = memaccess_stochastic_instrument(module, percent, cluster_size);
+    is_batch = true;
   }
   else if (routine == "memshared-stochastic") { 
     if (args.size() != 3) { throw std::runtime_error("memshared stochastic needs 3 args"); }
     int percent = stoi(args[1]);
     int cluster_size = stoi(args[2]);
     out_modules = memshared_stochastic_instrument(module, args[0], percent, cluster_size);
+    is_batch = true;
   }
   else if (routine == "sample") { sample_instrument(module); }
   else if (routine == "func-weight") { all_funcs_weight_instrument(module); }
@@ -135,10 +139,11 @@ int main(int argc, char *argv[]) {
     arg_vec.push_back(s);
   }
 
-  std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec);
+  bool is_batch;
+  std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec, is_batch);
 
   /* Encode instrumented module */
-  if (out_modules.size() == 1) {
+  if (!is_batch) {
     bytedeque bq = module.encode_module(args.outfile);
   }
   else {
