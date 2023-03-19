@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <numeric>
 #include <random>
+#include <set>
 #include <unordered_set>
 
 #define MAX(A, B) ({ ((A > B) ? (A) : (B)); })
@@ -519,16 +520,18 @@ static std::vector<uint32_t> read_binary_file(const std::string& filename) {
 
 /************************************************/
 /* Instrument filtered accesses from vector */
-static void memfiltered_instrument_internal 
-        (WasmModule &module, std::vector<uint32_t> &inst_idx_filter, 
-        bool insert_global = true, bool no_filter = false) {
+static void memfiltered_instrument_internal (
+    WasmModule &module, 
+    std::set<uint32_t> &inst_idx_filter, 
+    bool insert_global = true, 
+    bool no_filter = false) {
 
   for (auto &i : inst_idx_filter) {
     std::cout << i << " ";
   }
   std::cout << "\n";
 
-  std::vector<uint32_t>::iterator filter_itr = inst_idx_filter.begin();
+  auto filter_itr = inst_idx_filter.begin();
 
   /* Access Instrument function import */
   ImportInfo iminfo = {
@@ -582,7 +585,7 @@ static void memfiltered_instrument_internal
   /* Start/End function instrument import */
   if (insert_global) {
     /* Global to store the max instruction index number */
-    uint32_t max_inst_id = (no_filter ? access_idx : (inst_idx_filter.back() + 1));
+    uint32_t max_inst_id = (no_filter ? access_idx : *(--inst_idx_filter.end()));
     GlobalDecl global = {
       .type = WASM_TYPE_I32,
       .is_mutable = false,
@@ -603,12 +606,13 @@ static void memfiltered_instrument_internal
 /************************************************/
 /* Instrument all accesses, filtered by path if given */
 void memaccess_instrument (WasmModule &module, const std::string& path) {
-  std::vector<uint32_t> placeholder;
+  std::set<uint32_t> placeholder;
   if (path.empty()) {
     memfiltered_instrument_internal (module, placeholder, true, true);
   } else {
     std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
-    memfiltered_instrument_internal (module, inst_idx_filter);
+    std::set<uint32_t> inst_idx_filterset(inst_idx_filter.begin(), inst_idx_filter.end());
+    memfiltered_instrument_internal (module, inst_idx_filterset);
   }
 }
 /************************************************/
@@ -636,10 +640,10 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
 
   std::vector<WasmModule> module_set(cluster_size, module);
   for (int i = 0; i < cluster_size; i++) {
-    std::vector<uint32_t> partition;
+    std::set<uint32_t> partition;
     /* Get a random sample */
     std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
-                std::back_inserter(partition), partition_size,
+                std::inserter(partition, partition.end()), partition_size,
                 std::mt19937{std::random_device{}()});
 
     memfiltered_instrument_internal (module_set[i], partition);
@@ -652,7 +656,7 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
 
 
 /************************************************/
-static std::vector<std::vector<uint32_t>> balanced_partition_internal (
+static std::vector<std::set<uint32_t>> balanced_partition_internal (
     WasmModule &module, 
     int cluster_size, 
     std::unordered_map<InstBasePtr, uint32_t> &access_idx_map,
@@ -664,7 +668,7 @@ static std::vector<std::vector<uint32_t>> balanced_partition_internal (
   std::cout << "\n";
 
   
-  std::vector<std::vector<uint32_t>> partitions(cluster_size);
+  std::vector<std::set<uint32_t>> partitions(cluster_size);
 
   for (auto &func : module.Funcs()) {
     ScopeList scope_list = module.gen_scopes_from_instructions(&func);
@@ -702,12 +706,10 @@ static std::vector<std::vector<uint32_t>> balanced_partition_internal (
       uint32_t num_hp_size = scope_idxs.size() - lp_size*cluster_size;
       uint32_t num_lp_size = cluster_size - num_hp_size;
       for (int i = 0; i < num_hp_size; i++) {
-        partitions[i].insert(partitions[i].end(), 
-            scope_idxs.begin() + i*hp_size, scope_idxs.begin() + (i+1)*hp_size);          
+        partitions[i].insert(scope_idxs.begin() + i*hp_size, scope_idxs.begin() + (i+1)*hp_size);          
       }
       for (int i = num_hp_size; i < num_hp_size + num_lp_size; i++) {
-        partitions[i].insert(partitions[i].end(),
-            scope_idxs.begin() + i*lp_size, scope_idxs.begin() + (i+1)*lp_size);
+        partitions[i].insert(scope_idxs.begin() + i*lp_size, scope_idxs.begin() + (i+1)*lp_size);
       }
     }
   }
@@ -740,7 +742,7 @@ std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module,
   printf("Num accesses: %u\n", num_accesses);
   int partition_size = (num_accesses + cluster_size - 1) / cluster_size;
 
-  std::vector<std::vector<uint32_t>> inst_idx_partitions = 
+  std::vector<std::set<uint32_t>> inst_idx_partitions = 
     balanced_partition_internal (module, cluster_size, access_idx_map, 
         inst_idx_filter);
 
