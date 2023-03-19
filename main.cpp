@@ -95,13 +95,23 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   }
   
   else if (routine == "memaccess-stochastic") {
-    if (args.size() > 3) { 
+    if ((args.size() < 2) || (args.size() > 3)) { 
       throw std::runtime_error("memaccess stochastic needs 2/3 args");
     }
     int percent = stoi(args[0]);
     int cluster_size = stoi(args[1]);
     std::string path = ((args.size() == 3) ? args[2] : std::string());
     out_modules = memaccess_stochastic_instrument(module, percent, cluster_size, path);
+    is_batch = true;
+  }
+
+  else if (routine == "memaccess-balanced") {
+    if ((args.size() > 2) || (args.size() < 1)) { 
+      throw std::runtime_error("memaccess stochastic needs 1/2 args");
+    }
+    int cluster_size = stoi(args[0]);
+    std::string path = ((args.size() == 2) ? args[1] : std::string());
+    out_modules = memaccess_balanced_instrument(module, cluster_size, path);
     is_batch = true;
   }
   

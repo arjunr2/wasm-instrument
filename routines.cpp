@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <numeric>
 #include <random>
+#include <unordered_set>
 
 #define MAX(A, B) ({ ((A > B) ? (A) : (B)); })
 
@@ -463,8 +464,9 @@ static void insert_logend(WasmModule &module, FuncDecl *main_fn) {
 
 
 /************************************************/
-/* Do not actually instrument; collect number of accesses */
-uint32_t memaccess_dry_run (WasmModule &module) {
+/* Do not actually instrument; collect number of accesses and their locations */
+static std::unordered_map<InstBasePtr, uint32_t> memaccess_dry_run (WasmModule &module) {
+  std::unordered_map<InstBasePtr, uint32_t> access_idx_map;
   uint32_t local_indices[7];
   uint32_t access_idx = 0;
   for (auto &func : module.Funcs()) {
@@ -475,11 +477,14 @@ uint32_t memaccess_dry_run (WasmModule &module) {
         /* Add instruction will be empty if we choose to ignore some access instructions
           * eg: atomic.notify, atomic.wait */
         InstList addinst = setup_logappend_args(institr, local_indices, NULL, access_idx);
-        if (!addinst.empty()) { access_idx++; }
+        if (!addinst.empty()) {
+          access_idx++; 
+          access_idx_map[instruction] = access_idx;
+        }
       }
     }
   }
-  return access_idx;
+  return access_idx_map;
 }
 
 
@@ -617,7 +622,7 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
 
   std::vector<uint32_t> inst_idx_filter;
   if (path.empty()) {
-    uint32_t num_accesses = memaccess_dry_run (module);
+    uint32_t num_accesses = memaccess_dry_run(module).size();
     inst_idx_filter.resize(num_accesses);
     std::iota (inst_idx_filter.begin(), inst_idx_filter.end(), 1);
   }
@@ -643,3 +648,107 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
 }
 /************************************************/
 
+
+
+
+/************************************************/
+static std::vector<std::vector<uint32_t>> balanced_partition_internal (
+    WasmModule &module, 
+    int cluster_size, 
+    std::unordered_map<InstBasePtr, uint32_t> &access_idx_map,
+    std::unordered_set<uint32_t> &inst_idx_filter) {
+  
+  for (auto &i : inst_idx_filter) {
+    std::cout << i << " ";
+  }
+  std::cout << "\n";
+
+  
+  std::vector<std::vector<uint32_t>> partitions(cluster_size);
+
+  for (auto &func : module.Funcs()) {
+    ScopeList scope_list = module.gen_scopes_from_instructions(&func);
+    for (auto &scope : scope_list) {
+      std::vector<uint32_t> scope_idxs;
+      /* Get all memaccesses within scope */
+      auto next_outer_subscope = scope.outer_subscopes.begin();
+      for (auto institr = scope.start; institr != scope.end; ++institr) {
+        InstBasePtr instptr = *institr;
+        ScopeBlock* outer_subscope = *next_outer_subscope;
+        /* When encountering subscope, just skip past it */
+        if ( (next_outer_subscope != scope.outer_subscopes.end()) &&
+              (institr == outer_subscope->start) ) {
+          institr = outer_subscope->end;
+          std::advance(next_outer_subscope, 1);
+          continue;
+        }
+        /* Get indices for memaccesses in scope */
+        if (instptr->getImmType() == IMM_MEMARG) {
+          uint32_t idx = 
+            (access_idx_map.contains(instptr) ? access_idx_map[instptr] : 0);
+          if (idx && inst_idx_filter.count(idx)) {
+            scope_idxs.push_back(idx);
+          }
+        }
+      }
+
+      std::cout << "Scope idxs: ";
+      for (auto &i : scope_idxs) {
+        std::cout << i << " ";
+      }
+      std::cout << "\n";
+      uint32_t lp_size = scope_idxs.size() / cluster_size;
+      uint32_t hp_size = lp_size + 1;
+      uint32_t num_hp_size = scope_idxs.size() - lp_size*cluster_size;
+      uint32_t num_lp_size = cluster_size - num_hp_size;
+      for (int i = 0; i < num_hp_size; i++) {
+        partitions[i].insert(partitions[i].end(), 
+            scope_idxs.begin() + i*hp_size, scope_idxs.begin() + (i+1)*hp_size);          
+      }
+      for (int i = num_hp_size; i < num_hp_size + num_lp_size; i++) {
+        partitions[i].insert(partitions[i].end(),
+            scope_idxs.begin() + i*lp_size, scope_idxs.begin() + (i+1)*lp_size);
+      }
+    }
+  }
+
+  return partitions;
+}
+
+/* Instrument balanced set of all memory accesses
+* across cluster size, filtered by path if given 
+  * Balance by splitting assignment equally within each scope */
+std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module, 
+    int cluster_size, const std::string& path) {
+
+  std::unordered_map<InstBasePtr, uint32_t> access_idx_map = memaccess_dry_run (module);
+  std::unordered_set<uint32_t> inst_idx_filter;
+  if (path.empty()) {
+    uint32_t num_accesses = access_idx_map.size();
+    for (uint32_t i = 1; i <= num_accesses; i++) {
+      inst_idx_filter.insert(i);
+    }
+  }
+  else {
+    std::vector<uint32_t> filter_vec = read_binary_file(path);
+    for (auto &idx : filter_vec) {
+      inst_idx_filter.insert(idx);
+    }
+  }
+
+  uint32_t num_accesses = inst_idx_filter.size();
+  printf("Num accesses: %u\n", num_accesses);
+  int partition_size = (num_accesses + cluster_size - 1) / cluster_size;
+
+  std::vector<std::vector<uint32_t>> inst_idx_partitions = 
+    balanced_partition_internal (module, cluster_size, access_idx_map, 
+        inst_idx_filter);
+
+  std::vector<WasmModule> module_set(cluster_size, module);
+  for (int i = 0; i < cluster_size; i++) {
+    memfiltered_instrument_internal (module_set[i], inst_idx_partitions[i]);
+  }
+
+  return module_set;
+}
+/************************************************/

@@ -52,7 +52,7 @@ ScopeList WasmModule::gen_scopes_from_instructions(FuncDecl *func) {
       }
       /* Scope end + start instructions */
       case WASM_OP_ELSE: {
-          REMOVE_SCOPE(last_institr);
+          REMOVE_SCOPE(institr);
           ADD_SCOPE(institr);
           break;
       }
