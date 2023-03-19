@@ -74,7 +74,8 @@ void free_args (args_t args) {
 }
 
 
-std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, std::vector<std::string> args, bool &is_batch) {
+std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, 
+    std::vector<std::string> args, bool &is_batch) {
 
   printf("Running instrumentation: %s\n", routine.c_str());
   for (auto &a : args)
@@ -84,22 +85,26 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   is_batch = false;
 
   if (routine == "empty") { }
-  else if (routine == "memaccess") { memaccess_instrument(module); }
-  else if (routine == "memshared") { memshared_instrument(module, args[0]); }
+
+  else if (routine == "memaccess") { 
+    if (args.size() > 1) {
+      throw std::runtime_error("memaccess needs 0/1 args");
+    }
+    std::string path = ((args.size() == 1) ? args[0] : std::string());
+    memaccess_instrument(module, path);
+  }
+  
   else if (routine == "memaccess-stochastic") {
-    if (args.size() != 2) { throw std::runtime_error("memacceses stochastic needs 2 args"); }
+    if (args.size() > 3) { 
+      throw std::runtime_error("memaccess stochastic needs 2/3 args");
+    }
     int percent = stoi(args[0]);
     int cluster_size = stoi(args[1]);
-    out_modules = memaccess_stochastic_instrument(module, percent, cluster_size);
+    std::string path = ((args.size() == 3) ? args[2] : std::string());
+    out_modules = memaccess_stochastic_instrument(module, percent, cluster_size, path);
     is_batch = true;
   }
-  else if (routine == "memshared-stochastic") { 
-    if (args.size() != 3) { throw std::runtime_error("memshared stochastic needs 3 args"); }
-    int percent = stoi(args[1]);
-    int cluster_size = stoi(args[2]);
-    out_modules = memshared_stochastic_instrument(module, args[0], percent, cluster_size);
-    is_batch = true;
-  }
+  
   else if (routine == "sample") { sample_instrument(module); }
   else if (routine == "func-weight") { all_funcs_weight_instrument(module); }
   else if (routine == "loop-count") { loop_instrument(module); }

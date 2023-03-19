@@ -515,7 +515,8 @@ static std::vector<uint32_t> read_binary_file(const std::string& filename) {
 /************************************************/
 /* Instrument filtered accesses from vector */
 static void memfiltered_instrument_internal 
-        (WasmModule &module, std::vector<uint32_t> &inst_idx_filter, bool insert_global = true, bool no_filter = false) {
+        (WasmModule &module, std::vector<uint32_t> &inst_idx_filter, 
+        bool insert_global = true, bool no_filter = false) {
 
   for (auto &i : inst_idx_filter) {
     std::cout << i << " ";
@@ -595,57 +596,38 @@ static void memfiltered_instrument_internal
 
 
 /************************************************/
-/* Instrument all accesses
-* Returns number of accesses that are/would be instrumented */
-void memaccess_instrument (WasmModule &module) {
+/* Instrument all accesses, filtered by path if given */
+void memaccess_instrument (WasmModule &module, const std::string& path) {
   std::vector<uint32_t> placeholder;
-  memfiltered_instrument_internal (module, placeholder, true, true);
+  if (path.empty()) {
+    memfiltered_instrument_internal (module, placeholder, true, true);
+  } else {
+    std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
+    memfiltered_instrument_internal (module, inst_idx_filter);
+  }
 }
-/************************************************/
-
-void memshared_instrument (WasmModule &module, std::string path) {
-  std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
-  memfiltered_instrument_internal (module, inst_idx_filter);
-}
-
 /************************************************/
 
 
 /************************************************/
 /* Instrument random (percent) set of all memory accesses
-* across cluster size */
+* across cluster size, filtered by path if given */
 std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, 
-    int percent, int cluster_size) {
+    int percent, int cluster_size, const std::string& path) {
 
-  uint32_t num_accesses = memaccess_dry_run (module);
-  printf("Num accesses: %u\n", num_accesses);
-  std::vector<uint32_t> inst_idx_range(num_accesses);
-  std::iota (inst_idx_range.begin(), inst_idx_range.end(), 1);
-  int partition_size = (num_accesses * percent) / 100;
-
-  std::vector<WasmModule> module_set(cluster_size, module);
-  for (int i = 0; i < cluster_size; i++) {
-    std::vector<uint32_t> partition;
-    /* Get a random sample */
-    std::sample(inst_idx_range.begin(), inst_idx_range.end(), 
-                std::back_inserter(partition), partition_size,
-                std::mt19937{std::random_device{}()});
-
-    memfiltered_instrument_internal (module_set[i], partition);
+  std::vector<uint32_t> inst_idx_filter;
+  if (path.empty()) {
+    uint32_t num_accesses = memaccess_dry_run (module);
+    inst_idx_filter.resize(num_accesses);
+    std::iota (inst_idx_filter.begin(), inst_idx_filter.end(), 1);
   }
-  return module_set;
-}
-/************************************************/
+  else {
+    inst_idx_filter = read_binary_file(path);
+  }
 
-/************************************************/
-/* Instrument random (percent) set of filtered accesses from path, 
-* with across cluster size */
-std::vector<WasmModule> memshared_stochastic_instrument (WasmModule &module, 
-    std::string path, int percent, int cluster_size) {
-
-  std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
-  printf("Num accesses: %lu\n", inst_idx_filter.size());
-  int partition_size = inst_idx_filter.size() * percent / 100;
+  uint32_t num_accesses = inst_idx_filter.size();
+  printf("Num accesses: %u\n", num_accesses);
+  int partition_size = (num_accesses * percent) / 100;
 
   std::vector<WasmModule> module_set(cluster_size, module);
   for (int i = 0; i < cluster_size; i++) {
@@ -656,7 +638,6 @@ std::vector<WasmModule> memshared_stochastic_instrument (WasmModule &module,
                 std::mt19937{std::random_device{}()});
 
     memfiltered_instrument_internal (module_set[i], partition);
-    printf("Instrument %d done!\n", i);
   }
   return module_set;
 }
