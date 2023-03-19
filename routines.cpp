@@ -526,6 +526,7 @@ static void memfiltered_instrument_internal (
     bool insert_global = true, 
     bool no_filter = false) {
 
+  std::cout << "Filter | Count: " << inst_idx_filter.size() << " | ";
   for (auto &i : inst_idx_filter) {
     std::cout << i << " ";
   }
@@ -662,7 +663,8 @@ static std::vector<std::set<uint32_t>> balanced_partition_internal (
     std::unordered_map<InstBasePtr, uint32_t> &access_idx_map,
     std::unordered_set<uint32_t> &inst_idx_filter) {
   
-  for (auto &i : inst_idx_filter) {
+  std::set sorted_idxs(inst_idx_filter.begin(), inst_idx_filter.end());
+  for (auto &i : sorted_idxs) {
     std::cout << i << " ";
   }
   std::cout << "\n";
@@ -696,21 +698,32 @@ static std::vector<std::set<uint32_t>> balanced_partition_internal (
         }
       }
 
-      std::cout << "Scope idxs: ";
-      for (auto &i : scope_idxs) {
-        std::cout << i << " ";
-      }
-      std::cout << "\n";
       uint32_t lp_size = scope_idxs.size() / cluster_size;
       uint32_t hp_size = lp_size + 1;
       uint32_t num_hp_size = scope_idxs.size() - lp_size*cluster_size;
       uint32_t num_lp_size = cluster_size - num_hp_size;
+      uint32_t dl_idx = 0;
       for (int i = 0; i < num_hp_size; i++) {
-        partitions[i].insert(scope_idxs.begin() + i*hp_size, scope_idxs.begin() + (i+1)*hp_size);          
+        partitions[i].insert(scope_idxs.begin() + dl_idx, scope_idxs.begin() + dl_idx + hp_size);          
+        dl_idx += hp_size;
       }
       for (int i = num_hp_size; i < num_hp_size + num_lp_size; i++) {
-        partitions[i].insert(scope_idxs.begin() + i*lp_size, scope_idxs.begin() + (i+1)*lp_size);
+        partitions[i].insert(scope_idxs.begin() + dl_idx, scope_idxs.begin() + dl_idx + lp_size);
+        dl_idx += lp_size;
       }
+      //std::cout << "Scope idx: ";
+      //for (auto &i : scope_idxs) {
+      //  std::cout << i << " ";
+      //}
+      //std::cout << "\n";
+      //std::cout << "Scope idx partitions: ";
+      //for (auto &part : partitions) {
+      //  for (auto &i : part) {
+      //    std::cout << i << " ";
+      //  }
+      //  std::cout << " | ";
+      //}
+      //std::cout << "\n";
     }
   }
 
