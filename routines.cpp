@@ -672,6 +672,7 @@ static std::vector<std::set<uint32_t>> balanced_partition_internal (
 
   
   std::vector<std::set<uint32_t>> partitions(cluster_size);
+  std::vector<uint32_t> partition_weight(partitions.size(), 0);
 
   for (auto &func : module.Funcs()) {
     ScopeList scope_list = module.gen_scopes_from_instructions(&func);
@@ -704,12 +705,29 @@ static std::vector<std::set<uint32_t>> balanced_partition_internal (
       uint32_t num_hp_size = scope_idxs.size() - lp_size*cluster_size;
       uint32_t num_lp_size = cluster_size - num_hp_size;
       uint32_t dl_idx = 0;
+
+      /* Argsort partition weight */
+      std::vector<int> sort_idxs(cluster_size);
+      std::iota(sort_idxs.begin(), sort_idxs.end(), 0);
+      std::sort(sort_idxs.begin(), sort_idxs.end(), [&](int i, int j) {
+        return partition_weight[i] < partition_weight[j];
+      });
+
+      printf("PW | ");
+      for (auto &k : partition_weight) { printf("%d ", k); }
+      printf("\n");
+      printf("Sort | ");
+      for (auto &k : sort_idxs) { printf("%d ", k); }
+      printf("\n");
+
       for (int i = 0; i < num_hp_size; i++) {
-        partitions[i].insert(scope_idxs.begin() + dl_idx, scope_idxs.begin() + dl_idx + hp_size);          
+        partitions[sort_idxs[i]].insert(scope_idxs.begin() + dl_idx, scope_idxs.begin() + dl_idx + hp_size);
+        partition_weight[sort_idxs[i]] += hp_size;
         dl_idx += hp_size;
       }
       for (int i = num_hp_size; i < num_hp_size + num_lp_size; i++) {
-        partitions[i].insert(scope_idxs.begin() + dl_idx, scope_idxs.begin() + dl_idx + lp_size);
+        partitions[sort_idxs[i]].insert(scope_idxs.begin() + dl_idx, scope_idxs.begin() + dl_idx + lp_size);
+        partition_weight[sort_idxs[i]] += lp_size;
         dl_idx += lp_size;
       }
       //std::cout << "Scope idx: ";
