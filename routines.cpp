@@ -586,7 +586,8 @@ static void memfiltered_instrument_internal (
   /* Start/End function instrument import */
   if (insert_global) {
     /* Global to store the max instruction index number */
-    uint32_t max_inst_id = (no_filter ? access_idx : *(--inst_idx_filter.end()));
+    uint32_t max_inst_id = (no_filter ? access_idx 
+                            : (inst_idx_filter.size() ? *(--inst_idx_filter.end()) : 0));
     GlobalDecl global = {
       .type = WASM_TYPE_I32,
       .is_mutable = false,
