@@ -1,21 +1,28 @@
 #include "views.h"
 
 #define ADD_SCOPE(startitr) ({  \
-  ScopeBlock scopeblock(startitr);  \
+  ScopeBlock scopeblock(startitr, scope_depth++);  \
+  if (scopeblock.get_scope_type() == LOOP) {  \
+    scopeblock.set_loop_depth(++loop_depth);  \
+  } else {  \
+    scopeblock.set_loop_depth(loop_depth);  \
+  } \
   static_scopes.push_back(scopeblock);  \
   ScopeBlock* scp = &static_scopes.back();  \
   /* Add as subscope to all parent scopes */  \
   for (auto &par : dynamic_scopes) {  \
-    par->subscopes.push_back(scp); \
+    par->subscopes.push_back(scp);  \
   } \
   dynamic_scopes.back()->outer_subscopes.push_back(scp);  \
   /* */   \
-  dynamic_scopes.push_back(&static_scopes.back()); \
+  dynamic_scopes.push_back(&static_scopes.back());  \
 })
 
 #define REMOVE_SCOPE(enditr) ({ \
   ScopeBlock* s = dynamic_scopes.back();  \
   s->set_end(enditr); \
+  scope_depth--;  \
+  if (s->get_scope_type() == LOOP) { loop_depth--; }  \
   dynamic_scopes.pop_back();  \
 })
 
@@ -29,8 +36,11 @@ ScopeList WasmModule::gen_scopes_from_instructions(FuncDecl *func) {
 
   InstList &instructions = func->instructions;
 
+  int scope_depth = 0;
+  int loop_depth = 0;
   /* First instruction starts scope */
-  ScopeBlock scopeblock(instructions.begin());
+  ScopeBlock scopeblock(instructions.begin(), scope_depth++);
+  scopeblock.set_loop_depth(loop_depth);
   static_scopes.push_back(scopeblock);
   dynamic_scopes.push_back(&static_scopes.back());
 

@@ -17,6 +17,8 @@ typedef enum {
 struct ScopeBlock {
   InstItr start;
   InstItr end;
+  int depth;
+  int loop_depth;
 
   /* N-level subscope depth */
   std::list<ScopeBlock*> subscopes;
@@ -24,9 +26,13 @@ struct ScopeBlock {
   std::list<ScopeBlock*> outer_subscopes;
   
   ScopeBlock () { };
-  ScopeBlock (InstItr start) { this->start = start; }
+  ScopeBlock (InstItr start, int depth) { 
+    this->start = start;
+    this->depth = depth;
+  }
 
   inline void set_end(InstItr end) { this->end = end; }
+  inline void set_loop_depth(int loop_depth) { this->loop_depth = loop_depth; }
 
   scope_type_t get_scope_type() {
     InstBasePtr startinst = *start;

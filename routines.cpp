@@ -713,21 +713,22 @@ static std::vector<std::set<uint32_t>> balanced_partition_internal (
         return partition_weight[i] < partition_weight[j];
       });
 
+      printf("Scope | Depth: %d ; Loop Depth: %d\n", scope.depth, scope.loop_depth);
       printf("PW | ");
       for (auto &k : partition_weight) { printf("%d ", k); }
       printf("\n");
       printf("Sort | ");
       for (auto &k : sort_idxs) { printf("%d ", k); }
-      printf("\n");
+      printf("\n\n");
 
       for (int i = 0; i < num_hp_size; i++) {
         partitions[sort_idxs[i]].insert(scope_idxs.begin() + dl_idx, scope_idxs.begin() + dl_idx + hp_size);
-        partition_weight[sort_idxs[i]] += hp_size;
+        partition_weight[sort_idxs[i]] += (hp_size * (scope.loop_depth+1));
         dl_idx += hp_size;
       }
       for (int i = num_hp_size; i < num_hp_size + num_lp_size; i++) {
         partitions[sort_idxs[i]].insert(scope_idxs.begin() + dl_idx, scope_idxs.begin() + dl_idx + lp_size);
-        partition_weight[sort_idxs[i]] += lp_size;
+        partition_weight[sort_idxs[i]] += (lp_size * (scope.loop_depth+1));
         dl_idx += lp_size;
       }
       //std::cout << "Scope idx: ";
