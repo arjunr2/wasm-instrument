@@ -7,7 +7,7 @@ CFLAGS = -I./inc -I.
 CPPFLAGS = -g -std=c++2a -I./inc -I.
 
 SRC_C = $(notdir $(wildcard src/*.c))
-SRC_CPP = $(notdir $(wildcard src/*.cpp) main.cpp routines.cpp)
+SRC_CPP = $(notdir $(wildcard src/*.cpp) main.cpp $(wildcard routines/*.cpp))
 
 
 SRC_O = $(addprefix build/, $(SRC_C:.c=.o) $(SRC_CPP:.cpp=.o))
@@ -21,6 +21,9 @@ build/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 build/%.o: src/%.cpp
+	$(CXX) $(CPPFLAGS) -c -o $@ $<
+
+build/%.o: routines/%.cpp
 	$(CXX) $(CPPFLAGS) -c -o $@ $<
 
 build/%.o: %.cpp
