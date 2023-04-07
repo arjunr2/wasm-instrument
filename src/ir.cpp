@@ -73,7 +73,8 @@ WasmModule::WasmModule (const WasmModule &mod) {
   this->datas = mod.datas;
 
   this->has_start = mod.has_start;
-  this->start_fn = REASSIGN(mod.start_fn, Func);
+
+  this->start_fn = this->has_start ? REASSIGN(mod.start_fn, Func) : NULL;
 
   this->has_datacount = mod.has_datacount;
   this->num_datas_datacount = mod.num_datas_datacount;
