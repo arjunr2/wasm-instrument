@@ -494,6 +494,6 @@ bytedeque WasmModule::encode_module(char* outfile) {
     ENCODE_CALL (custom, custom);
   }
 
-  dump_bytedeque(bdeq, outfile);
+  if(outfile != NULL) { dump_bytedeque(bdeq, outfile); }
   return bdeq;
 }

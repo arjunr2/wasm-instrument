@@ -1,4 +1,5 @@
 #include "routine_common.h"
+#include "ir.h"
 
 
 void loop_instrument (WasmModule &module) {

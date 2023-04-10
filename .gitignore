@@ -4,3 +4,4 @@
 *.wat
 *.wat.*
 build/
+__pycache__

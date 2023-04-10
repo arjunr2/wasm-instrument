@@ -1,38 +1,20 @@
 import sys
 import numpy as np
-import wasmtime
-from wasmtime import Store, Module, Instance, Linker, WasiConfig, Engine
+from runtime import Wasmtime
 
 
-engine = Engine()
-linker = Linker(engine)
-linker.define_wasi()
+wasmtime = Wasmtime()
+
 
 with open(sys.argv[1], 'rb') as f:
     module_bytes = f.read()
-module = Module(engine, module_bytes)
 
-config = WasiConfig()
-config.argv = sys.argv[1:]
-config.preopen_dir(".", ".")
+module = wasmtime.create_module(module_bytes, argv=sys.argv[1:])
+wasmtime.run_module(module)
 
-store = Store(linker.engine)
-store.set_wasi(config)
-instance = linker.instantiate(store, module)
+exported = wasmtime.get_instrumentation(module, prefix="_lc")
 
-main = instance.exports(store)["_start"]
-main(store)
-
-
-def __bugfix(x):
-    return x.value if isinstance(x, wasmtime.Val) else x
-
-
-exported = {
-    k: __bugfix(v.value(store))
-    for k, v in instance.exports(store)._extern_map.items()
-    if k.startswith('_lc')
-}
-
-data = np.array(sorted([exported[k] for k in sorted(exported.keys())]))
+data = np.array([exported[k] for k in sorted(exported.keys())])
 print(len(data), data[data > 0])
+import pdb
+pdb.set_trace()
