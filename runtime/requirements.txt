@@ -1,0 +1,4 @@
+beartype
+mypy
+wasmtime==7.0.0
+numpy

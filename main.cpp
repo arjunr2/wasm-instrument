@@ -15,7 +15,7 @@
 #include "views.h"
 #include "ir.h"
 #include "instructions.h"
-#include "routines.h"
+#include "routines/routines.h"
 
 
 static struct option long_options[] = {
