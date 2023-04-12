@@ -1,14 +1,9 @@
 #include <sstream>
 #include <iostream>
 #include <cstdio>
-
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <inttypes.h>
+#include <chrono>
+#include <cstring>
 #include <getopt.h>
-#include <math.h>
-#include <limits.h>
 
 #include "common.h"
 #include "parse.h"
@@ -77,7 +72,7 @@ void free_args (args_t args) {
 std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, 
     std::vector<std::string> args, bool &is_batch) {
 
-  printf("Running instrumentation: %s\n", routine.c_str());
+  TRACE("Running instrumentation: %s\n", routine.c_str());
   for (auto &a : args)
     printf("Args: %s\n", a.c_str());
 
@@ -125,10 +120,26 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   return out_modules.empty() ? std::vector<WasmModule>(1, module) : out_modules;
 }
 
+#define TIME_SECTION(nest, logstr, code)  \
+  start_time = std::chrono::high_resolution_clock::now();  \
+  code;  \
+  end_time = std::chrono::high_resolution_clock::now(); \
+  { \
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);  \
+    printf("%*s%-25s:%8ld us\n", nest*4, "", logstr, elapsed.count()); \
+  }
+
+  
+
 // Main function.
 // Parses arguments and either runs a file with arguments.
 //  -trace: enable tracing to stderr
 int main(int argc, char *argv[]) {
+  auto start_time = std::chrono::high_resolution_clock::now();
+  auto end_time = std::chrono::high_resolution_clock::now();
+
+  auto begin_time = start_time;
+
   args_t args = parse_args(argc, argv);
     
   byte* start = NULL;
@@ -140,9 +151,11 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+TIME_SECTION(0, "Time to load module", 
   TRACE("loaded %s: %ld bytes\n", args.infile, r);
   WasmModule module = parse_bytecode(start, end);
   unload_file(&start, &end);
+)
 
   /* Instrument */
   /* Get argument in vector format */
@@ -155,11 +168,15 @@ int main(int argc, char *argv[]) {
   }
 
   bool is_batch;
+TIME_SECTION(0, "Time to instrument",
   std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec, is_batch);
+)
 
   /* Encode instrumented module */
   if (!is_batch) {
+TIME_SECTION(0, "Time to encode module",
     bytedeque bq = module.encode_module(args.outfile);
+)
   }
   else {
     std::string outfile_template(args.outfile);
@@ -176,6 +193,16 @@ int main(int argc, char *argv[]) {
   }
 
   free_args(args);
+
+  printf("--------------------------------------\n");
+  auto final_time = std::chrono::high_resolution_clock::now();
+  {
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(final_time - begin_time);
+    printf("%-25s:%8ld us\n", "Total Time", elapsed.count());
+  }
+  printf("--------------------------------------\n");
+
+
   return 0;
 }
 

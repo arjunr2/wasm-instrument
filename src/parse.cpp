@@ -285,7 +285,7 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
 void WasmModule::decode_start_section (buffer_t &buf, uint32_t len) {
   this->has_start = true;
   this->start_fn = this->getFunc(RD_U32());
-  ERR("NOTE: Start section not fully complete\n");
+  TRACE("NOTE: Start section not fully complete\n");
 }
 
 

@@ -21,10 +21,7 @@ typedef enum {
 } section_id;
 
 static void dump_bytedeque(bytedeque &bdeq, char* outfile) {
-  //for (auto &it: bdeq) {
-  //  std::cout << it;
-  //}
-  printf("Writing module to \"%s\"\n", outfile);
+  TRACE("Writing module to \"%s\"\n", outfile);
   std::ofstream FILE(outfile, std::ios::out | std::ofstream::binary);
   if (!FILE) {
     throw std::runtime_error("Unable to open file-path");
@@ -280,7 +277,7 @@ bytedeque WasmModule::encode_export_section() {
 bytedeque WasmModule::encode_start_section() {
   bytedeque bdeq;
   if (this->has_start) {
-    ERR("NOTE: Start section not fully complete\n");
+    TRACE("NOTE: Start section not fully complete\n");
     uint32_t start_idx = this->getFuncIdx(this->start_fn);
     WR_U32(start_idx);
   }
