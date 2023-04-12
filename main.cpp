@@ -125,8 +125,8 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   code;  \
   end_time = std::chrono::high_resolution_clock::now(); \
   { \
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);  \
-    printf("%*s%-25s:%8ld us\n", nest*4, "", logstr, elapsed.count()); \
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
+    printf("%*s%-25s:%8ld ms\n", nest*4, "", logstr, elapsed.count()); \
   }
 
   
@@ -197,8 +197,8 @@ TIME_SECTION(0, "Time to encode module",
   printf("--------------------------------------\n");
   auto final_time = std::chrono::high_resolution_clock::now();
   {
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(final_time - begin_time);
-    printf("%-25s:%8ld us\n", "Total Time", elapsed.count());
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(final_time - begin_time);
+    printf("%-25s:%8ld ms\n", "Total Time", elapsed.count());
   }
   printf("--------------------------------------\n");
 
