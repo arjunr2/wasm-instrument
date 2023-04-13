@@ -29,12 +29,13 @@ extern int g_trace;
 extern int g_disassemble;
 /***************/
 
+extern int g_time;
 /*** Timing macros ***/
 #define TIME_SECTION(nest, logstr, code)  \
   start_time = std::chrono::high_resolution_clock::now();  \
   code;  \
   end_time = std::chrono::high_resolution_clock::now(); \
-  { \
+  if (g_time) { \
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
     printf("%*s%-25s:%8ld ms\n", nest*4, "", logstr, elapsed.count()); \
   }

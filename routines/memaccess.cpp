@@ -1,4 +1,5 @@
 #include "routine_common.h"
+#include <chrono>
 
 /*****************/
 void memaccess_instrument (WasmModule &module, const std::string& path);
@@ -311,11 +312,11 @@ static void memfiltered_instrument_internal (
     bool insert_global = true, 
     bool no_filter = false) {
 
-  std::cout << "Filter | Count: " << inst_idx_filter.size() << " | ";
+  TRACE("Filter | Count: %ld | ", inst_idx_filter.size());
   for (auto &i : inst_idx_filter) {
-    std::cout << i << " ";
+    TRACE("%u ", i);
   }
-  std::cout << "\n";
+  TRACE("\n");
 
   auto filter_itr = inst_idx_filter.begin();
 
@@ -355,7 +356,7 @@ static void memfiltered_instrument_internal (
           // Add if no filtering; or if index matches
           bool filter_cond = (!no_filter && (*filter_itr == access_idx));
           if (no_filter || filter_cond) {
-            printf("Inserting at Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
+            TRACE("Inserting at Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
             insts.insert(institr, addinst.begin(), addinst.end());
             if (filter_cond) { filter_itr++; }
           }
@@ -411,6 +412,8 @@ void memaccess_instrument (WasmModule &module, const std::string& path) {
 std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, 
     int percent, int cluster_size, const std::string& path) {
 
+  DEF_TIME_VAR();
+TIME_SECTION(2, "Time for dry run", 
   std::vector<uint32_t> inst_idx_filter;
   if (path.empty()) {
     uint32_t num_accesses = memaccess_dry_run(module).size();
@@ -420,9 +423,9 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
   else {
     inst_idx_filter = read_binary_file(path);
   }
-
+);
   uint32_t num_accesses = inst_idx_filter.size();
-  printf("Num accesses: %u\n", num_accesses);
+  TRACE("Num accesses: %u\n", num_accesses);
   int partition_size = (num_accesses * percent) / 100;
 
   std::vector<WasmModule> module_set(cluster_size, module);

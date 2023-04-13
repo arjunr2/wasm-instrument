@@ -11,6 +11,8 @@
 int g_trace = 0;
 /* The global disassembly flag */
 int g_disassemble = 0;
+/* The global time flag */
+int g_time = 0;
 
 ssize_t load_file(const char* path, uint8_t** start, uint8_t** end) {
   // Open the file for reading.

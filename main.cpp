@@ -17,6 +17,7 @@ static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
   {"dis", no_argument, &g_disassemble, 1},
   {"scheme", optional_argument, NULL, 's'},
+  {"time", no_argument, &g_time, 1},
   {"out", required_argument, NULL, 'o'},
   {"args", optional_argument, NULL, 'a'},
   {"help", no_argument, NULL, 'h'}
@@ -80,7 +81,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   std::vector<WasmModule> out_modules;
   is_batch = false;
 
-TIME_SECTION(1, "Time to add inst",
+TIME_SECTION(1, "Time to add instrumentation",
   if (routine == "empty") { }
 
   else if (routine == "memaccess") { 
@@ -104,7 +105,7 @@ TIME_SECTION(1, "Time to add inst",
 
   else if (routine == "memaccess-balanced") {
     if ((args.size() > 2) || (args.size() < 1)) { 
-      throw std::runtime_error("memaccess stochastic needs 1/2 args");
+      throw std::runtime_error("memaccess balanced needs 1/2 args");
     }
     int cluster_size = stoi(args[0]);
     std::string path = ((args.size() == 2) ? args[1] : std::string());
@@ -174,10 +175,9 @@ TIME_SECTION(0, "Time to instrument",
 )
 
   /* Encode instrumented module */
+TIME_SECTION(0, "Time to encode modules",
   if (!is_batch) {
-TIME_SECTION(0, "Time to encode module",
     bytedeque bq = module.encode_module(args.outfile);
-)
   }
   else {
     std::string outfile_template(args.outfile);
@@ -192,6 +192,7 @@ TIME_SECTION(0, "Time to encode module",
       i++;
     }
   }
+)
 
   free_args(args);
 
@@ -202,7 +203,6 @@ TIME_SECTION(0, "Time to encode module",
     printf("%-25s:%8ld ms\n", "Total Time", elapsed.count());
   }
   printf("--------------------------------------\n");
-
 
   return 0;
 }

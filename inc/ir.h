@@ -7,6 +7,7 @@
 #include <string>
 #include <algorithm>
 #include <memory>
+#include <unordered_map>
 
 #include "common.h"
 #include "wasmdefs.h"
@@ -270,11 +271,11 @@ class WasmModule {
 
     /* Descriptor patching for copy constructor */
     template<typename T>
-    void DescriptorPatch (std::list<T> &list, const WasmModule &mod);
+    void DescriptorPatch (std::list<T> &list, const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
     /* Function patching for copy constructor */
-    void FunctionPatch (const WasmModule &mod);
+    void FunctionPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
     /* Custom section patching */
-    void CustomPatch (const WasmModule &mod);
+    void CustomPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
 
   public:
     WasmModule () = default;
