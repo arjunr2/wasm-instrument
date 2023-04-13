@@ -12,6 +12,19 @@
 #include "instructions.h"
 #include "routines.h"
 
+#define TIME_SECTION(nest, logstr, code)  \
+  start_time = std::chrono::high_resolution_clock::now();  \
+  code;  \
+  end_time = std::chrono::high_resolution_clock::now(); \
+  { \
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
+    printf("%*s%-25s:%8ld ms\n", nest*4, "", logstr, elapsed.count()); \
+  }
+
+#define DEF_TIME_VAR()  \
+  auto start_time = std::chrono::high_resolution_clock::now();  \
+  auto end_time = std::chrono::high_resolution_clock::now();
+
 
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
@@ -72,6 +85,7 @@ void free_args (args_t args) {
 std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, 
     std::vector<std::string> args, bool &is_batch) {
 
+  DEF_TIME_VAR();
   TRACE("Running instrumentation: %s\n", routine.c_str());
   for (auto &a : args)
     printf("Args: %s\n", a.c_str());
@@ -79,6 +93,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   std::vector<WasmModule> out_modules;
   is_batch = false;
 
+TIME_SECTION(1, "Time to add inst",
   if (routine == "empty") { }
 
   else if (routine == "memaccess") { 
@@ -116,18 +131,17 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   else {
     printf("Unsupported instrumentation scheme\n");
   }
+)
 
-  return out_modules.empty() ? std::vector<WasmModule>(1, module) : out_modules;
-}
-
-#define TIME_SECTION(nest, logstr, code)  \
-  start_time = std::chrono::high_resolution_clock::now();  \
-  code;  \
-  end_time = std::chrono::high_resolution_clock::now(); \
-  { \
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
-    printf("%*s%-25s:%8ld ms\n", nest*4, "", logstr, elapsed.count()); \
+  if (out_modules.empty()) {
+TIME_SECTION(1, "Time to copy module",
+    auto module_vec = std::vector<WasmModule>(1, module);
+)
+    return module_vec;
+  } else {
+    return out_modules;
   }
+}
 
   
 
@@ -135,8 +149,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
 // Parses arguments and either runs a file with arguments.
 //  -trace: enable tracing to stderr
 int main(int argc, char *argv[]) {
-  auto start_time = std::chrono::high_resolution_clock::now();
-  auto end_time = std::chrono::high_resolution_clock::now();
+  DEF_TIME_VAR();
 
   auto begin_time = start_time;
 
@@ -151,7 +164,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-TIME_SECTION(0, "Time to load module", 
+TIME_SECTION(0, "Time to parse module", 
   TRACE("loaded %s: %ld bytes\n", args.infile, r);
   WasmModule module = parse_bytecode(start, end);
   unload_file(&start, &end);

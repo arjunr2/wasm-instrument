@@ -3,7 +3,7 @@
 CC=gcc
 CXX=g++
 
-CFLAGS = -Iinc -I.
+CFLAGS = -O3 -Iinc -I.
 CPPFLAGS = -O3 -g -std=c++2a -Iinc -I.
 
 SRC_C = $(notdir $(wildcard src/*.c))
