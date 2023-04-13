@@ -295,8 +295,8 @@ class WasmModule {
 
     /* Index Accessors */
     inline uint32_t getSigIdx(SigDecl *sig)           const { return GET_LIST_IDX(this->sigs, sig); }
-    inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_LIST_IDX(this->funcs, func); }
-    inline uint32_t getGlobalIdx(GlobalDecl *global)  const { return GET_LIST_IDX(this->globals, global); }
+    inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_DEQUE_IDX(this->funcs, func); }
+    inline uint32_t getGlobalIdx(GlobalDecl *global)  const { return GET_DEQUE_IDX(this->globals, global); }
     inline uint32_t getTableIdx(TableDecl *table)     const { return GET_LIST_IDX(this->tables, table); }
     inline uint32_t getMemoryIdx(MemoryDecl *mem)     const {
       uint32_t idx = GET_LIST_IDX(this->mems, mem);
