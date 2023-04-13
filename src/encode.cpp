@@ -1,5 +1,7 @@
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <cstdio>
 
 #include "ir.h"
 #include "inst_internal.h"
@@ -22,12 +24,13 @@ typedef enum {
 
 static void dump_bytedeque(bytedeque &bdeq, char* outfile) {
   TRACE("Writing module to \"%s\"\n", outfile);
-  std::ofstream FILE(outfile, std::ios::out | std::ofstream::binary);
-  if (!FILE) {
+  FILE* file = fopen(outfile, "wb");
+  if (!file) {
     throw std::runtime_error("Unable to open file-path");
   }
-  std::copy(bdeq.begin(), bdeq.end(), std::ostreambuf_iterator<char>(FILE));
-  FILE.flush();
+  std::vector<byte> vec(bdeq.begin(), bdeq.end());
+  fwrite(vec.data(), 1, vec.size(), file);
+  fclose(file);
 }
 
 /* Write LimitsType */
@@ -459,12 +462,14 @@ bytedeque WasmModule::encode_custom_section(CustomDecl &custom) {
 /* Main Encoder routine */
 bytedeque WasmModule::encode_module(char* outfile) {
   bytedeque bdeq;
+  DEF_TIME_VAR();
 
   TRACE("<=== Encoding module ===>\n");
   WR_U32_RAW (this->magic);
   WR_U32_RAW (this->version);
 
   #define ENCODE_CALL(sec, ...) { \
+  TIME_SECTION(1, "Time for " #sec, \
     auto secdeq = this->encode_##sec##_section(__VA_ARGS__);  \
     uint32_t section_size = secdeq.size();  \
     /* Push section information */  \
@@ -473,6 +478,7 @@ bytedeque WasmModule::encode_module(char* outfile) {
       WR_SECBYTE_PRE (sec##_id); \
       bdeq.insert(bdeq.end(), secdeq.begin(), secdeq.end()); \
     } \
+  ) \
   }
   ENCODE_CALL (type);
   ENCODE_CALL (import);
@@ -491,6 +497,8 @@ bytedeque WasmModule::encode_module(char* outfile) {
     ENCODE_CALL (custom, custom);
   }
 
+TIME_SECTION(1, "Time for file write",
   dump_bytedeque(bdeq, outfile);
+);
   return bdeq;
 }

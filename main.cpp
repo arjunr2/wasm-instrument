@@ -12,19 +12,6 @@
 #include "instructions.h"
 #include "routines.h"
 
-#define TIME_SECTION(nest, logstr, code)  \
-  start_time = std::chrono::high_resolution_clock::now();  \
-  code;  \
-  end_time = std::chrono::high_resolution_clock::now(); \
-  { \
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
-    printf("%*s%-25s:%8ld ms\n", nest*4, "", logstr, elapsed.count()); \
-  }
-
-#define DEF_TIME_VAR()  \
-  auto start_time = std::chrono::high_resolution_clock::now();  \
-  auto end_time = std::chrono::high_resolution_clock::now();
-
 
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
@@ -135,7 +122,8 @@ TIME_SECTION(1, "Time to add inst",
 
   if (out_modules.empty()) {
 TIME_SECTION(1, "Time to copy module",
-    auto module_vec = std::vector<WasmModule>(1, module);
+    auto module_vec = std::vector<WasmModule>(1);
+    module_vec[0] = std::move(module);
 )
     return module_vec;
   } else {
