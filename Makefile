@@ -3,8 +3,8 @@
 CC=gcc
 CXX=g++
 
-CFLAGS = -I./inc -I.
-CPPFLAGS = -g -std=c++2a -I./inc -I.
+CFLAGS = -O3 -Iinc -I.
+CPPFLAGS = -O3 -g -std=c++2a -Iinc -I.
 
 SRC_C = $(notdir $(wildcard src/*.c))
 SRC_CPP = $(notdir $(wildcard src/*.cpp) main.cpp $(wildcard routines/*.cpp))

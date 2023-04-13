@@ -29,6 +29,20 @@ extern int g_trace;
 extern int g_disassemble;
 /***************/
 
+/*** Timing macros ***/
+#define TIME_SECTION(nest, logstr, code)  \
+  start_time = std::chrono::high_resolution_clock::now();  \
+  code;  \
+  end_time = std::chrono::high_resolution_clock::now(); \
+  { \
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
+    printf("%*s%-25s:%8ld ms\n", nest*4, "", logstr, elapsed.count()); \
+  }
+
+#define DEF_TIME_VAR()  \
+  auto start_time = std::chrono::high_resolution_clock::now();  \
+  auto end_time = std::chrono::high_resolution_clock::now();
+/***************/
 
 /*** Parsing macros ***/
 #define RD_U32()        read_u32leb(&buf)
@@ -119,6 +133,13 @@ extern int g_disassemble;
   } \
   i;  \
 })
+
+#define GET_DEQUE_ELEM(deq, idx) ({ &deq[idx]; })
+#define GET_DEQUE_IDX(deq, ptr) ({ \
+    auto res = std::find_if(deq.begin(), deq.end(), [ptr](auto &i) { return ptr == &i; });  \
+    std::distance(deq.begin(), res); \
+    })
+
 /********************/
 
 

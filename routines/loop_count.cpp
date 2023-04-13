@@ -14,7 +14,7 @@ void loop_instrument (WasmModule &module) {
           .init_expr_bytes = INIT_EXPR (I64_CONST, 0)
         };
         GlobalDecl *gref = module.add_global(global, 
-                              (std::string("__slinstrument_lpcnt_") + std::to_string(num_loops++)).c_str());
+                              (std::string("__lc_") + std::to_string(num_loops++)).c_str());
         auto loc = std::next(institr);
         InstList addinst;
         addinst.push_back(InstBasePtr(new GlobalGetInst(gref)));
