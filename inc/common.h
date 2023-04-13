@@ -119,6 +119,13 @@ extern int g_disassemble;
   } \
   i;  \
 })
+
+#define GET_DEQUE_ELEM(deq, idx) ({ &deq[idx]; })
+#define GET_DEQUE_IDX(deq, ptr) ({ \
+    auto res = std::find_if(deq.begin(), deq.end(), [ptr](auto &i) { return ptr == &i; });  \
+    std::distance(deq.begin(), res); \
+    })
+
 /********************/
 
 

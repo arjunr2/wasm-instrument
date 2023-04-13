@@ -204,13 +204,13 @@ class WasmModule {
     std::list <SigDecl>     sigs;
     ImportSet               imports;
     /* Func space */
-    std::list <FuncDecl>    funcs;
+    std::deque <FuncDecl>    funcs;
     /* Table space */
     std::list <TableDecl>   tables;
     /* Mem space */
     std::list <MemoryDecl>  mems;
     /* Global space */
-    std::list <GlobalDecl>  globals;
+    std::deque <GlobalDecl>  globals;
     std::list <ExportDecl>  exports;
     std::list <ElemDecl>    elems;
     std::list <DataDecl>    datas;
@@ -283,8 +283,8 @@ class WasmModule {
 
     /* Field Accessors */
     inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }
-    inline FuncDecl* getFunc(uint32_t idx)      { return GET_LIST_ELEM(this->funcs, idx); }
-    inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_LIST_ELEM(this->globals, idx); }
+    inline FuncDecl* getFunc(uint32_t idx)      { return GET_DEQUE_ELEM(this->funcs, idx); }
+    inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_DEQUE_ELEM(this->globals, idx); }
     inline TableDecl* getTable(uint32_t idx)    { return GET_LIST_ELEM(this->tables, idx); }
     inline MemoryDecl* getMemory(uint32_t idx)  { 
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
@@ -313,8 +313,8 @@ class WasmModule {
     inline bool isImport(MemoryDecl *mem)     { return getMemoryIdx(mem)    < this->imports.num_mems; }
 
     /* Section Accessors */
-    inline std::list <FuncDecl> &Funcs() { return this->funcs; }
-    inline std::list <GlobalDecl> &Globals() { return this->globals; }
+    inline std::deque <FuncDecl> &Funcs() { return this->funcs; }
+    inline std::deque <GlobalDecl> &Globals() { return this->globals; }
 
     inline FuncDecl* get_start_fn() { return this->has_start ? this->start_fn : NULL; }
     inline uint32_t get_num_customs() { return this->customs.size(); }
