@@ -18,6 +18,7 @@ static struct option long_options[] = {
   {"dis", no_argument, &g_disassemble, 1},
   {"scheme", optional_argument, NULL, 's'},
   {"time", no_argument, &g_time, 1},
+  {"multithread", no_argument, &g_threads, 1},
   {"out", required_argument, NULL, 'o'},
   {"args", optional_argument, NULL, 'a'},
   {"help", no_argument, NULL, 'h'}

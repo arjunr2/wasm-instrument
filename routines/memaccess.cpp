@@ -1,5 +1,9 @@
 #include "routine_common.h"
+#include "BS_thread_pool_light.hpp"
 #include <chrono>
+#include <thread>
+
+int num_workers = std::thread::hardware_concurrency() - 1;
 
 /*****************/
 void memaccess_instrument (WasmModule &module, const std::string& path);
@@ -318,11 +322,15 @@ static void memfiltered_instrument_internal (
     bool insert_global = true, 
     bool no_filter = false) {
 
-  ERR("Filter | Count: %ld | ", inst_idx_filter.size());
-  for (auto &i : inst_idx_filter) {
-    TRACE("%u ", i);
+  if (no_filter) {
+    ERR("Filter | None\n");
+  } else {
+    ERR("Filter | Count: %ld | ", inst_idx_filter.size());
+    for (auto &i : inst_idx_filter) {
+      TRACE("%u ", i);
+    }
+    ERR("\n");
   }
-  ERR("\n");
 
   auto filter_itr = inst_idx_filter.begin();
 
@@ -412,6 +420,7 @@ void memaccess_instrument (WasmModule &module, const std::string& path) {
 /************************************************/
 
 
+#define THREADING 0
 /************************************************/
 /* Instrument random (percent) set of all memory accesses
 * across cluster size, filtered by path if given */
@@ -432,16 +441,39 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
   TRACE("Num accesses: %u\n", num_accesses);
   int partition_size = (num_accesses * percent) / 100;
 
-  std::vector<WasmModule> module_set(cluster_size, module);
-  for (int i = 0; i < cluster_size; i++) {
-    std::set<uint32_t> partition;
-    /* Get a random sample */
-    std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
-                std::inserter(partition, partition.end()), partition_size,
-                std::mt19937{std::random_device{}()});
+  std::vector<WasmModule> module_set(cluster_size);
 
-    memfiltered_instrument_internal (module_set[i], partition);
+  if (!g_threads) {
+    for (int i = 0; i < cluster_size; i++) {
+      module_set[i] = module;
+      std::set<uint32_t> partition;
+      /* Get a random sample */
+      std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
+                  std::inserter(partition, partition.end()), partition_size,
+                  std::mt19937{std::random_device{}()});
+
+      memfiltered_instrument_internal (module_set[i], partition);
+    }
   }
+  else {
+    BS::thread_pool_light pool;
+    printf("Pool size: %d\n", pool.get_thread_count());
+    auto loop = [&module_set, &module, &inst_idx_filter, &partition_size](const int a, const int b) {
+      printf("Pool starting with %d\n", a);
+      for (int i = a; i < b; i++) {
+        module_set[i] = module;
+        std::set<uint32_t> partition;
+        /* Get a random sample */
+        std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
+                    std::inserter(partition, partition.end()), partition_size,
+                    std::mt19937{std::random_device{}()});
+        memfiltered_instrument_internal (module_set[i], partition);
+      }
+    };
+    pool.push_loop(cluster_size, loop);
+    pool.wait_for_tasks();
+  }
+
   return module_set;
 }
 /************************************************/

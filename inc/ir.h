@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <cstddef>
 #include <list>
-#include <vector>
 #include <string>
 #include <algorithm>
 #include <memory>
@@ -280,6 +279,8 @@ class WasmModule {
     WasmModule () = default;
     WasmModule (const WasmModule &mod);
     ~WasmModule() = default;
+
+    WasmModule& operator=(const WasmModule &mod);
 
     /* Field Accessors */
     inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }

@@ -51,7 +51,7 @@ const char* wasm_section_name(byte code) {
 
 
 #define REASSIGN(val, ispace, rettype) ({ \
-  auto &cached_val = reassign_cache[val]; \
+  /* auto &cached_val = reassign_cache[val]; \
   if (!cached_val) {  \
     TRACE("Uncached\n"); \
     cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
@@ -59,11 +59,11 @@ const char* wasm_section_name(byte code) {
     TRACE("Cached val: %p\n", cached_val); \
     cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
   }\
-  (rettype*) cached_val;\
+  (rettype*) cached_val; */ \
+  this->get##ispace(mod.get##ispace##Idx(val));  \
 })
 
-WasmModule::WasmModule (const WasmModule &mod) {
-
+WasmModule& WasmModule::operator= (const WasmModule &mod) {
   static std::unordered_map<void*, void*> reassign_cache;
   DEF_TIME_VAR();
 
@@ -92,7 +92,7 @@ WasmModule::WasmModule (const WasmModule &mod) {
   this->has_datacount = mod.has_datacount;
   this->num_datas_datacount = mod.num_datas_datacount;
 
-TIME_SECTION(2, "Time for CC patching",
+TIME_SECTION(2, "Time for Assignment patching",
   // Patching
   DescriptorPatch<ImportDecl> (this->imports.list, mod, reassign_cache);
   DescriptorPatch<ExportDecl> (this->exports, mod, reassign_cache);
@@ -105,6 +105,8 @@ TIME_SECTION(2, "Time for CC patching",
 
   CustomPatch (mod, reassign_cache);
 )
+
+  return *this;
 }
 
 
@@ -180,4 +182,49 @@ void WasmModule::CustomPatch (const WasmModule &mod, std::unordered_map<void*, v
       this->fn_names_debug = &debug.func_assoc;
     }
   }
+}
+
+
+WasmModule::WasmModule (const WasmModule &mod) {
+  static std::unordered_map<void*, void*> reassign_cache;
+  DEF_TIME_VAR();
+
+  this->magic = mod.magic;
+  this->version = mod.version;
+
+  //
+  this->customs = mod.customs;
+  this->sigs = mod.sigs;
+
+  this->imports = mod.imports;
+
+  this->funcs = mod.funcs;
+  this->tables = mod.tables;
+  this->mems = mod.mems;
+  this->globals = mod.globals;
+
+  this->exports = mod.exports;
+  
+  this->elems = mod.elems;
+
+  this->datas = mod.datas;
+
+  this->start_fn = mod.start_fn ? REASSIGN(mod.start_fn, Func, FuncDecl) : NULL;
+
+  this->has_datacount = mod.has_datacount;
+  this->num_datas_datacount = mod.num_datas_datacount;
+
+TIME_SECTION(2, "Time for CC patching",
+  // Patching
+  DescriptorPatch<ImportDecl> (this->imports.list, mod, reassign_cache);
+  DescriptorPatch<ExportDecl> (this->exports, mod, reassign_cache);
+  FunctionPatch (mod, reassign_cache);
+  for (auto &elem : this->elems) {
+    for (auto &fn_ptr : elem.func_indices) {
+      fn_ptr = REASSIGN(fn_ptr, Func, FuncDecl);
+    }
+  }
+
+  CustomPatch (mod, reassign_cache);
+)
 }

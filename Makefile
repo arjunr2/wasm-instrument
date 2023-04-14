@@ -4,7 +4,7 @@ CC=gcc
 CXX=g++
 
 CFLAGS = -O3 -Iinc -I.
-CPPFLAGS = -O3 -g -std=c++2a -Iinc -I.
+CPPFLAGS = -O3 -g -std=c++2a -Iinc -I. -pthread
 
 SRC_C = $(notdir $(wildcard src/*.c))
 SRC_CPP = $(notdir $(wildcard src/*.cpp) main.cpp $(wildcard routines/*.cpp))

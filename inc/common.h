@@ -20,7 +20,7 @@ typedef struct {
 } buffer_t;
 /***************/
 
-
+extern int g_threads;
 /*** Global trace/err/disassemble flags and macros. ***/
 #define TRACE(...) do { if(g_trace) fprintf(stderr, __VA_ARGS__); } while(0)
 #define DISASS(...) do { if(g_disassemble) fprintf(stderr, __VA_ARGS__); } while(0)

@@ -23,7 +23,6 @@ typedef enum {
 } section_id;
 
 static void dump_bytedeque(bytedeque &bdeq, char* outfile) {
-  printf("Writing module to \"%s\"\n", outfile);
   FILE* file = fopen(outfile, "wb");
   if (!file) {
     throw std::runtime_error("Unable to open file-path");
@@ -500,5 +499,6 @@ bytedeque WasmModule::encode_module(char* outfile) {
 TIME_SECTION(1, "Time for file write",
   dump_bytedeque(bdeq, outfile);
 );
+  printf("Wrote module to \"%s\"\n", outfile);
   return bdeq;
 }
