@@ -81,7 +81,6 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   std::vector<WasmModule> out_modules;
   is_batch = false;
 
-TIME_SECTION(1, "Time to add instrumentation",
   if (routine == "empty") { }
 
   else if (routine == "memaccess") { 
@@ -119,13 +118,10 @@ TIME_SECTION(1, "Time to add instrumentation",
   else {
     printf("Unsupported instrumentation scheme\n");
   }
-)
 
   if (out_modules.empty()) {
-TIME_SECTION(1, "Time to copy module",
     auto module_vec = std::vector<WasmModule>(1);
     module_vec[0] = std::move(module);
-)
     return module_vec;
   } else {
     return out_modules;

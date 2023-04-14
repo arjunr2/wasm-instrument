@@ -253,9 +253,14 @@ static void insert_logend(WasmModule &module, FuncDecl *main_fn) {
 /************************************************/
 /* Do not actually instrument; collect number of accesses and their locations */
 static std::unordered_map<InstBasePtr, uint32_t> memaccess_dry_run (WasmModule &module) {
+
+  DEF_TIME_VAR();
+
   std::unordered_map<InstBasePtr, uint32_t> access_idx_map;
   uint32_t local_indices[7];
   uint32_t access_idx = 0;
+
+TIME_SECTION(2, "Time for dry run",
   for (auto &func : module.Funcs()) {
     InstList &insts = func.instructions;
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
@@ -271,6 +276,7 @@ static std::unordered_map<InstBasePtr, uint32_t> memaccess_dry_run (WasmModule &
       }
     }
   }
+)
   return access_idx_map;
 }
 
@@ -312,11 +318,11 @@ static void memfiltered_instrument_internal (
     bool insert_global = true, 
     bool no_filter = false) {
 
-  TRACE("Filter | Count: %ld | ", inst_idx_filter.size());
+  ERR("Filter | Count: %ld | ", inst_idx_filter.size());
   for (auto &i : inst_idx_filter) {
     TRACE("%u ", i);
   }
-  TRACE("\n");
+  ERR("\n");
 
   auto filter_itr = inst_idx_filter.begin();
 
@@ -412,8 +418,6 @@ void memaccess_instrument (WasmModule &module, const std::string& path) {
 std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, 
     int percent, int cluster_size, const std::string& path) {
 
-  DEF_TIME_VAR();
-TIME_SECTION(2, "Time for dry run", 
   std::vector<uint32_t> inst_idx_filter;
   if (path.empty()) {
     uint32_t num_accesses = memaccess_dry_run(module).size();
@@ -423,7 +427,7 @@ TIME_SECTION(2, "Time for dry run",
   else {
     inst_idx_filter = read_binary_file(path);
   }
-);
+
   uint32_t num_accesses = inst_idx_filter.size();
   TRACE("Num accesses: %u\n", num_accesses);
   int partition_size = (num_accesses * percent) / 100;

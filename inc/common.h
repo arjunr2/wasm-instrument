@@ -38,6 +38,7 @@ extern int g_time;
   if (g_time) { \
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
     printf("%*s%-25s:%8ld ms\n", nest*4, "", logstr, elapsed.count()); \
+    fflush(stdout); \
   }
 
 #define DEF_TIME_VAR()  \
@@ -109,10 +110,10 @@ extern int g_time;
 #define PRINT_LIST_PTRS(ll) { \
   uint32_t i = 0; \
   for (auto &it : ll) { \
-    TRACE ("Idx: %u | Ptr: %p\n", i, &it);  \
+    ERR ("Idx: %u | Ptr: %p\n", i, &it);  \
     i++;  \
   } \
-  TRACE ("\n"); \
+  ERR ("\n"); \
 }
 
 

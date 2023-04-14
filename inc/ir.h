@@ -76,14 +76,14 @@ struct SigDecl {
   typelist params;
   typelist results;
 
-  bool operator==(const SigDecl sig) {
+  bool operator==(const SigDecl &sig) {
     bool parameq = std::equal(this->params.begin(), this->params.end(),
             sig.params.begin(), sig.params.end());
     bool resulteq = std::equal(this->results.begin(), this->results.end(),
             sig.results.begin(), sig.results.end());
     return parameq && resulteq;
   }
-  bool operator!=(const SigDecl sig) {
+  bool operator!=(const SigDecl &sig) {
     bool parameq = std::equal(this->params.begin(), this->params.end(),
             sig.params.begin(), sig.params.end());
     bool resulteq = std::equal(this->results.begin(), this->results.end(),
@@ -217,7 +217,6 @@ class WasmModule {
     std::list <DataDecl>    datas;
 
     /* Start section */
-    int has_start;
     FuncDecl* start_fn;
 
     /* Datacount section */ 
@@ -317,7 +316,7 @@ class WasmModule {
     inline std::deque <FuncDecl> &Funcs() { return this->funcs; }
     inline std::deque <GlobalDecl> &Globals() { return this->globals; }
 
-    inline FuncDecl* get_start_fn() { return this->has_start ? this->start_fn : NULL; }
+    inline FuncDecl* get_start_fn() { return this->start_fn; }
     inline uint32_t get_num_customs() { return this->customs.size(); }
 
 

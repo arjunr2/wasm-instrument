@@ -50,16 +50,22 @@ const char* wasm_section_name(byte code) {
 }
 
 
-
 #define REASSIGN(val, ispace, rettype) ({ \
-  rettype* cached_val = (rettype*) reassign_cache[val]; \
-  cached_val ? cached_val : this->get##ispace(mod.get##ispace##Idx(val)); \
-  /* this->get##ispace(mod.get##ispace##Idx(val)); */  \
+  auto &cached_val = reassign_cache[val]; \
+  if (!cached_val) {  \
+    TRACE("Uncached\n"); \
+    cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
+  } else {  \
+    TRACE("Cached val: %p\n", cached_val); \
+    cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
+  }\
+  (rettype*) cached_val;\
 })
-WasmModule::WasmModule (const WasmModule &mod) {
-  DEF_TIME_VAR();
 
-  std::unordered_map<void*, void*> reassign_cache;
+WasmModule::WasmModule (const WasmModule &mod) {
+
+  static std::unordered_map<void*, void*> reassign_cache;
+  DEF_TIME_VAR();
 
   this->magic = mod.magic;
   this->version = mod.version;
@@ -81,9 +87,7 @@ WasmModule::WasmModule (const WasmModule &mod) {
 
   this->datas = mod.datas;
 
-  this->has_start = mod.has_start;
-
-  this->start_fn = this->has_start ? REASSIGN(mod.start_fn, Func, FuncDecl) : NULL;
+  this->start_fn = mod.start_fn ? REASSIGN(mod.start_fn, Func, FuncDecl) : NULL;
 
   this->has_datacount = mod.has_datacount;
   this->num_datas_datacount = mod.num_datas_datacount;
@@ -114,8 +118,8 @@ void WasmModule::DescriptorPatch (std::list<T> &list, const WasmModule &mod, std
       case KIND_MEMORY: v.desc.mem = REASSIGN(v.desc.mem, Memory, MemoryDecl); break;
       case KIND_GLOBAL: v.desc.global = REASSIGN(v.desc.global, Global, GlobalDecl); break;
       default:
-        ERR("Import kind: %u\n", v.kind);
-        throw std::runtime_error("Invalid import kind");
+        ERR("Import/Export kind: %u\n", v.kind);
+        throw std::runtime_error("Invalid import/export kind");
     }
   }
 }
