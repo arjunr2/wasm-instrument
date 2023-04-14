@@ -31,14 +31,16 @@ extern int g_disassemble;
 
 extern int g_time;
 /*** Timing macros ***/
-#define TIME_SECTION(nest, logstr, code)  \
-  start_time = std::chrono::high_resolution_clock::now();  \
-  code;  \
-  end_time = std::chrono::high_resolution_clock::now(); \
-  if (g_time) { \
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
-    printf("%*s%-25s:%8ld ms\n", nest*4, "", logstr, elapsed.count()); \
-    fflush(stdout); \
+#define TIME_SECTION(nest, time_logstr, ...)  \
+  { start_time = std::chrono::high_resolution_clock::now(); } \
+  __VA_ARGS__;  \
+  { \
+    end_time = std::chrono::high_resolution_clock::now(); \
+    if (g_time) { \
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
+      printf("%*s%-25s:%8ld ms\n", nest*4, "", time_logstr, elapsed.count()); \
+      fflush(stdout); \
+    } \
   }
 
 #define DEF_TIME_VAR()  \

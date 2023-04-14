@@ -11,6 +11,7 @@
 #include "ir.h"
 #include "instructions.h"
 #include "routines.h"
+#include "BS_thread_pool_light.hpp"
 
 
 static struct option long_options[] = {
@@ -154,7 +155,7 @@ TIME_SECTION(0, "Time to parse module",
   TRACE("loaded %s: %ld bytes\n", args.infile, r);
   WasmModule module = parse_bytecode(start, end);
   unload_file(&start, &end);
-)
+);
 
   /* Instrument */
   /* Get argument in vector format */
@@ -171,6 +172,7 @@ TIME_SECTION(0, "Time to instrument",
   std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec, is_batch);
 )
 
+  #define COMMA ,
   /* Encode instrumented module */
 TIME_SECTION(0, "Time to encode modules",
   if (!is_batch) {
@@ -180,13 +182,27 @@ TIME_SECTION(0, "Time to encode modules",
     std::string outfile_template(args.outfile);
     std::size_t splitidx = outfile_template.find_last_of("/");
     outfile_template.insert(splitidx + 1, "part%d.");
+    auto loop = [&out_modules, &outfile_template](const int a, const int b) {
+      for (int i = a; i < b; i++) {
+        char outfile[200];
+        sprintf(outfile, outfile_template.data(), i);
+        bytedeque bq = out_modules[i].encode_module(outfile);
+      }
+    };
 
-    int i = 1;
-    for (auto &mod : out_modules) {
-      char outfile[200];
-      sprintf(outfile, outfile_template.data(), i);
-      bytedeque bq = mod.encode_module(outfile);
-      i++;
+    if (!g_threads) {
+      int i = 1;
+      for (int i = 0; i < out_modules.size(); i++) {
+        char outfile[200];
+        sprintf(outfile, outfile_template.data(), i);
+        bytedeque bq = out_modules[i].encode_module(outfile);
+      }
+    }
+    /* Parallel write */
+    else {
+      BS::thread_pool_light pool;
+      pool.push_loop(out_modules.size(), loop);
+      pool.wait_for_tasks();
     }
   }
 )
