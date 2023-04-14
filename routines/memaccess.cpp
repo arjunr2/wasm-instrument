@@ -442,33 +442,24 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
   int partition_size = (num_accesses * percent) / 100;
 
   std::vector<WasmModule> module_set(cluster_size);
-
-  if (!g_threads) {
-    for (int i = 0; i < cluster_size; i++) {
+  auto loop = [&module_set, &module, &inst_idx_filter, &partition_size](const int a, const int b) {
+    for (int i = a; i < b; i++) {
       module_set[i] = module;
       std::set<uint32_t> partition;
       /* Get a random sample */
       std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
                   std::inserter(partition, partition.end()), partition_size,
                   std::mt19937{std::random_device{}()});
-
       memfiltered_instrument_internal (module_set[i], partition);
     }
+  };
+
+  if (!g_threads) {
+    loop(0, cluster_size);
   }
   else {
     BS::thread_pool_light pool;
     printf("Pool size: %d\n", pool.get_thread_count());
-    auto loop = [&module_set, &module, &inst_idx_filter, &partition_size](const int a, const int b) {
-      for (int i = a; i < b; i++) {
-        module_set[i] = module;
-        std::set<uint32_t> partition;
-        /* Get a random sample */
-        std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
-                    std::inserter(partition, partition.end()), partition_size,
-                    std::mt19937{std::random_device{}()});
-        memfiltered_instrument_internal (module_set[i], partition);
-      }
-    };
     pool.push_loop(cluster_size, loop);
     pool.wait_for_tasks();
   }

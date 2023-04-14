@@ -83,7 +83,11 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   std::vector<WasmModule> out_modules;
   is_batch = false;
 
-  if (routine == "empty") { }
+  if (routine == "empty") { 
+    out_modules.resize(3);
+    for (int i = 0; i < 3; i++) { out_modules[i] = module; }
+    is_batch = true;
+  }
 
   else if (routine == "memaccess") { 
     if (args.size() > 1) {
@@ -185,18 +189,13 @@ TIME_SECTION(0, "Time to encode modules",
     auto loop = [&out_modules, &outfile_template](const int a, const int b) {
       for (int i = a; i < b; i++) {
         char outfile[200];
-        sprintf(outfile, outfile_template.data(), i);
+        sprintf(outfile, outfile_template.data(), i+1);
         bytedeque bq = out_modules[i].encode_module(outfile);
       }
     };
 
     if (!g_threads) {
-      int i = 1;
-      for (int i = 0; i < out_modules.size(); i++) {
-        char outfile[200];
-        sprintf(outfile, outfile_template.data(), i);
-        bytedeque bq = out_modules[i].encode_module(outfile);
-      }
+      loop(0, out_modules.size());
     }
     /* Parallel write */
     else {

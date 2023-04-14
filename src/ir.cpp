@@ -57,10 +57,9 @@ const char* wasm_section_name(byte code) {
     cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
   } else {  \
     TRACE("Cached val: %p\n", cached_val); \
-    cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
   }\
   (rettype*) cached_val; */ \
-  this->get##ispace(mod.get##ispace##Idx(val));  \
+  this->get##ispace(mod.get##ispace##Idx(val)); \
 })
 
 WasmModule& WasmModule::deepcopy(const WasmModule &mod, const char* log_str) {
