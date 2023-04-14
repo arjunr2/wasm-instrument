@@ -459,7 +459,6 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
     BS::thread_pool_light pool;
     printf("Pool size: %d\n", pool.get_thread_count());
     auto loop = [&module_set, &module, &inst_idx_filter, &partition_size](const int a, const int b) {
-      printf("Pool starting with %d\n", a);
       for (int i = a; i < b; i++) {
         module_set[i] = module;
         std::set<uint32_t> partition;

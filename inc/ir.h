@@ -267,13 +267,16 @@ class WasmModule {
     /* Code + local encoding for instructions */
     bytedeque encode_code (FuncDecl &func);
 
-    /* Descriptor patching for copy constructor */
+    /* Descriptor patching for copy/assign */
     template<typename T>
     void DescriptorPatch (std::list<T> &list, const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
-    /* Function patching for copy constructor */
+    /* Function patching for copy/assign */
     void FunctionPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
-    /* Custom section patching */
+    /* Custom section patching for copy/assign */
     void CustomPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
+
+    /* Perform a full deep copy */
+    WasmModule& deepcopy(const WasmModule &mod, const char* log_str);
 
   public:
     WasmModule () = default;
