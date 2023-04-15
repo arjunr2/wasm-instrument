@@ -50,20 +50,26 @@ const char* wasm_section_name(byte code) {
 }
 
 
+#define CACHE 1
+
+#if CACHE == 0
 #define REASSIGN(val, ispace, rettype) ({ \
-  /* auto &cached_val = reassign_cache[val]; \
-  if (!cached_val) {  \
-    TRACE("Uncached\n"); \
-    cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
-  } else {  \
-    TRACE("Cached val: %p\n", cached_val); \
-  }\
-  (rettype*) cached_val; */ \
   this->get##ispace(mod.get##ispace##Idx(val)); \
 })
+#else
+#define REASSIGN(val, ispace, rettype) ({ \
+  auto &cached_val = reassign_cache[val]; \
+  if (!cached_val) {  \
+    cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
+  } \
+  (rettype*) cached_val; \
+})
+#endif
+
 
 WasmModule& WasmModule::deepcopy(const WasmModule &mod, const char* log_str) {
-  static std::unordered_map<void*, void*> reassign_cache;
+  std::unordered_map<void*, void*> reassign_cache;
+
   DEF_TIME_VAR();
 
   this->magic = mod.magic;

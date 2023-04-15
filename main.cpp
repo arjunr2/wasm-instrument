@@ -216,7 +216,7 @@ TIME_SECTION(0, "Time to encode modules",
   }
   printf("--------------------------------------\n");
 
-  return 0;
+  exit(0);
 }
 
 

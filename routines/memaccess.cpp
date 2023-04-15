@@ -3,7 +3,7 @@
 #include <chrono>
 #include <thread>
 
-int num_workers = std::thread::hardware_concurrency() - 1;
+int num_workers = std::thread::hardware_concurrency() / 2;
 
 /*****************/
 void memaccess_instrument (WasmModule &module, const std::string& path);
@@ -458,7 +458,7 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
     loop(0, cluster_size);
   }
   else {
-    BS::thread_pool_light pool;
+    BS::thread_pool_light pool(num_workers);
     printf("Pool size: %d\n", pool.get_thread_count());
     pool.push_loop(cluster_size, loop);
     pool.wait_for_tasks();
