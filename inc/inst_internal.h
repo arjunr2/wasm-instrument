@@ -174,13 +174,13 @@ class ImmMemargInst: public InstBase {
 
 
 class ImmI32Inst: public InstBase {
-  uint32_t value;
+  int32_t value;
   public:
     ImmI32Inst (WasmModule &module, uint16_t opcode, buffer_t &buf);
-    ImmI32Inst (uint16_t opcode, uint32_t value) : 
+    ImmI32Inst (uint16_t opcode, int32_t value) : 
       InstBase(opcode), value(value) { }
 
-    inline uint32_t getValue() { return value; }
+    inline int32_t getValue() { return value; }
 
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
@@ -227,7 +227,7 @@ class ImmI64Inst: public InstBase {
   int64_t value;  
   public:
     ImmI64Inst (WasmModule &module, uint16_t opcode, buffer_t &buf);
-    ImmI64Inst (uint16_t opcode, double value) : 
+    ImmI64Inst (uint16_t opcode, int64_t value) : 
       InstBase(opcode), value(value) { }
 
     inline int64_t getValue() { return value; }

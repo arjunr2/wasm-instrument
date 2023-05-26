@@ -7,10 +7,11 @@
 
 #include "common.h"
 
-/* The global trace flag */
+/* The global flags */
 int g_trace = 0;
-/* The global disassembly flag */
 int g_disassemble = 0;
+int g_time = 0;
+int g_threads = 0;
 
 ssize_t load_file(const char* path, uint8_t** start, uint8_t** end) {
   // Open the file for reading.

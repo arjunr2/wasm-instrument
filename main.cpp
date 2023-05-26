@@ -1,27 +1,25 @@
 #include <sstream>
 #include <iostream>
 #include <cstdio>
-
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <inttypes.h>
+#include <chrono>
+#include <cstring>
 #include <getopt.h>
-#include <math.h>
-#include <limits.h>
 
 #include "common.h"
 #include "parse.h"
 #include "views.h"
 #include "ir.h"
 #include "instructions.h"
-#include "routines/routines.h"
+#include "routines.h"
+#include "BS_thread_pool_light.hpp"
 
 
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
   {"dis", no_argument, &g_disassemble, 1},
   {"scheme", optional_argument, NULL, 's'},
+  {"time", no_argument, &g_time, 1},
+  {"multithread", no_argument, &g_threads, 1},
   {"out", required_argument, NULL, 'o'},
   {"args", optional_argument, NULL, 'a'},
   {"help", no_argument, NULL, 'h'}
@@ -77,14 +75,19 @@ void free_args (args_t args) {
 std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, 
     std::vector<std::string> args, bool &is_batch) {
 
-  printf("Running instrumentation: %s\n", routine.c_str());
+  DEF_TIME_VAR();
+  TRACE("Running instrumentation: %s\n", routine.c_str());
   for (auto &a : args)
     printf("Args: %s\n", a.c_str());
 
   std::vector<WasmModule> out_modules;
   is_batch = false;
 
-  if (routine == "empty") { }
+  if (routine == "empty") { 
+    out_modules.resize(3);
+    for (int i = 0; i < 3; i++) { out_modules[i] = module; }
+    is_batch = true;
+  }
 
   else if (routine == "memaccess") { 
     if (args.size() > 1) {
@@ -107,7 +110,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
 
   else if (routine == "memaccess-balanced") {
     if ((args.size() > 2) || (args.size() < 1)) { 
-      throw std::runtime_error("memaccess stochastic needs 1/2 args");
+      throw std::runtime_error("memaccess balanced needs 1/2 args");
     }
     int cluster_size = stoi(args[0]);
     std::string path = ((args.size() == 2) ? args[1] : std::string());
@@ -122,13 +125,25 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
     printf("Unsupported instrumentation scheme\n");
   }
 
-  return out_modules.empty() ? std::vector<WasmModule>(1, module) : out_modules;
+  if (out_modules.empty()) {
+    auto module_vec = std::vector<WasmModule>(1);
+    module_vec[0] = std::move(module);
+    return module_vec;
+  } else {
+    return out_modules;
+  }
 }
+
+  
 
 // Main function.
 // Parses arguments and either runs a file with arguments.
 //  -trace: enable tracing to stderr
 int main(int argc, char *argv[]) {
+  DEF_TIME_VAR();
+
+  auto begin_time = start_time;
+
   args_t args = parse_args(argc, argv);
     
   byte* start = NULL;
@@ -140,9 +155,11 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+TIME_SECTION(0, "Time to parse module", 
   TRACE("loaded %s: %ld bytes\n", args.infile, r);
   WasmModule module = parse_bytecode(start, end);
   unload_file(&start, &end);
+);
 
   /* Instrument */
   /* Get argument in vector format */
@@ -155,9 +172,13 @@ int main(int argc, char *argv[]) {
   }
 
   bool is_batch;
+TIME_SECTION(0, "Time to instrument",
   std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec, is_batch);
+)
 
+  #define COMMA ,
   /* Encode instrumented module */
+TIME_SECTION(0, "Time to encode modules",
   if (!is_batch) {
     bytedeque bq = module.encode_module(args.outfile);
   }
@@ -165,18 +186,37 @@ int main(int argc, char *argv[]) {
     std::string outfile_template(args.outfile);
     std::size_t splitidx = outfile_template.find_last_of("/");
     outfile_template.insert(splitidx + 1, "part%d.");
+    auto loop = [&out_modules, &outfile_template](const int a, const int b) {
+      for (int i = a; i < b; i++) {
+        char outfile[200];
+        sprintf(outfile, outfile_template.data(), i+1);
+        bytedeque bq = out_modules[i].encode_module(outfile);
+      }
+    };
 
-    int i = 1;
-    for (auto &mod : out_modules) {
-      char outfile[200];
-      sprintf(outfile, outfile_template.data(), i);
-      bytedeque bq = mod.encode_module(outfile);
-      i++;
+    if (!g_threads) {
+      loop(0, out_modules.size());
+    }
+    /* Parallel write */
+    else {
+      BS::thread_pool_light pool;
+      pool.push_loop(out_modules.size(), loop);
+      pool.wait_for_tasks();
     }
   }
+)
 
   free_args(args);
-  return 0;
+
+  printf("--------------------------------------\n");
+  auto final_time = std::chrono::high_resolution_clock::now();
+  {
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(final_time - begin_time);
+    printf("%-25s:%8ld ms\n", "Total Time", elapsed.count());
+  }
+  printf("--------------------------------------\n");
+
+  exit(0);
 }
 
 

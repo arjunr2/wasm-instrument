@@ -20,7 +20,7 @@ typedef struct {
 } buffer_t;
 /***************/
 
-
+extern int g_threads;
 /*** Global trace/err/disassemble flags and macros. ***/
 #define TRACE(...) do { if(g_trace) fprintf(stderr, __VA_ARGS__); } while(0)
 #define DISASS(...) do { if(g_disassemble) fprintf(stderr, __VA_ARGS__); } while(0)
@@ -29,6 +29,24 @@ extern int g_trace;
 extern int g_disassemble;
 /***************/
 
+extern int g_time;
+/*** Timing macros ***/
+#define TIME_SECTION(nest, time_logstr, ...)  \
+  { start_time = std::chrono::high_resolution_clock::now(); } \
+  __VA_ARGS__;  \
+  { \
+    end_time = std::chrono::high_resolution_clock::now(); \
+    if (g_time) { \
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);  \
+      printf("%*s%-25s:%8ld ms\n", nest*4, "", time_logstr, elapsed.count()); \
+      fflush(stdout); \
+    } \
+  }
+
+#define DEF_TIME_VAR()  \
+  auto start_time = std::chrono::high_resolution_clock::now();  \
+  auto end_time = std::chrono::high_resolution_clock::now();
+/***************/
 
 /*** Parsing macros ***/
 #define RD_U32()        read_u32leb(&buf)
@@ -94,10 +112,10 @@ extern int g_disassemble;
 #define PRINT_LIST_PTRS(ll) { \
   uint32_t i = 0; \
   for (auto &it : ll) { \
-    TRACE ("Idx: %u | Ptr: %p\n", i, &it);  \
+    ERR ("Idx: %u | Ptr: %p\n", i, &it);  \
     i++;  \
   } \
-  TRACE ("\n"); \
+  ERR ("\n"); \
 }
 
 
@@ -119,6 +137,13 @@ extern int g_disassemble;
   } \
   i;  \
 })
+
+#define GET_DEQUE_ELEM(deq, idx) ({ &deq[idx]; })
+#define GET_DEQUE_IDX(deq, ptr) ({ \
+    auto res = std::find_if(deq.begin(), deq.end(), [ptr](auto &i) { return ptr == &i; });  \
+    std::distance(deq.begin(), res); \
+    })
+
 /********************/
 
 

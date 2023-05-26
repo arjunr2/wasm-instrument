@@ -153,10 +153,10 @@ void WasmModule::decode_import_section (buffer_t &buf, uint32_t len) {
 
   auto &info = this->imports;
 
-  std::list <FuncDecl> &funcs = this->funcs;
-  std::list <TableDecl> &tables = this->tables;
-  std::list <MemoryDecl> &mems = this->mems;
-  std::list <GlobalDecl> &globals = this->globals;
+  auto &funcs = this->funcs;
+  auto &tables = this->tables;
+  auto &mems = this->mems;
+  auto &globals = this->globals;
 
   for (uint32_t i = 0; i < num_imports; i++) {
     ImportDecl import;
@@ -283,9 +283,8 @@ void WasmModule::decode_export_section (buffer_t &buf, uint32_t len) {
 
 
 void WasmModule::decode_start_section (buffer_t &buf, uint32_t len) {
-  this->has_start = true;
   this->start_fn = this->getFunc(RD_U32());
-  ERR("NOTE: Start section not fully complete\n");
+  TRACE("NOTE: Start section not fully complete\n");
 }
 
 

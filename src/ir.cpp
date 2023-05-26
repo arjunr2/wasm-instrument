@@ -1,6 +1,8 @@
 #include "ir.h"
 #include "inst_internal.h"
 
+#include <chrono>
+
 const char* wasm_type_string(wasm_type_t type) {
   switch (type) {
     case WASM_TYPE_I32:       return "i32"; break;
@@ -48,10 +50,28 @@ const char* wasm_section_name(byte code) {
 }
 
 
-#define REASSIGN(val, ispace) ({ \
-  this->get##ispace(mod.get##ispace##Idx(val));   \
+#define CACHE 1
+
+#if CACHE == 0
+#define REASSIGN(val, ispace, rettype) ({ \
+  this->get##ispace(mod.get##ispace##Idx(val)); \
 })
-WasmModule::WasmModule (const WasmModule &mod) {
+#else
+#define REASSIGN(val, ispace, rettype) ({ \
+  auto &cached_val = reassign_cache[val]; \
+  if (!cached_val) {  \
+    cached_val = this->get##ispace(mod.get##ispace##Idx(val));  \
+  } \
+  (rettype*) cached_val; \
+})
+#endif
+
+
+WasmModule& WasmModule::deepcopy(const WasmModule &mod, const char* log_str) {
+  std::unordered_map<void*, void*> reassign_cache;
+
+  DEF_TIME_VAR();
+
   this->magic = mod.magic;
   this->version = mod.version;
 
@@ -72,39 +92,41 @@ WasmModule::WasmModule (const WasmModule &mod) {
 
   this->datas = mod.datas;
 
-  this->has_start = mod.has_start;
-
-  this->start_fn = this->has_start ? REASSIGN(mod.start_fn, Func) : NULL;
+  this->start_fn = mod.start_fn ? REASSIGN(mod.start_fn, Func, FuncDecl) : NULL;
 
   this->has_datacount = mod.has_datacount;
   this->num_datas_datacount = mod.num_datas_datacount;
 
+TIME_SECTION(2, log_str,
   // Patching
-  DescriptorPatch<ImportDecl> (this->imports.list, mod);
-  DescriptorPatch<ExportDecl> (this->exports, mod);
-  FunctionPatch (mod);
+  DescriptorPatch<ImportDecl> (this->imports.list, mod, reassign_cache);
+  DescriptorPatch<ExportDecl> (this->exports, mod, reassign_cache);
+  FunctionPatch (mod, reassign_cache);
   for (auto &elem : this->elems) {
     for (auto &fn_ptr : elem.func_indices) {
-      fn_ptr = REASSIGN(fn_ptr, Func);
+      fn_ptr = REASSIGN(fn_ptr, Func, FuncDecl);
     }
   }
 
-  CustomPatch (mod);
+  CustomPatch (mod, reassign_cache);
+)
+  return *this;
 }
+
 
 
 /* Descriptor patching for copy constructor */
 template<typename T>
-void WasmModule::DescriptorPatch (std::list<T> &list, const WasmModule &mod) {
+void WasmModule::DescriptorPatch (std::list<T> &list, const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache) {
   for (auto &v : list) {
     switch (v.kind) {
-      case KIND_FUNC: v.desc.func = REASSIGN(v.desc.func, Func); break;
-      case KIND_TABLE: v.desc.table = REASSIGN(v.desc.table, Table); break;
-      case KIND_MEMORY: v.desc.mem = REASSIGN(v.desc.mem, Memory); break;
-      case KIND_GLOBAL: v.desc.global = REASSIGN(v.desc.global, Global); break;
+      case KIND_FUNC: v.desc.func = REASSIGN(v.desc.func, Func, FuncDecl); break;
+      case KIND_TABLE: v.desc.table = REASSIGN(v.desc.table, Table, TableDecl); break;
+      case KIND_MEMORY: v.desc.mem = REASSIGN(v.desc.mem, Memory, MemoryDecl); break;
+      case KIND_GLOBAL: v.desc.global = REASSIGN(v.desc.global, Global, GlobalDecl); break;
       default:
-        ERR("Import kind: %u\n", v.kind);
-        throw std::runtime_error("Invalid import kind");
+        ERR("Import/Export kind: %u\n", v.kind);
+        throw std::runtime_error("Invalid import/export kind");
     }
   }
 }
@@ -115,9 +137,12 @@ void WasmModule::DescriptorPatch (std::list<T> &list, const WasmModule &mod) {
     auto ispec = static_pointer_cast<clsname>(instptr); \
     instptr.reset(new clsname(instptr->getOpcode() __VA_OPT__(,) __VA_ARGS__ )); break;  \
   }
-void WasmModule::FunctionPatch (const WasmModule &mod) {
+void WasmModule::FunctionPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache) {
+  DEF_TIME_VAR();
+  
+TIME_SECTION(3, "Time for func patching", 
   for (auto &func : this->funcs) {
-    func.sig = REASSIGN(func.sig, Sig);
+    func.sig = REASSIGN(func.sig, Sig, SigDecl);
     for (auto institr = func.instructions.begin(); institr != func.instructions.end(); ++institr) {
       InstBasePtr &instptr = *institr;
       switch (instptr->getImmType()) {
@@ -125,40 +150,50 @@ void WasmModule::FunctionPatch (const WasmModule &mod) {
         PCS (IMM_BLOCKT, ImmBlocktInst, ispec->getType());
         PCS (IMM_LABEL, ImmLabelInst, ispec->getLabel());
         PCS (IMM_LABELS, ImmLabelsInst, ispec->getLabels(), ispec->getDefLabel());
-        PCS (IMM_FUNC, ImmFuncInst, REASSIGN(ispec->getFunc(), Func));
-        PCS (IMM_SIG_TABLE, ImmSigTableInst, REASSIGN(ispec->getSig(), Sig), REASSIGN(ispec->getTable(), Table));
+        PCS (IMM_FUNC, ImmFuncInst, REASSIGN(ispec->getFunc(), Func, FuncDecl));
+        PCS (IMM_SIG_TABLE, ImmSigTableInst, REASSIGN(ispec->getSig(), Sig, SigDecl), REASSIGN(ispec->getTable(), Table, TableDecl));
         PCS (IMM_LOCAL, ImmLocalInst, ispec->getLocal());
-        PCS (IMM_GLOBAL, ImmGlobalInst, REASSIGN(ispec->getGlobal(), Global));
-        PCS (IMM_TABLE, ImmTableInst, REASSIGN(ispec->getTable(), Table));
+        PCS (IMM_GLOBAL, ImmGlobalInst, REASSIGN(ispec->getGlobal(), Global, GlobalDecl));
+        PCS (IMM_TABLE, ImmTableInst, REASSIGN(ispec->getTable(), Table, TableDecl));
         PCS (IMM_MEMARG, ImmMemargInst, ispec->getAlign(), ispec->getOffset());
         PCS (IMM_I32, ImmI32Inst, ispec->getValue());
         PCS (IMM_F64, ImmF64Inst, ispec->getValue());
-        PCS (IMM_MEMORY, ImmMemoryInst, REASSIGN(ispec->getMemory(), Memory));
+        PCS (IMM_MEMORY, ImmMemoryInst, REASSIGN(ispec->getMemory(), Memory, MemoryDecl));
         PCS (IMM_TAG, ImmTagInst);
         PCS (IMM_I64, ImmI64Inst, ispec->getValue());
         PCS (IMM_F32, ImmF32Inst, ispec->getValue());
         PCS (IMM_REFNULLT, ImmRefnulltInst, ispec->getType());
         PCS (IMM_VALTS, ImmValtsInst, ispec->getTypes());
         // Extension Immediates
-        PCS (IMM_DATA_MEMORY, ImmDataMemoryInst, REASSIGN(ispec->getData(), Data), REASSIGN(ispec->getMemory(), Memory));
-        PCS (IMM_DATA, ImmDataInst, REASSIGN(ispec->getData(), Data));
-        PCS (IMM_MEMORY_CP, ImmMemoryCpInst, REASSIGN(ispec->getDestMemory(), Memory), REASSIGN(ispec->getSrcMemory(), Memory));
+        PCS (IMM_DATA_MEMORY, ImmDataMemoryInst, REASSIGN(ispec->getData(), Data, DataDecl), REASSIGN(ispec->getMemory(), Memory, MemoryDecl));
+        PCS (IMM_DATA, ImmDataInst, REASSIGN(ispec->getData(), Data, DataDecl));
+        PCS (IMM_MEMORY_CP, ImmMemoryCpInst, REASSIGN(ispec->getDestMemory(), Memory, MemoryDecl), REASSIGN(ispec->getSrcMemory(), Memory, MemoryDecl));
       }
     }
   }
+);
 }
 
 
-void WasmModule::CustomPatch (const WasmModule &mod) {
+void WasmModule::CustomPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache) {
   for (auto &custom : this->customs) {
     if (custom.name == "name") {
       DebugNameDecl &debug = custom.debug;
       if (!debug.func_assoc.empty()) {
         for (auto &name_asc : debug.func_assoc) {
-          name_asc.func = REASSIGN(name_asc.func, Func);
+          name_asc.func = REASSIGN(name_asc.func, Func, FuncDecl);
         }
       }
       this->fn_names_debug = &debug.func_assoc;
     }
   }
+}
+
+
+WasmModule& WasmModule::operator= (const WasmModule &mod) {
+  return this->deepcopy(mod, "Assign Module");
+}
+
+WasmModule::WasmModule (const WasmModule &mod) {
+  this->deepcopy(mod, "Copy Module");
 }

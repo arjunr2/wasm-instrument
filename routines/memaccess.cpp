@@ -1,4 +1,9 @@
 #include "routine_common.h"
+#include "BS_thread_pool_light.hpp"
+#include <chrono>
+#include <thread>
+
+int num_workers = std::thread::hardware_concurrency() / 2;
 
 /*****************/
 void memaccess_instrument (WasmModule &module, const std::string& path);
@@ -252,9 +257,14 @@ static void insert_logend(WasmModule &module, FuncDecl *main_fn) {
 /************************************************/
 /* Do not actually instrument; collect number of accesses and their locations */
 static std::unordered_map<InstBasePtr, uint32_t> memaccess_dry_run (WasmModule &module) {
+
+  DEF_TIME_VAR();
+
   std::unordered_map<InstBasePtr, uint32_t> access_idx_map;
   uint32_t local_indices[7];
   uint32_t access_idx = 0;
+
+TIME_SECTION(2, "Time for dry run",
   for (auto &func : module.Funcs()) {
     InstList &insts = func.instructions;
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
@@ -270,6 +280,7 @@ static std::unordered_map<InstBasePtr, uint32_t> memaccess_dry_run (WasmModule &
       }
     }
   }
+)
   return access_idx_map;
 }
 
@@ -311,11 +322,15 @@ static void memfiltered_instrument_internal (
     bool insert_global = true, 
     bool no_filter = false) {
 
-  std::cout << "Filter | Count: " << inst_idx_filter.size() << " | ";
-  for (auto &i : inst_idx_filter) {
-    std::cout << i << " ";
+  if (no_filter) {
+    ERR("Filter | None\n");
+  } else {
+    ERR("Filter | Count: %ld | ", inst_idx_filter.size());
+    for (auto &i : inst_idx_filter) {
+      TRACE("%u ", i);
+    }
+    ERR("\n");
   }
-  std::cout << "\n";
 
   auto filter_itr = inst_idx_filter.begin();
 
@@ -355,7 +370,7 @@ static void memfiltered_instrument_internal (
           // Add if no filtering; or if index matches
           bool filter_cond = (!no_filter && (*filter_itr == access_idx));
           if (no_filter || filter_cond) {
-            printf("Inserting at Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
+            TRACE("Inserting at Access Idx: %d | Op: %s\n", access_idx, opcode_table[instruction->getOpcode()].mnemonic);
             insts.insert(institr, addinst.begin(), addinst.end());
             if (filter_cond) { filter_itr++; }
           }
@@ -405,6 +420,7 @@ void memaccess_instrument (WasmModule &module, const std::string& path) {
 /************************************************/
 
 
+#define THREADING 0
 /************************************************/
 /* Instrument random (percent) set of all memory accesses
 * across cluster size, filtered by path if given */
@@ -422,19 +438,32 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
   }
 
   uint32_t num_accesses = inst_idx_filter.size();
-  printf("Num accesses: %u\n", num_accesses);
+  TRACE("Num accesses: %u\n", num_accesses);
   int partition_size = (num_accesses * percent) / 100;
 
-  std::vector<WasmModule> module_set(cluster_size, module);
-  for (int i = 0; i < cluster_size; i++) {
-    std::set<uint32_t> partition;
-    /* Get a random sample */
-    std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
-                std::inserter(partition, partition.end()), partition_size,
-                std::mt19937{std::random_device{}()});
+  std::vector<WasmModule> module_set(cluster_size);
+  auto loop = [&module_set, &module, &inst_idx_filter, &partition_size](const int a, const int b) {
+    for (int i = a; i < b; i++) {
+      module_set[i] = module;
+      std::set<uint32_t> partition;
+      /* Get a random sample */
+      std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
+                  std::inserter(partition, partition.end()), partition_size,
+                  std::mt19937{std::random_device{}()});
+      memfiltered_instrument_internal (module_set[i], partition);
+    }
+  };
 
-    memfiltered_instrument_internal (module_set[i], partition);
+  if (!g_threads) {
+    loop(0, cluster_size);
   }
+  else {
+    BS::thread_pool_light pool(num_workers);
+    printf("Pool size: %d\n", pool.get_thread_count());
+    pool.push_loop(cluster_size, loop);
+    pool.wait_for_tasks();
+  }
+
   return module_set;
 }
 /************************************************/

@@ -1,17 +1,5 @@
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <inttypes.h>
-
-#include "views.h"
-#include "instructions.h"
-
-#include <climits>
 #include <fstream>
 #include <iostream>
-#include <algorithm>
-#include <numeric>
 #include <random>
 #include <set>
 #include <map>
@@ -19,6 +7,9 @@
 
 #include "common.h"
 #include "ir.h"
+#include "views.h"
+#include "instructions.h"
+
 
 static ExportDecl* get_main_export(WasmModule &module) {
   /* look for either main or _start */

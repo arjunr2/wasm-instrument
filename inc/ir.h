@@ -3,19 +3,19 @@
 #include <cstdint>
 #include <cstddef>
 #include <list>
-#include <vector>
 #include <string>
 #include <algorithm>
 #include <memory>
+#include <unordered_map>
 
 #include "common.h"
 #include "wasmdefs.h"
 
 
+/* For instruction parsing */
 class InstBase;
 typedef std::shared_ptr<InstBase> InstBasePtr;
 typedef std::list<InstBasePtr> InstList;
-
 typedef std::list<InstBasePtr>::iterator InstItr;
 
 typedef std::list<wasm_type_t> typelist;
@@ -75,14 +75,14 @@ struct SigDecl {
   typelist params;
   typelist results;
 
-  bool operator==(const SigDecl sig) {
+  bool operator==(const SigDecl &sig) {
     bool parameq = std::equal(this->params.begin(), this->params.end(),
             sig.params.begin(), sig.params.end());
     bool resulteq = std::equal(this->results.begin(), this->results.end(),
             sig.results.begin(), sig.results.end());
     return parameq && resulteq;
   }
-  bool operator!=(const SigDecl sig) {
+  bool operator!=(const SigDecl &sig) {
     bool parameq = std::equal(this->params.begin(), this->params.end(),
             sig.params.begin(), sig.params.end());
     bool resulteq = std::equal(this->results.begin(), this->results.end(),
@@ -204,19 +204,18 @@ class WasmModule {
     std::list <SigDecl>     sigs;
     ImportSet               imports;
     /* Func space */
-    std::list <FuncDecl>    funcs;
+    std::deque <FuncDecl>    funcs;
     /* Table space */
     std::list <TableDecl>   tables;
     /* Mem space */
     std::list <MemoryDecl>  mems;
     /* Global space */
-    std::list <GlobalDecl>  globals;
+    std::deque <GlobalDecl>  globals;
     std::list <ExportDecl>  exports;
     std::list <ElemDecl>    elems;
     std::list <DataDecl>    datas;
 
     /* Start section */
-    int has_start;
     FuncDecl* start_fn;
 
     /* Datacount section */ 
@@ -268,23 +267,28 @@ class WasmModule {
     /* Code + local encoding for instructions */
     bytedeque encode_code (FuncDecl &func);
 
-    /* Descriptor patching for copy constructor */
+    /* Descriptor patching for copy/assign */
     template<typename T>
-    void DescriptorPatch (std::list<T> &list, const WasmModule &mod);
-    /* Function patching for copy constructor */
-    void FunctionPatch (const WasmModule &mod);
-    /* Custom section patching */
-    void CustomPatch (const WasmModule &mod);
+    void DescriptorPatch (std::list<T> &list, const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
+    /* Function patching for copy/assign */
+    void FunctionPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
+    /* Custom section patching for copy/assign */
+    void CustomPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
+
+    /* Perform a full deep copy */
+    WasmModule& deepcopy(const WasmModule &mod, const char* log_str);
 
   public:
     WasmModule () = default;
     WasmModule (const WasmModule &mod);
     ~WasmModule() = default;
 
+    WasmModule& operator=(const WasmModule &mod);
+
     /* Field Accessors */
     inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }
-    inline FuncDecl* getFunc(uint32_t idx)      { return GET_LIST_ELEM(this->funcs, idx); }
-    inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_LIST_ELEM(this->globals, idx); }
+    inline FuncDecl* getFunc(uint32_t idx)      { return GET_DEQUE_ELEM(this->funcs, idx); }
+    inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_DEQUE_ELEM(this->globals, idx); }
     inline TableDecl* getTable(uint32_t idx)    { return GET_LIST_ELEM(this->tables, idx); }
     inline MemoryDecl* getMemory(uint32_t idx)  { 
       if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
@@ -295,8 +299,8 @@ class WasmModule {
 
     /* Index Accessors */
     inline uint32_t getSigIdx(SigDecl *sig)           const { return GET_LIST_IDX(this->sigs, sig); }
-    inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_LIST_IDX(this->funcs, func); }
-    inline uint32_t getGlobalIdx(GlobalDecl *global)  const { return GET_LIST_IDX(this->globals, global); }
+    inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_DEQUE_IDX(this->funcs, func); }
+    inline uint32_t getGlobalIdx(GlobalDecl *global)  const { return GET_DEQUE_IDX(this->globals, global); }
     inline uint32_t getTableIdx(TableDecl *table)     const { return GET_LIST_IDX(this->tables, table); }
     inline uint32_t getMemoryIdx(MemoryDecl *mem)     const {
       uint32_t idx = GET_LIST_IDX(this->mems, mem);
@@ -313,10 +317,10 @@ class WasmModule {
     inline bool isImport(MemoryDecl *mem)     { return getMemoryIdx(mem)    < this->imports.num_mems; }
 
     /* Section Accessors */
-    inline std::list <FuncDecl> &Funcs() { return this->funcs; }
-    inline std::list <GlobalDecl> &Globals() { return this->globals; }
+    inline std::deque <FuncDecl> &Funcs() { return this->funcs; }
+    inline std::deque <GlobalDecl> &Globals() { return this->globals; }
 
-    inline FuncDecl* get_start_fn() { return this->has_start ? this->start_fn : NULL; }
+    inline FuncDecl* get_start_fn() { return this->start_fn; }
     inline uint32_t get_num_customs() { return this->customs.size(); }
 
 
