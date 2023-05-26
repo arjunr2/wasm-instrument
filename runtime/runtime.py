@@ -1,7 +1,10 @@
 """Runtime wrapper."""
 
-from beartype.typing import NamedTuple
-from wasmtime import Store, Module, Linker, WasiConfig, Engine, Instance, Val, Global
+import numpy as np
+
+from beartype.typing import NamedTuple, Union
+from wasmtime import (
+    Store, Module, Linker, WasiConfig, Engine, Instance, Global)
 
 
 class WasmtimeModule(NamedTuple):
@@ -40,13 +43,15 @@ class Wasmtime:
         main(module.store)
 
     def get_instrumentation(
-            self, module: WasmtimeModule, prefix="_lc") -> dict:
+        self, module: WasmtimeModule, prefix="__lc", array=True
+    ) -> Union[dict, np.ndarray]:
         """Extract instrumentation from module."""
-        def _bugfix(x):
-            return x.value if isinstance(x, Val) else x
-
-        return {
-            k: _bugfix(v.value(module.store))
+        values = {
+            k: v.value(module.store)
             for k, v in module.inst.exports(module.store)._extern_map.items()
             if k.startswith(prefix) and isinstance(v, Global)
         }
+        if array:
+            return np.array([values[k] for k in sorted(values.keys())])
+        else:
+            return values
