@@ -136,7 +136,6 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   }
 }
 
-  
 
 // Main function.
 // Parses arguments and either runs a file with arguments.
@@ -178,7 +177,6 @@ TIME_SECTION(0, "Time to instrument",
   std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec, is_batch);
 )
 
-  #define COMMA ,
   /* Encode instrumented module */
 TIME_SECTION(0, "Time to encode modules",
   if (!is_batch) {
@@ -220,7 +218,3 @@ TIME_SECTION(0, "Time to encode modules",
 
   exit(0);
 }
-
-
-
-

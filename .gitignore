@@ -3,5 +3,6 @@
 *.wasm.*
 *.wat
 *.wat.*
+instrument
 build/
 __pycache__

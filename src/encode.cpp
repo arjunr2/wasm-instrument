@@ -496,9 +496,11 @@ bytedeque WasmModule::encode_module(char* outfile) {
     ENCODE_CALL (custom, custom);
   }
 
-TIME_SECTION(1, "Time for file write",
-  dump_bytedeque(bdeq, outfile);
-);
-  printf("Wrote module to \"%s\"\n", outfile);
+  if (outfile != NULL) {
+    TIME_SECTION(1, "Time for file write",
+    dump_bytedeque(bdeq, outfile);
+    );
+    printf("Wrote module to \"%s\"\n", outfile);
+  }
   return bdeq;
 }

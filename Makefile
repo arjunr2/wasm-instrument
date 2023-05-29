@@ -51,4 +51,3 @@ gen-insns:
 
 clean:
 	rm -rf build
-
