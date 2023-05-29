@@ -52,6 +52,7 @@ class Wasmtime:
             if k.startswith(prefix) and isinstance(v, Global)
         }
         if array:
-            return np.array([values[k] for k in sorted(values.keys())])
+            return np.array(
+                [values[k] for k in sorted(values.keys())], dtype=np.uint32)
         else:
             return values
