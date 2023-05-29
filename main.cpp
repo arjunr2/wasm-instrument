@@ -17,7 +17,7 @@
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
   {"dis", no_argument, &g_disassemble, 1},
-  {"scheme", optional_argument, NULL, 's'},
+  {"scheme", required_argument, NULL, 's'},
   {"time", no_argument, &g_time, 1},
   {"multithread", no_argument, &g_threads, 1},
   {"out", required_argument, NULL, 'o'},
@@ -36,7 +36,8 @@ args_t parse_args(int argc, char* argv[]) {
   int opt;
   args_t args = {0};
   optind = 0;
-  while ((opt = getopt_long_only(argc, argv, "o:s:a:h", long_options, NULL)) != -1) {
+  while ((opt = getopt_long_only(argc, argv, "o:s:a::h", long_options, NULL)) != -1) {
+    printf("%c, %s\n", opt, optarg);
     switch(opt) {
       case 0: break;
       case 'o': args.outfile = strdup(optarg); break;
@@ -45,6 +46,7 @@ args_t parse_args(int argc, char* argv[]) {
       case 'h':
       default:
         ERR("Usage: %s [--trace] [--scheme SCHEME] [--args SCHEME_ARGS (optional)] [--out OUTFILE] <infile>\n", argv[0]);
+        ERR("Supported schemes: \'empty\', \'sample\', \'loop-count\'\n");
         exit(opt != 'h');
     }
   }
@@ -60,7 +62,7 @@ args_t parse_args(int argc, char* argv[]) {
   }
   
   // Run sample instrumentation by default
-  if (!args.scheme) { args.scheme = strdup("sample"); } 
+  //if (!args.scheme) { args.scheme = strdup("sample"); } 
   args.infile = argv[optind];
   return args;
 }
