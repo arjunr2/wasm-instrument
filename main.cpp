@@ -122,7 +122,6 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   
   else if (routine == "sample") { sample_instrument(module); }
   else if (routine == "func-weight") { all_funcs_weight_instrument(module); }
-  else if (routine == "loop-count") { loop_instrument(module); }
   else {
     printf("Unsupported instrumentation scheme\n");
   }

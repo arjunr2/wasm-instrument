@@ -6,8 +6,6 @@
 
 void sample_instrument (WasmModule& module);
 
-void loop_instrument (WasmModule &module);
-
 std::map<FuncDecl*, uint64_t> all_funcs_weight_instrument (WasmModule &module);
 
 void memaccess_instrument (WasmModule &module, const std::string& path);
