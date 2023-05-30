@@ -16,7 +16,6 @@
 
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
-  {"dis", no_argument, &g_disassemble, 1},
   {"scheme", required_argument, NULL, 's'},
   {"time", no_argument, &g_time, 1},
   {"multithread", no_argument, &g_threads, 1},
@@ -37,7 +36,6 @@ args_t parse_args(int argc, char* argv[]) {
   args_t args = {0};
   optind = 0;
   while ((opt = getopt_long_only(argc, argv, "o:s:a::h", long_options, NULL)) != -1) {
-    printf("%c, %s\n", opt, optarg);
     switch(opt) {
       case 0: break;
       case 'o': args.outfile = strdup(optarg); break;
@@ -45,7 +43,8 @@ args_t parse_args(int argc, char* argv[]) {
       case 'a': args.inst_args = strdup(optarg); break;
       case 'h':
       default:
-        ERR("Usage: %s [--trace] [--scheme SCHEME] [--args SCHEME_ARGS (optional)] [--out OUTFILE] <infile>\n", argv[0]);
+        ERR("Usage: %s [--trace (opt)] [--multithread (opt)] [--time (opt)] "
+            "[--scheme SCHEME] [--args SCHEME_ARGS (opt)] [--out OUTFILE] input-file\n", argv[0]);
         ERR("Supported schemes: \'empty\', \'sample\', \'loop-count\'\n");
         exit(opt != 'h');
     }

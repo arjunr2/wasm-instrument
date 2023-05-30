@@ -9,7 +9,6 @@
 
 /* The global flags */
 int g_trace = 0;
-int g_disassemble = 0;
 int g_time = 0;
 int g_threads = 0;
 

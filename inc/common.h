@@ -23,10 +23,8 @@ typedef struct {
 extern int g_threads;
 /*** Global trace/err/disassemble flags and macros. ***/
 #define TRACE(...) do { if(g_trace) fprintf(stderr, __VA_ARGS__); } while(0)
-#define DISASS(...) do { if(g_disassemble) fprintf(stderr, __VA_ARGS__); } while(0)
 #define ERR(...) fprintf(stderr, __VA_ARGS__)
 extern int g_trace;
-extern int g_disassemble;
 /***************/
 
 extern int g_time;
