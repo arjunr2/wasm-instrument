@@ -13,6 +13,7 @@ static void insert_opcode_instrumentation(WasmModule &module, InstItr &institr, 
   };
 
   InstList addinst;
+  TRACE("Inserting instrumentation here\n");
   for (auto it = run_counts.begin(); it != run_counts.end(); ++it) {
     uint16_t opcode = it->first;
     uint64_t count = it->second;
@@ -54,6 +55,7 @@ static void scope_opcode_instrument (WasmModule &module, ScopeBlock* scope, Func
       if (isScopeInst(instptr)) {
         continue;
       }
+      TRACE("O: %s\n", opcode_table[instptr->getOpcode()].mnemonic);
       // For all other instructions, add to profile
       uint16_t opcode = instptr->getOpcode();
       run_counts[opcode]++;
