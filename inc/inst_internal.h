@@ -30,6 +30,7 @@ class InstBase {
     inline uint16_t getOpcode() { return opcode; }
     inline bool is(uint16_t opc) { return (this->opcode == opc); } 
     inline opcode_imm_type getImmType() { return imm_type; }
+    inline bool isImmType(opcode_imm_type oit) { return (this->imm_type == oit); }
 
     virtual void encode_imm (WasmModule &module, bytedeque &bdeq) const;
 };

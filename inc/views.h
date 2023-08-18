@@ -48,3 +48,17 @@ struct ScopeBlock {
     return INVALID;
   }
 };
+
+inline static bool isScopeInst(InstBasePtr inst) {
+  switch (inst->getOpcode()) {
+    case WASM_OP_LOOP:
+    case WASM_OP_BLOCK:
+    case WASM_OP_IF:
+    case WASM_OP_ELSE:
+    case WASM_OP_END:
+      return true;
+    default:
+      return false;
+  }
+  return false;
+}
