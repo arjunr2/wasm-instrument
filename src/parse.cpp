@@ -375,6 +375,11 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
       ICS (IMM_DATA_MEMORY, ImmDataMemoryInst);
       ICS (IMM_DATA, ImmDataInst);
       ICS (IMM_MEMORYCP, ImmMemorycpInst);
+      ICS (IMM_DATA_TABLE, ImmDataTableInst);
+      ICS (IMM_TABLECP, ImmTablecpInst);
+      ICS (IMM_V128, ImmV128Inst);
+      ICS (IMM_LANEIDX, ImmLaneidxInst);
+      ICS (IMM_MEMARG_LANEIDX, ImmMemargLaneidxInst);
       default:
         ERR("Unknown imm type: %d\n", imm_type);
         throw std::runtime_error("Unknown imm");

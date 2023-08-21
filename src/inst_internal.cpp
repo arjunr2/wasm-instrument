@@ -280,3 +280,75 @@ void ImmMemorycpInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t src_idx = module.getMemoryIdx(this->src);
   WR_U32 (src_idx);
 }
+
+
+
+
+
+/* ImmDataTableInst  */
+ImmDataTableInst::ImmDataTableInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  this->data = module.getData (RD_U32());
+  this->table = module.getTable (RD_U32());
+}
+
+void ImmDataTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  uint32_t data_idx = module.getDataIdx(this->data);
+  WR_U32 (data_idx);
+  uint32_t table_idx = module.getTableIdx(this->table);
+  WR_U32 (table_idx);
+}
+
+
+/* ImmTablecpInst  */
+ImmTablecpInst::ImmTablecpInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  this->dst = module.getTable (RD_U32());
+  this->src = module.getTable (RD_U32());
+}
+
+void ImmTablecpInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  uint32_t dst_idx = module.getTableIdx(this->dst);
+  WR_U32 (dst_idx);
+  uint32_t src_idx = module.getTableIdx(this->src);
+  WR_U32 (src_idx);
+}
+
+
+/* ImmV128Inst  */
+ImmV128Inst::ImmV128Inst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  this->value.v[0] = RD_U64_RAW();
+  this->value.v[1] = RD_U64_RAW();
+}
+
+void ImmV128Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  WR_U64_RAW (this->value.v[0]);
+  WR_U64_RAW (this->value.v[1]);
+}
+
+
+/* ImmLaneidxInst  */
+ImmLaneidxInst::ImmLaneidxInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  this->idx = RD_BYTE();
+}
+
+void ImmLaneidxInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  WR_BYTE (this->idx);
+}
+
+
+/* ImmMemargLaneidxInst  */
+ImmMemargLaneidxInst::ImmMemargLaneidxInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  this->align = RD_U32();
+  this->offset = RD_U32();
+  this->laneidx = RD_BYTE();
+}
+
+void ImmMemargLaneidxInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  WR_U32 (this->align);
+  WR_U32 (this->offset);
+  WR_BYTE (this->laneidx);
+}

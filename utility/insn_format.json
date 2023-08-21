@@ -19,5 +19,10 @@
   "ImmValtsInst": ["std::list<wasm_type_t> types"],
   "ImmDataMemoryInst": ["DataDecl* data, MemoryDecl *mem"],
   "ImmDataInst": ["DataDecl* data"],
-  "ImmMemorycpInst": ["MemoryDecl* dst, MemoryDecl* src"]
+  "ImmMemorycpInst": ["MemoryDecl* dst, MemoryDecl* src"],
+  "ImmDataTableInst": ["DataDecl* data, TableDecl* table"],
+  "ImmTablecpInst": ["TableDecl* dst", "TableDecl* src"],
+  "ImmV128Inst": ["V128_t value"],
+  "ImmLaneidxInst": ["Laneidx_t idx"],
+  "ImmMemargLaneidxInst": ["uint32_t align", "uint32_t offset", "Laneidx_t idx"
 }

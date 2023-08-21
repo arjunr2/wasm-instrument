@@ -2,6 +2,7 @@
 
 #include "wasmops.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 #define WASM_MAGIC 0x6d736100u
 #define WASM_VERSION 1
@@ -67,6 +68,14 @@ typedef enum {
   KIND_MEMORY = WASM_DESC_MEM,
   KIND_GLOBAL = WASM_DESC_GLOBAL
 } wasm_kind_t;
+
+/* Common types */
+typedef union V128_t {
+  uint64_t v[2];
+} V128_t;
+
+typedef uint32_t Opcode_t;
+typedef uint8_t Laneidx_t;
 
 static inline bool isReftype(wasm_type_t type) { 
   return (type == WASM_TYPE_EXTERNREF) || (type == WASM_TYPE_FUNCREF);

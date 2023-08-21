@@ -275,6 +275,7 @@ class ImmValtsInst: public InstBase {
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
 
+// Extensions
 
 class ImmDataMemoryInst: public InstBase {
   DataDecl* data;
@@ -312,8 +313,82 @@ class ImmMemorycpInst: public InstBase {
     ImmMemorycpInst (Opcode_t opcode, MemoryDecl* dst, MemoryDecl* src) : 
       InstBase(opcode), dst(dst), src(src) { }
 
-    inline MemoryDecl* getDestMemory()  { return dst; }
+    inline MemoryDecl* getDstMemory()  { return dst; }
     inline MemoryDecl* getSrcMemory()  { return src; }
 
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
+
+
+class ImmDataTableInst: public InstBase {
+  DataDecl* data;
+  TableDecl* table;
+  public:
+    ImmDataTableInst (WasmModule &module, Opcode_t opcode, buffer_t &buf);
+    ImmDataTableInst (Opcode_t opcode, DataDecl* data, TableDecl* table) : 
+      InstBase(opcode), data(data), table(table) { }
+
+    inline DataDecl* getData()  { return data; }
+    inline TableDecl* getTable()  { return table; }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
+
+class ImmTablecpInst: public InstBase {
+  TableDecl* dst;
+  TableDecl* src;
+  public:
+    ImmTablecpInst (WasmModule &module, Opcode_t opcode, buffer_t &buf);
+    ImmTablecpInst (Opcode_t opcode, TableDecl* dst, TableDecl* src) : 
+      InstBase(opcode), dst(dst), src(src) { }
+
+    inline TableDecl* getDstTable()  { return dst; }
+    inline TableDecl* getSrcTable()  { return src; }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
+
+class ImmV128Inst: public InstBase {
+  V128_t value;
+  public:
+    ImmV128Inst (WasmModule &module, Opcode_t opcode, buffer_t &buf);
+    ImmV128Inst (Opcode_t opcode, V128_t value) : 
+      InstBase(opcode), value(value) { }
+
+    inline V128_t getValue() { return value; }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
+
+class ImmLaneidxInst: public InstBase {
+  Laneidx_t idx;
+  public:
+    ImmLaneidxInst (WasmModule &module, Opcode_t opcode, buffer_t &buf);
+    ImmLaneidxInst (Opcode_t opcode, Laneidx_t idx) : 
+      InstBase(opcode), idx(idx) { }
+
+    inline Laneidx_t getLaneidx() { return idx; }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
+
+class ImmMemargLaneidxInst: public InstBase {
+  uint32_t align;
+  uint32_t offset;
+  Laneidx_t laneidx;
+  public:
+    ImmMemargLaneidxInst (WasmModule &module, Opcode_t opcode, buffer_t &buf);
+    ImmMemargLaneidxInst (Opcode_t opcode, uint32_t align, uint32_t offset, Laneidx_t laneidx) : 
+      InstBase(opcode), align(align), offset(offset), laneidx(laneidx) { }
+
+    inline uint32_t getOffset()  { return offset; }
+    inline uint32_t getAlign()   { return align; }
+    inline Laneidx_t getLaneidx() { return laneidx; }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
