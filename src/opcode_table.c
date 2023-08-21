@@ -214,7 +214,7 @@ opcode_entry_t opcode_table[] = {
   // 0xFC extension
   [WASM_OP_MEMORY_INIT] = {"memory.init", IMM_DATA_MEMORY},
   [WASM_OP_DATA_DROP] = {"data.drop", IMM_DATA},
-  [WASM_OP_MEMORY_COPY] = {"memory.copy", IMM_MEMORY_CP},
+  [WASM_OP_MEMORY_COPY] = {"memory.copy", IMM_MEMORYCP},
   [WASM_OP_MEMORY_FILL] = {"memory.fill", IMM_MEMORY},
 
   // Threads Extension: 0xFE

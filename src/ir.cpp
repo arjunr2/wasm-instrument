@@ -167,7 +167,7 @@ TIME_SECTION(3, "Time for func patching",
         // Extension Immediates
         PCS (IMM_DATA_MEMORY, ImmDataMemoryInst, REASSIGN(ispec->getData(), Data, DataDecl), REASSIGN(ispec->getMemory(), Memory, MemoryDecl));
         PCS (IMM_DATA, ImmDataInst, REASSIGN(ispec->getData(), Data, DataDecl));
-        PCS (IMM_MEMORY_CP, ImmMemoryCpInst, REASSIGN(ispec->getDestMemory(), Memory, MemoryDecl), REASSIGN(ispec->getSrcMemory(), Memory, MemoryDecl));
+        PCS (IMM_MEMORYCP, ImmMemorycpInst, REASSIGN(ispec->getDestMemory(), Memory, MemoryDecl), REASSIGN(ispec->getSrcMemory(), Memory, MemoryDecl));
       }
     }
   }

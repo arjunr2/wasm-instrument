@@ -96,9 +96,9 @@ typedef enum {
   // Extension immediates
   IMM_DATA_MEMORY,
   IMM_DATA,
-  IMM_MEMORY_CP,
+  IMM_MEMORYCP,
   IMM_DATA_TABLE,
-  IMM_TABLE_CP
+  IMM_TABLECP
 } opcode_imm_type;
 
 /* Information associated with each opcode */

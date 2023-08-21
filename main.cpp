@@ -84,11 +84,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   std::vector<WasmModule> out_modules;
   is_batch = false;
 
-  if (routine == "empty") { 
-    out_modules.resize(3);
-    for (int i = 0; i < 3; i++) { out_modules[i] = module; }
-    is_batch = true;
-  }
+  if (routine == "empty") { }
 
   else if (routine == "memaccess") { 
     if (args.size() > 1) {
@@ -178,7 +174,6 @@ TIME_SECTION(0, "Time to instrument",
   std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec, is_batch);
 )
 
-  #define COMMA ,
   /* Encode instrumented module */
 TIME_SECTION(0, "Time to encode modules",
   if (!is_batch) {

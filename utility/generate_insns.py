@@ -29,7 +29,7 @@ def _main():
     with open(script_dir / "insn_format.json") as f:
         insn_format = json.load(f)
 
-    with open(script_dir / ".." / "opcode_table.c") as f:
+    with open(script_dir / ".." / "src" / "opcode_table.c") as f:
         print("#include \"inst_internal.h\"\n")
         pattern = re.compile(r"\s*\[WASM_OP_(.*)\]\s*=\s*{(.*)}");
         for line in f.readlines():

@@ -304,12 +304,12 @@ class ImmDataInst: public InstBase {
 };
 
 
-class ImmMemoryCpInst: public InstBase {
+class ImmMemorycpInst: public InstBase {
   MemoryDecl* dst;
   MemoryDecl* src;
   public:
-    ImmMemoryCpInst (WasmModule &module, uint16_t opcode, buffer_t &buf);
-    ImmMemoryCpInst (uint16_t opcode, MemoryDecl* dst, MemoryDecl* src) : 
+    ImmMemorycpInst (WasmModule &module, uint16_t opcode, buffer_t &buf);
+    ImmMemorycpInst (uint16_t opcode, MemoryDecl* dst, MemoryDecl* src) : 
       InstBase(opcode), dst(dst), src(src) { }
 
     inline MemoryDecl* getDestMemory()  { return dst; }

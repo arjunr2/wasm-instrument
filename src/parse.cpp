@@ -374,7 +374,7 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
       // Extension Immediates
       ICS (IMM_DATA_MEMORY, ImmDataMemoryInst);
       ICS (IMM_DATA, ImmDataInst);
-      ICS (IMM_MEMORY_CP, ImmMemoryCpInst);
+      ICS (IMM_MEMORYCP, ImmMemorycpInst);
       default:
         ERR("Unknown imm type: %d\n", imm_type);
         throw std::runtime_error("Unknown imm");
