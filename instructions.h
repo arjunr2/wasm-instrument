@@ -860,6 +860,31 @@ class F64ReinterpretI64Inst: public ImmNoneInst {
 	F64ReinterpretI64Inst() : ImmNoneInst(WASM_OP_F64_REINTERPRET_I64) { }
 };
 
+class I32Extend8SInst: public ImmNoneInst {
+	public:
+	I32Extend8SInst() : ImmNoneInst(WASM_OP_I32_EXTEND8_S) { }
+};
+
+class I32Extend16SInst: public ImmNoneInst {
+	public:
+	I32Extend16SInst() : ImmNoneInst(WASM_OP_I32_EXTEND16_S) { }
+};
+
+class I64Extend8SInst: public ImmNoneInst {
+	public:
+	I64Extend8SInst() : ImmNoneInst(WASM_OP_I64_EXTEND8_S) { }
+};
+
+class I64Extend16SInst: public ImmNoneInst {
+	public:
+	I64Extend16SInst() : ImmNoneInst(WASM_OP_I64_EXTEND16_S) { }
+};
+
+class I64Extend32SInst: public ImmNoneInst {
+	public:
+	I64Extend32SInst() : ImmNoneInst(WASM_OP_I64_EXTEND32_S) { }
+};
+
 class TryInst: public ImmBlocktInst {
 	public:
 	TryInst(int64_t type) : ImmBlocktInst(WASM_OP_TRY, type) { }
@@ -925,31 +950,6 @@ class TableSetInst: public ImmTableInst {
 	TableSetInst(TableDecl* table) : ImmTableInst(WASM_OP_TABLE_SET, table) { }
 };
 
-class I32Extend8SInst: public ImmNoneInst {
-	public:
-	I32Extend8SInst() : ImmNoneInst(WASM_OP_I32_EXTEND8_S) { }
-};
-
-class I32Extend16SInst: public ImmNoneInst {
-	public:
-	I32Extend16SInst() : ImmNoneInst(WASM_OP_I32_EXTEND16_S) { }
-};
-
-class I64Extend8SInst: public ImmNoneInst {
-	public:
-	I64Extend8SInst() : ImmNoneInst(WASM_OP_I64_EXTEND8_S) { }
-};
-
-class I64Extend16SInst: public ImmNoneInst {
-	public:
-	I64Extend16SInst() : ImmNoneInst(WASM_OP_I64_EXTEND16_S) { }
-};
-
-class I64Extend32SInst: public ImmNoneInst {
-	public:
-	I64Extend32SInst() : ImmNoneInst(WASM_OP_I64_EXTEND32_S) { }
-};
-
 class RefNullInst: public ImmRefnulltInst {
 	public:
 	RefNullInst(wasm_type_t type) : ImmRefnulltInst(WASM_OP_REF_NULL, type) { }
@@ -983,5 +983,1540 @@ class RefEqInst: public ImmNoneInst {
 class BrOnNonNullInst: public ImmLabelInst {
 	public:
 	BrOnNonNullInst(uint32_t idx) : ImmLabelInst(WASM_OP_BR_ON_NON_NULL, idx) { }
+};
+
+class MemoryInitInst: public ImmDataMemoryInst {
+	public:
+	MemoryInitInst(DataDecl* data, MemoryDecl *mem) : ImmDataMemoryInst(WASM_OP_MEMORY_INIT, *mem) { }
+};
+
+class DataDropInst: public ImmDataInst {
+	public:
+	DataDropInst(DataDecl* data) : ImmDataInst(WASM_OP_DATA_DROP, data) { }
+};
+
+class MemoryCopyInst: public ImmMemorycpInst {
+	public:
+	MemoryCopyInst(MemoryDecl* dst, MemoryDecl* src) : ImmMemorycpInst(WASM_OP_MEMORY_COPY, src) { }
+};
+
+class MemoryFillInst: public ImmMemoryInst {
+	public:
+	MemoryFillInst(MemoryDecl* mem) : ImmMemoryInst(WASM_OP_MEMORY_FILL, mem) { }
+};
+
+class V128LoadInst: public ImmMemargInst {
+	public:
+	V128LoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD, align,offset) { }
+};
+
+class V128Load8x8SInst: public ImmMemargInst {
+	public:
+	V128Load8x8SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD8x8_S, align,offset) { }
+};
+
+class V128Load8x8UInst: public ImmMemargInst {
+	public:
+	V128Load8x8UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD8x8_U, align,offset) { }
+};
+
+class V128Load16x4SInst: public ImmMemargInst {
+	public:
+	V128Load16x4SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD16x4_S, align,offset) { }
+};
+
+class V128Load16x4UInst: public ImmMemargInst {
+	public:
+	V128Load16x4UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD16x4_U, align,offset) { }
+};
+
+class V128Load32x2SInst: public ImmMemargInst {
+	public:
+	V128Load32x2SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD32x2_S, align,offset) { }
+};
+
+class V128Load32x2UInst: public ImmMemargInst {
+	public:
+	V128Load32x2UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD32x2_U, align,offset) { }
+};
+
+class V128Load8SplatInst: public ImmMemargInst {
+	public:
+	V128Load8SplatInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD8_SPLAT, align,offset) { }
+};
+
+class V128Load16SplatInst: public ImmMemargInst {
+	public:
+	V128Load16SplatInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD16_SPLAT, align,offset) { }
+};
+
+class V128Load32SplatInst: public ImmMemargInst {
+	public:
+	V128Load32SplatInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD32_SPLAT, align,offset) { }
+};
+
+class V128Load64SplatInst: public ImmMemargInst {
+	public:
+	V128Load64SplatInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD64_SPLAT, align,offset) { }
+};
+
+class V128StoreInst: public ImmMemargInst {
+	public:
+	V128StoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_STORE, align,offset) { }
+};
+
+class V128ConstInst: public ImmV128Inst {
+	public:
+	V128ConstInst(V128_t value) : ImmV128Inst(WASM_OP_V128_CONST, value) { }
+};
+
+class I8x16ShuffleInst: public ImmLaneidx16Inst {
+	public:
+	I8x16ShuffleInst(Laneidx16_t idxs) : ImmLaneidx16Inst(WASM_OP_I8x16_SHUFFLE, idxs) { }
+};
+
+class I8x16SwizzleInst: public ImmNoneInst {
+	public:
+	I8x16SwizzleInst() : ImmNoneInst(WASM_OP_I8x16_SWIZZLE) { }
+};
+
+class I8x16SplatInst: public ImmNoneInst {
+	public:
+	I8x16SplatInst() : ImmNoneInst(WASM_OP_I8x16_SPLAT) { }
+};
+
+class I16x8SplatInst: public ImmNoneInst {
+	public:
+	I16x8SplatInst() : ImmNoneInst(WASM_OP_I16x8_SPLAT) { }
+};
+
+class I32x4SplatInst: public ImmNoneInst {
+	public:
+	I32x4SplatInst() : ImmNoneInst(WASM_OP_I32x4_SPLAT) { }
+};
+
+class I64x2SplatInst: public ImmNoneInst {
+	public:
+	I64x2SplatInst() : ImmNoneInst(WASM_OP_I64x2_SPLAT) { }
+};
+
+class F32x4SplatInst: public ImmNoneInst {
+	public:
+	F32x4SplatInst() : ImmNoneInst(WASM_OP_F32x4_SPLAT) { }
+};
+
+class F64x2SplatInst: public ImmNoneInst {
+	public:
+	F64x2SplatInst() : ImmNoneInst(WASM_OP_F64x2_SPLAT) { }
+};
+
+class I8x16ExtractLaneSInst: public ImmLaneidxInst {
+	public:
+	I8x16ExtractLaneSInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I8x16_EXTRACT_LANE_S, idx) { }
+};
+
+class I8x16ExtractLaneUInst: public ImmLaneidxInst {
+	public:
+	I8x16ExtractLaneUInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I8x16_EXTRACT_LANE_U, idx) { }
+};
+
+class I8x16ReplaceLaneInst: public ImmLaneidxInst {
+	public:
+	I8x16ReplaceLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I8x16_REPLACE_LANE, idx) { }
+};
+
+class I16x8ExtractLaneSInst: public ImmLaneidxInst {
+	public:
+	I16x8ExtractLaneSInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I16x8_EXTRACT_LANE_S, idx) { }
+};
+
+class I16x8ExtractLaneUInst: public ImmLaneidxInst {
+	public:
+	I16x8ExtractLaneUInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I16x8_EXTRACT_LANE_U, idx) { }
+};
+
+class I16x8ReplaceLaneInst: public ImmLaneidxInst {
+	public:
+	I16x8ReplaceLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I16x8_REPLACE_LANE, idx) { }
+};
+
+class I32x4ExtractLaneInst: public ImmLaneidxInst {
+	public:
+	I32x4ExtractLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I32x4_EXTRACT_LANE, idx) { }
+};
+
+class I32x4ReplaceLaneInst: public ImmLaneidxInst {
+	public:
+	I32x4ReplaceLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I32x4_REPLACE_LANE, idx) { }
+};
+
+class I64x2ExtractLaneInst: public ImmLaneidxInst {
+	public:
+	I64x2ExtractLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I64x2_EXTRACT_LANE, idx) { }
+};
+
+class I64x2ReplaceLaneInst: public ImmLaneidxInst {
+	public:
+	I64x2ReplaceLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_I64x2_REPLACE_LANE, idx) { }
+};
+
+class F32x4ExtractLaneInst: public ImmLaneidxInst {
+	public:
+	F32x4ExtractLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_F32x4_EXTRACT_LANE, idx) { }
+};
+
+class F32x4ReplaceLaneInst: public ImmLaneidxInst {
+	public:
+	F32x4ReplaceLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_F32x4_REPLACE_LANE, idx) { }
+};
+
+class F64x2ExtractLaneInst: public ImmLaneidxInst {
+	public:
+	F64x2ExtractLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_F64x2_EXTRACT_LANE, idx) { }
+};
+
+class F64x2ReplaceLaneInst: public ImmLaneidxInst {
+	public:
+	F64x2ReplaceLaneInst(Laneidx_t idx) : ImmLaneidxInst(WASM_OP_F64x2_REPLACE_LANE, idx) { }
+};
+
+class I8x16EqInst: public ImmNoneInst {
+	public:
+	I8x16EqInst() : ImmNoneInst(WASM_OP_I8x16_EQ) { }
+};
+
+class I8x16NeInst: public ImmNoneInst {
+	public:
+	I8x16NeInst() : ImmNoneInst(WASM_OP_I8x16_NE) { }
+};
+
+class I8x16LtSInst: public ImmNoneInst {
+	public:
+	I8x16LtSInst() : ImmNoneInst(WASM_OP_I8x16_LT_S) { }
+};
+
+class I8x16LtUInst: public ImmNoneInst {
+	public:
+	I8x16LtUInst() : ImmNoneInst(WASM_OP_I8x16_LT_U) { }
+};
+
+class I8x16GtSInst: public ImmNoneInst {
+	public:
+	I8x16GtSInst() : ImmNoneInst(WASM_OP_I8x16_GT_S) { }
+};
+
+class I8x16GtUInst: public ImmNoneInst {
+	public:
+	I8x16GtUInst() : ImmNoneInst(WASM_OP_I8x16_GT_U) { }
+};
+
+class I8x16LeSInst: public ImmNoneInst {
+	public:
+	I8x16LeSInst() : ImmNoneInst(WASM_OP_I8x16_LE_S) { }
+};
+
+class I8x16LeUInst: public ImmNoneInst {
+	public:
+	I8x16LeUInst() : ImmNoneInst(WASM_OP_I8x16_LE_U) { }
+};
+
+class I8x16GeSInst: public ImmNoneInst {
+	public:
+	I8x16GeSInst() : ImmNoneInst(WASM_OP_I8x16_GE_S) { }
+};
+
+class I8x16GeUInst: public ImmNoneInst {
+	public:
+	I8x16GeUInst() : ImmNoneInst(WASM_OP_I8x16_GE_U) { }
+};
+
+class I16x8EqInst: public ImmNoneInst {
+	public:
+	I16x8EqInst() : ImmNoneInst(WASM_OP_I16x8_EQ) { }
+};
+
+class I16x8NeInst: public ImmNoneInst {
+	public:
+	I16x8NeInst() : ImmNoneInst(WASM_OP_I16x8_NE) { }
+};
+
+class I16x8LtSInst: public ImmNoneInst {
+	public:
+	I16x8LtSInst() : ImmNoneInst(WASM_OP_I16x8_LT_S) { }
+};
+
+class I16x8LtUInst: public ImmNoneInst {
+	public:
+	I16x8LtUInst() : ImmNoneInst(WASM_OP_I16x8_LT_U) { }
+};
+
+class I16x8GtSInst: public ImmNoneInst {
+	public:
+	I16x8GtSInst() : ImmNoneInst(WASM_OP_I16x8_GT_S) { }
+};
+
+class I16x8GtUInst: public ImmNoneInst {
+	public:
+	I16x8GtUInst() : ImmNoneInst(WASM_OP_I16x8_GT_U) { }
+};
+
+class I16x8LeSInst: public ImmNoneInst {
+	public:
+	I16x8LeSInst() : ImmNoneInst(WASM_OP_I16x8_LE_S) { }
+};
+
+class I16x8LeUInst: public ImmNoneInst {
+	public:
+	I16x8LeUInst() : ImmNoneInst(WASM_OP_I16x8_LE_U) { }
+};
+
+class I16x8GeSInst: public ImmNoneInst {
+	public:
+	I16x8GeSInst() : ImmNoneInst(WASM_OP_I16x8_GE_S) { }
+};
+
+class I16x8GeUInst: public ImmNoneInst {
+	public:
+	I16x8GeUInst() : ImmNoneInst(WASM_OP_I16x8_GE_U) { }
+};
+
+class I32x4EqInst: public ImmNoneInst {
+	public:
+	I32x4EqInst() : ImmNoneInst(WASM_OP_I32x4_EQ) { }
+};
+
+class I32x4NeInst: public ImmNoneInst {
+	public:
+	I32x4NeInst() : ImmNoneInst(WASM_OP_I32x4_NE) { }
+};
+
+class I32x4LtSInst: public ImmNoneInst {
+	public:
+	I32x4LtSInst() : ImmNoneInst(WASM_OP_I32x4_LT_S) { }
+};
+
+class I32x4LtUInst: public ImmNoneInst {
+	public:
+	I32x4LtUInst() : ImmNoneInst(WASM_OP_I32x4_LT_U) { }
+};
+
+class I32x4GtSInst: public ImmNoneInst {
+	public:
+	I32x4GtSInst() : ImmNoneInst(WASM_OP_I32x4_GT_S) { }
+};
+
+class I32x4GtUInst: public ImmNoneInst {
+	public:
+	I32x4GtUInst() : ImmNoneInst(WASM_OP_I32x4_GT_U) { }
+};
+
+class I32x4LeSInst: public ImmNoneInst {
+	public:
+	I32x4LeSInst() : ImmNoneInst(WASM_OP_I32x4_LE_S) { }
+};
+
+class I32x4LeUInst: public ImmNoneInst {
+	public:
+	I32x4LeUInst() : ImmNoneInst(WASM_OP_I32x4_LE_U) { }
+};
+
+class I32x4GeSInst: public ImmNoneInst {
+	public:
+	I32x4GeSInst() : ImmNoneInst(WASM_OP_I32x4_GE_S) { }
+};
+
+class I32x4GeUInst: public ImmNoneInst {
+	public:
+	I32x4GeUInst() : ImmNoneInst(WASM_OP_I32x4_GE_U) { }
+};
+
+class F32x4EqInst: public ImmNoneInst {
+	public:
+	F32x4EqInst() : ImmNoneInst(WASM_OP_F32x4_EQ) { }
+};
+
+class F32x4NeInst: public ImmNoneInst {
+	public:
+	F32x4NeInst() : ImmNoneInst(WASM_OP_F32x4_NE) { }
+};
+
+class F32x4LtInst: public ImmNoneInst {
+	public:
+	F32x4LtInst() : ImmNoneInst(WASM_OP_F32x4_LT) { }
+};
+
+class F32x4GtInst: public ImmNoneInst {
+	public:
+	F32x4GtInst() : ImmNoneInst(WASM_OP_F32x4_GT) { }
+};
+
+class F32x4LeInst: public ImmNoneInst {
+	public:
+	F32x4LeInst() : ImmNoneInst(WASM_OP_F32x4_LE) { }
+};
+
+class F32x4GeInst: public ImmNoneInst {
+	public:
+	F32x4GeInst() : ImmNoneInst(WASM_OP_F32x4_GE) { }
+};
+
+class F64x2EqInst: public ImmNoneInst {
+	public:
+	F64x2EqInst() : ImmNoneInst(WASM_OP_F64x2_EQ) { }
+};
+
+class F64x2NeInst: public ImmNoneInst {
+	public:
+	F64x2NeInst() : ImmNoneInst(WASM_OP_F64x2_NE) { }
+};
+
+class F64x2LtInst: public ImmNoneInst {
+	public:
+	F64x2LtInst() : ImmNoneInst(WASM_OP_F64x2_LT) { }
+};
+
+class F64x2GtInst: public ImmNoneInst {
+	public:
+	F64x2GtInst() : ImmNoneInst(WASM_OP_F64x2_GT) { }
+};
+
+class F64x2LeInst: public ImmNoneInst {
+	public:
+	F64x2LeInst() : ImmNoneInst(WASM_OP_F64x2_LE) { }
+};
+
+class F64x2GeInst: public ImmNoneInst {
+	public:
+	F64x2GeInst() : ImmNoneInst(WASM_OP_F64x2_GE) { }
+};
+
+class V128NotInst: public ImmNoneInst {
+	public:
+	V128NotInst() : ImmNoneInst(WASM_OP_V128_NOT) { }
+};
+
+class V128AndInst: public ImmNoneInst {
+	public:
+	V128AndInst() : ImmNoneInst(WASM_OP_V128_AND) { }
+};
+
+class V128AndnotInst: public ImmNoneInst {
+	public:
+	V128AndnotInst() : ImmNoneInst(WASM_OP_V128_ANDNOT) { }
+};
+
+class V128OrInst: public ImmNoneInst {
+	public:
+	V128OrInst() : ImmNoneInst(WASM_OP_V128_OR) { }
+};
+
+class V128XorInst: public ImmNoneInst {
+	public:
+	V128XorInst() : ImmNoneInst(WASM_OP_V128_XOR) { }
+};
+
+class V128BitselectInst: public ImmNoneInst {
+	public:
+	V128BitselectInst() : ImmNoneInst(WASM_OP_V128_BITSELECT) { }
+};
+
+class V128AnyTrueInst: public ImmNoneInst {
+	public:
+	V128AnyTrueInst() : ImmNoneInst(WASM_OP_V128_ANY_TRUE) { }
+};
+
+class V128Load8LaneInst: public ImmMemargLaneidxInst {
+	public:
+	V128Load8LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD8_LANE, align,offset,idx) { }
+};
+
+class V128Load16LaneInst: public ImmMemargLaneidxInst {
+	public:
+	V128Load16LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD16_LANE, align,offset,idx) { }
+};
+
+class V128Load32LaneInst: public ImmMemargLaneidxInst {
+	public:
+	V128Load32LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD32_LANE, align,offset,idx) { }
+};
+
+class V128Load64LaneInst: public ImmMemargLaneidxInst {
+	public:
+	V128Load64LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD64_LANE, align,offset,idx) { }
+};
+
+class V128Store8LaneInst: public ImmMemargLaneidxInst {
+	public:
+	V128Store8LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE8_LANE, align,offset,idx) { }
+};
+
+class V128Store16LaneInst: public ImmMemargLaneidxInst {
+	public:
+	V128Store16LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE16_LANE, align,offset,idx) { }
+};
+
+class V128Store32LaneInst: public ImmMemargLaneidxInst {
+	public:
+	V128Store32LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE32_LANE, align,offset,idx) { }
+};
+
+class V128Store64LaneInst: public ImmMemargLaneidxInst {
+	public:
+	V128Store64LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE64_LANE, align,offset,idx) { }
+};
+
+class V128Load32ZeroInst: public ImmMemargInst {
+	public:
+	V128Load32ZeroInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD32_ZERO, align,offset) { }
+};
+
+class V128Load64ZeroInst: public ImmMemargInst {
+	public:
+	V128Load64ZeroInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD64_ZERO, align,offset) { }
+};
+
+class F32x4DemoteF64x2ZeroInst: public ImmNoneInst {
+	public:
+	F32x4DemoteF64x2ZeroInst() : ImmNoneInst(WASM_OP_F32x4_DEMOTE_F64x2_ZERO) { }
+};
+
+class F64x2PromoteF32x4Inst: public ImmNoneInst {
+	public:
+	F64x2PromoteF32x4Inst() : ImmNoneInst(WASM_OP_F64x2_PROMOTE_F32x4) { }
+};
+
+class I8x16AbsInst: public ImmNoneInst {
+	public:
+	I8x16AbsInst() : ImmNoneInst(WASM_OP_I8x16_ABS) { }
+};
+
+class I8x16NegInst: public ImmNoneInst {
+	public:
+	I8x16NegInst() : ImmNoneInst(WASM_OP_I8x16_NEG) { }
+};
+
+class I8x16PopcntInst: public ImmNoneInst {
+	public:
+	I8x16PopcntInst() : ImmNoneInst(WASM_OP_I8x16_POPCNT) { }
+};
+
+class I8x16AllTrueInst: public ImmNoneInst {
+	public:
+	I8x16AllTrueInst() : ImmNoneInst(WASM_OP_I8x16_ALL_TRUE) { }
+};
+
+class I8x16BitmaskInst: public ImmNoneInst {
+	public:
+	I8x16BitmaskInst() : ImmNoneInst(WASM_OP_I8x16_BITMASK) { }
+};
+
+class I8x16NarrowI16x8SInst: public ImmNoneInst {
+	public:
+	I8x16NarrowI16x8SInst() : ImmNoneInst(WASM_OP_I8x16_NARROW_I16x8_S) { }
+};
+
+class I8x16NarrowI16x8UInst: public ImmNoneInst {
+	public:
+	I8x16NarrowI16x8UInst() : ImmNoneInst(WASM_OP_I8x16_NARROW_I16x8_U) { }
+};
+
+class F32x4CeilInst: public ImmNoneInst {
+	public:
+	F32x4CeilInst() : ImmNoneInst(WASM_OP_F32x4_CEIL) { }
+};
+
+class F32x4FloorInst: public ImmNoneInst {
+	public:
+	F32x4FloorInst() : ImmNoneInst(WASM_OP_F32x4_FLOOR) { }
+};
+
+class F32x4TruncInst: public ImmNoneInst {
+	public:
+	F32x4TruncInst() : ImmNoneInst(WASM_OP_F32x4_TRUNC) { }
+};
+
+class F32x4NearestInst: public ImmNoneInst {
+	public:
+	F32x4NearestInst() : ImmNoneInst(WASM_OP_F32x4_NEAREST) { }
+};
+
+class I8x16ShlInst: public ImmNoneInst {
+	public:
+	I8x16ShlInst() : ImmNoneInst(WASM_OP_I8x16_SHL) { }
+};
+
+class I8x16ShrSInst: public ImmNoneInst {
+	public:
+	I8x16ShrSInst() : ImmNoneInst(WASM_OP_I8x16_SHR_S) { }
+};
+
+class I8x16ShrUInst: public ImmNoneInst {
+	public:
+	I8x16ShrUInst() : ImmNoneInst(WASM_OP_I8x16_SHR_U) { }
+};
+
+class I8x16AddInst: public ImmNoneInst {
+	public:
+	I8x16AddInst() : ImmNoneInst(WASM_OP_I8x16_ADD) { }
+};
+
+class I8x16AddSatSInst: public ImmNoneInst {
+	public:
+	I8x16AddSatSInst() : ImmNoneInst(WASM_OP_I8x16_ADD_SAT_S) { }
+};
+
+class I8x16AddSatUInst: public ImmNoneInst {
+	public:
+	I8x16AddSatUInst() : ImmNoneInst(WASM_OP_I8x16_ADD_SAT_U) { }
+};
+
+class I8x16SubInst: public ImmNoneInst {
+	public:
+	I8x16SubInst() : ImmNoneInst(WASM_OP_I8x16_SUB) { }
+};
+
+class I8x16SubSatSInst: public ImmNoneInst {
+	public:
+	I8x16SubSatSInst() : ImmNoneInst(WASM_OP_I8x16_SUB_SAT_S) { }
+};
+
+class I8x16SubSatUInst: public ImmNoneInst {
+	public:
+	I8x16SubSatUInst() : ImmNoneInst(WASM_OP_I8x16_SUB_SAT_U) { }
+};
+
+class F64x2CeilInst: public ImmNoneInst {
+	public:
+	F64x2CeilInst() : ImmNoneInst(WASM_OP_F64x2_CEIL) { }
+};
+
+class F64x2FloorInst: public ImmNoneInst {
+	public:
+	F64x2FloorInst() : ImmNoneInst(WASM_OP_F64x2_FLOOR) { }
+};
+
+class I8x16MinSInst: public ImmNoneInst {
+	public:
+	I8x16MinSInst() : ImmNoneInst(WASM_OP_I8x16_MIN_S) { }
+};
+
+class I8x16MinUInst: public ImmNoneInst {
+	public:
+	I8x16MinUInst() : ImmNoneInst(WASM_OP_I8x16_MIN_U) { }
+};
+
+class I8x16MaxSInst: public ImmNoneInst {
+	public:
+	I8x16MaxSInst() : ImmNoneInst(WASM_OP_I8x16_MAX_S) { }
+};
+
+class I8x16MaxUInst: public ImmNoneInst {
+	public:
+	I8x16MaxUInst() : ImmNoneInst(WASM_OP_I8x16_MAX_U) { }
+};
+
+class F64x2TruncInst: public ImmNoneInst {
+	public:
+	F64x2TruncInst() : ImmNoneInst(WASM_OP_F64x2_TRUNC) { }
+};
+
+class I8x16AvgrUInst: public ImmNoneInst {
+	public:
+	I8x16AvgrUInst() : ImmNoneInst(WASM_OP_I8x16_AVGR_U) { }
+};
+
+class I16x8ExtaddPairwiseI8x16SInst: public ImmNoneInst {
+	public:
+	I16x8ExtaddPairwiseI8x16SInst() : ImmNoneInst(WASM_OP_I16x8_EXTADD_PAIRWISE_I8x16_S) { }
+};
+
+class I16x8ExtaddPairwiseI8x16UInst: public ImmNoneInst {
+	public:
+	I16x8ExtaddPairwiseI8x16UInst() : ImmNoneInst(WASM_OP_I16x8_EXTADD_PAIRWISE_I8x16_U) { }
+};
+
+class I32x4ExtaddPairwiseI16x8SInst: public ImmNoneInst {
+	public:
+	I32x4ExtaddPairwiseI16x8SInst() : ImmNoneInst(WASM_OP_I32x4_EXTADD_PAIRWISE_I16x8_S) { }
+};
+
+class I32x4ExtaddPairwiseI16x8UInst: public ImmNoneInst {
+	public:
+	I32x4ExtaddPairwiseI16x8UInst() : ImmNoneInst(WASM_OP_I32x4_EXTADD_PAIRWISE_I16x8_U) { }
+};
+
+class I16x8AbsInst: public ImmNoneInst {
+	public:
+	I16x8AbsInst() : ImmNoneInst(WASM_OP_I16x8_ABS) { }
+};
+
+class I16x8NegInst: public ImmNoneInst {
+	public:
+	I16x8NegInst() : ImmNoneInst(WASM_OP_I16x8_NEG) { }
+};
+
+class I16x8Q15mulrSatSInst: public ImmNoneInst {
+	public:
+	I16x8Q15mulrSatSInst() : ImmNoneInst(WASM_OP_I16x8_Q15MULR_SAT_S) { }
+};
+
+class I16x8AllTrueInst: public ImmNoneInst {
+	public:
+	I16x8AllTrueInst() : ImmNoneInst(WASM_OP_I16x8_ALL_TRUE) { }
+};
+
+class I16x8BitmaskInst: public ImmNoneInst {
+	public:
+	I16x8BitmaskInst() : ImmNoneInst(WASM_OP_I16x8_BITMASK) { }
+};
+
+class I16x8NarrowI32x4SInst: public ImmNoneInst {
+	public:
+	I16x8NarrowI32x4SInst() : ImmNoneInst(WASM_OP_I16x8_NARROW_I32x4_S) { }
+};
+
+class I16x8NarrowI32x4UInst: public ImmNoneInst {
+	public:
+	I16x8NarrowI32x4UInst() : ImmNoneInst(WASM_OP_I16x8_NARROW_I32x4_U) { }
+};
+
+class I16x8ExtendLowI8x16SInst: public ImmNoneInst {
+	public:
+	I16x8ExtendLowI8x16SInst() : ImmNoneInst(WASM_OP_I16x8_EXTEND_LOW_I8x16_S) { }
+};
+
+class I16x8ExtendHighI8x16SInst: public ImmNoneInst {
+	public:
+	I16x8ExtendHighI8x16SInst() : ImmNoneInst(WASM_OP_I16x8_EXTEND_HIGH_I8x16_S) { }
+};
+
+class I16x8ExtendLowI8x16UInst: public ImmNoneInst {
+	public:
+	I16x8ExtendLowI8x16UInst() : ImmNoneInst(WASM_OP_I16x8_EXTEND_LOW_I8x16_U) { }
+};
+
+class I16x8ExtendHighI8x16UInst: public ImmNoneInst {
+	public:
+	I16x8ExtendHighI8x16UInst() : ImmNoneInst(WASM_OP_I16x8_EXTEND_HIGH_I8x16_U) { }
+};
+
+class I16x8ShlInst: public ImmNoneInst {
+	public:
+	I16x8ShlInst() : ImmNoneInst(WASM_OP_I16x8_SHL) { }
+};
+
+class I16x8ShrSInst: public ImmNoneInst {
+	public:
+	I16x8ShrSInst() : ImmNoneInst(WASM_OP_I16x8_SHR_S) { }
+};
+
+class I16x8ShrUInst: public ImmNoneInst {
+	public:
+	I16x8ShrUInst() : ImmNoneInst(WASM_OP_I16x8_SHR_U) { }
+};
+
+class I16x8AddInst: public ImmNoneInst {
+	public:
+	I16x8AddInst() : ImmNoneInst(WASM_OP_I16x8_ADD) { }
+};
+
+class I16x8AddSatSInst: public ImmNoneInst {
+	public:
+	I16x8AddSatSInst() : ImmNoneInst(WASM_OP_I16x8_ADD_SAT_S) { }
+};
+
+class I16x8AddSatUInst: public ImmNoneInst {
+	public:
+	I16x8AddSatUInst() : ImmNoneInst(WASM_OP_I16x8_ADD_SAT_U) { }
+};
+
+class I16x8SubInst: public ImmNoneInst {
+	public:
+	I16x8SubInst() : ImmNoneInst(WASM_OP_I16x8_SUB) { }
+};
+
+class I16x8SubSatSInst: public ImmNoneInst {
+	public:
+	I16x8SubSatSInst() : ImmNoneInst(WASM_OP_I16x8_SUB_SAT_S) { }
+};
+
+class I16x8SubSatUInst: public ImmNoneInst {
+	public:
+	I16x8SubSatUInst() : ImmNoneInst(WASM_OP_I16x8_SUB_SAT_U) { }
+};
+
+class F64x2NearestInst: public ImmNoneInst {
+	public:
+	F64x2NearestInst() : ImmNoneInst(WASM_OP_F64x2_NEAREST) { }
+};
+
+class I16x8MulInst: public ImmNoneInst {
+	public:
+	I16x8MulInst() : ImmNoneInst(WASM_OP_I16x8_MUL) { }
+};
+
+class I16x8MinSInst: public ImmNoneInst {
+	public:
+	I16x8MinSInst() : ImmNoneInst(WASM_OP_I16x8_MIN_S) { }
+};
+
+class I16x8MinUInst: public ImmNoneInst {
+	public:
+	I16x8MinUInst() : ImmNoneInst(WASM_OP_I16x8_MIN_U) { }
+};
+
+class I16x8MaxSInst: public ImmNoneInst {
+	public:
+	I16x8MaxSInst() : ImmNoneInst(WASM_OP_I16x8_MAX_S) { }
+};
+
+class I16x8MaxUInst: public ImmNoneInst {
+	public:
+	I16x8MaxUInst() : ImmNoneInst(WASM_OP_I16x8_MAX_U) { }
+};
+
+class I16x8AvgrUInst: public ImmNoneInst {
+	public:
+	I16x8AvgrUInst() : ImmNoneInst(WASM_OP_I16x8_AVGR_U) { }
+};
+
+class I16x8ExtmulLowI8x16SInst: public ImmNoneInst {
+	public:
+	I16x8ExtmulLowI8x16SInst() : ImmNoneInst(WASM_OP_I16x8_EXTMUL_LOW_I8x16_S) { }
+};
+
+class I16x8ExtmulHighI8x16SInst: public ImmNoneInst {
+	public:
+	I16x8ExtmulHighI8x16SInst() : ImmNoneInst(WASM_OP_I16x8_EXTMUL_HIGH_I8x16_S) { }
+};
+
+class I16x8ExtmulLowI8x16UInst: public ImmNoneInst {
+	public:
+	I16x8ExtmulLowI8x16UInst() : ImmNoneInst(WASM_OP_I16x8_EXTMUL_LOW_I8x16_U) { }
+};
+
+class I16x8ExtmulHighI8x16UInst: public ImmNoneInst {
+	public:
+	I16x8ExtmulHighI8x16UInst() : ImmNoneInst(WASM_OP_I16x8_EXTMUL_HIGH_I8x16_U) { }
+};
+
+class I32x4AbsInst: public ImmNoneInst {
+	public:
+	I32x4AbsInst() : ImmNoneInst(WASM_OP_I32x4_ABS) { }
+};
+
+class I32x4NegInst: public ImmNoneInst {
+	public:
+	I32x4NegInst() : ImmNoneInst(WASM_OP_I32x4_NEG) { }
+};
+
+class I32x4AllTrueInst: public ImmNoneInst {
+	public:
+	I32x4AllTrueInst() : ImmNoneInst(WASM_OP_I32x4_ALL_TRUE) { }
+};
+
+class I32x4BitmaskInst: public ImmNoneInst {
+	public:
+	I32x4BitmaskInst() : ImmNoneInst(WASM_OP_I32x4_BITMASK) { }
+};
+
+class I32x4ExtendLowI16x8SInst: public ImmNoneInst {
+	public:
+	I32x4ExtendLowI16x8SInst() : ImmNoneInst(WASM_OP_I32x4_EXTEND_LOW_I16x8_S) { }
+};
+
+class I32x4ExtendHighI16x8SInst: public ImmNoneInst {
+	public:
+	I32x4ExtendHighI16x8SInst() : ImmNoneInst(WASM_OP_I32x4_EXTEND_HIGH_I16x8_S) { }
+};
+
+class I32x4ExtendLowI16x8UInst: public ImmNoneInst {
+	public:
+	I32x4ExtendLowI16x8UInst() : ImmNoneInst(WASM_OP_I32x4_EXTEND_LOW_I16x8_U) { }
+};
+
+class I32x4ExtendHighI16x8UInst: public ImmNoneInst {
+	public:
+	I32x4ExtendHighI16x8UInst() : ImmNoneInst(WASM_OP_I32x4_EXTEND_HIGH_I16x8_U) { }
+};
+
+class I32x4ShlInst: public ImmNoneInst {
+	public:
+	I32x4ShlInst() : ImmNoneInst(WASM_OP_I32x4_SHL) { }
+};
+
+class I32x4ShrSInst: public ImmNoneInst {
+	public:
+	I32x4ShrSInst() : ImmNoneInst(WASM_OP_I32x4_SHR_S) { }
+};
+
+class I32x4ShrUInst: public ImmNoneInst {
+	public:
+	I32x4ShrUInst() : ImmNoneInst(WASM_OP_I32x4_SHR_U) { }
+};
+
+class I32x4AddInst: public ImmNoneInst {
+	public:
+	I32x4AddInst() : ImmNoneInst(WASM_OP_I32x4_ADD) { }
+};
+
+class I32x4SubInst: public ImmNoneInst {
+	public:
+	I32x4SubInst() : ImmNoneInst(WASM_OP_I32x4_SUB) { }
+};
+
+class I32x4MulInst: public ImmNoneInst {
+	public:
+	I32x4MulInst() : ImmNoneInst(WASM_OP_I32x4_MUL) { }
+};
+
+class I32x4MinSInst: public ImmNoneInst {
+	public:
+	I32x4MinSInst() : ImmNoneInst(WASM_OP_I32x4_MIN_S) { }
+};
+
+class I32x4MinUInst: public ImmNoneInst {
+	public:
+	I32x4MinUInst() : ImmNoneInst(WASM_OP_I32x4_MIN_U) { }
+};
+
+class I32x4MaxSInst: public ImmNoneInst {
+	public:
+	I32x4MaxSInst() : ImmNoneInst(WASM_OP_I32x4_MAX_S) { }
+};
+
+class I32x4MaxUInst: public ImmNoneInst {
+	public:
+	I32x4MaxUInst() : ImmNoneInst(WASM_OP_I32x4_MAX_U) { }
+};
+
+class I32x4DotI16x8SInst: public ImmNoneInst {
+	public:
+	I32x4DotI16x8SInst() : ImmNoneInst(WASM_OP_I32x4_DOT_I16x8_S) { }
+};
+
+class I32x4ExtmulLowI16x8SInst: public ImmNoneInst {
+	public:
+	I32x4ExtmulLowI16x8SInst() : ImmNoneInst(WASM_OP_I32x4_EXTMUL_LOW_I16x8_S) { }
+};
+
+class I32x4ExtmulHighI16x8SInst: public ImmNoneInst {
+	public:
+	I32x4ExtmulHighI16x8SInst() : ImmNoneInst(WASM_OP_I32x4_EXTMUL_HIGH_I16x8_S) { }
+};
+
+class I32x4ExtmulLowI16x8UInst: public ImmNoneInst {
+	public:
+	I32x4ExtmulLowI16x8UInst() : ImmNoneInst(WASM_OP_I32x4_EXTMUL_LOW_I16x8_U) { }
+};
+
+class I32x4ExtmulHighI16x8UInst: public ImmNoneInst {
+	public:
+	I32x4ExtmulHighI16x8UInst() : ImmNoneInst(WASM_OP_I32x4_EXTMUL_HIGH_I16x8_U) { }
+};
+
+class I64x2AbsInst: public ImmNoneInst {
+	public:
+	I64x2AbsInst() : ImmNoneInst(WASM_OP_I64x2_ABS) { }
+};
+
+class I64x2NegInst: public ImmNoneInst {
+	public:
+	I64x2NegInst() : ImmNoneInst(WASM_OP_I64x2_NEG) { }
+};
+
+class I64x2AllTrueInst: public ImmNoneInst {
+	public:
+	I64x2AllTrueInst() : ImmNoneInst(WASM_OP_I64x2_ALL_TRUE) { }
+};
+
+class I64x2BitmaskInst: public ImmNoneInst {
+	public:
+	I64x2BitmaskInst() : ImmNoneInst(WASM_OP_I64x2_BITMASK) { }
+};
+
+class I64x2ExtendLowI32x4SInst: public ImmNoneInst {
+	public:
+	I64x2ExtendLowI32x4SInst() : ImmNoneInst(WASM_OP_I64x2_EXTEND_LOW_I32x4_S) { }
+};
+
+class I64x2ExtendHighI32x4SInst: public ImmNoneInst {
+	public:
+	I64x2ExtendHighI32x4SInst() : ImmNoneInst(WASM_OP_I64x2_EXTEND_HIGH_I32x4_S) { }
+};
+
+class I64x2ExtendLowI32x4UInst: public ImmNoneInst {
+	public:
+	I64x2ExtendLowI32x4UInst() : ImmNoneInst(WASM_OP_I64x2_EXTEND_LOW_I32x4_U) { }
+};
+
+class I64x2ExtendHighI32x4UInst: public ImmNoneInst {
+	public:
+	I64x2ExtendHighI32x4UInst() : ImmNoneInst(WASM_OP_I64x2_EXTEND_HIGH_I32x4_U) { }
+};
+
+class I64x2ShlInst: public ImmNoneInst {
+	public:
+	I64x2ShlInst() : ImmNoneInst(WASM_OP_I64x2_SHL) { }
+};
+
+class I64x2ShrSInst: public ImmNoneInst {
+	public:
+	I64x2ShrSInst() : ImmNoneInst(WASM_OP_I64x2_SHR_S) { }
+};
+
+class I64x2ShrUInst: public ImmNoneInst {
+	public:
+	I64x2ShrUInst() : ImmNoneInst(WASM_OP_I64x2_SHR_U) { }
+};
+
+class I64x2AddInst: public ImmNoneInst {
+	public:
+	I64x2AddInst() : ImmNoneInst(WASM_OP_I64x2_ADD) { }
+};
+
+class I64x2SubInst: public ImmNoneInst {
+	public:
+	I64x2SubInst() : ImmNoneInst(WASM_OP_I64x2_SUB) { }
+};
+
+class I64x2MulInst: public ImmNoneInst {
+	public:
+	I64x2MulInst() : ImmNoneInst(WASM_OP_I64x2_MUL) { }
+};
+
+class I64x2EqInst: public ImmNoneInst {
+	public:
+	I64x2EqInst() : ImmNoneInst(WASM_OP_I64x2_EQ) { }
+};
+
+class I64x2NeInst: public ImmNoneInst {
+	public:
+	I64x2NeInst() : ImmNoneInst(WASM_OP_I64x2_NE) { }
+};
+
+class I64x2LtSInst: public ImmNoneInst {
+	public:
+	I64x2LtSInst() : ImmNoneInst(WASM_OP_I64x2_LT_S) { }
+};
+
+class I64x2GtSInst: public ImmNoneInst {
+	public:
+	I64x2GtSInst() : ImmNoneInst(WASM_OP_I64x2_GT_S) { }
+};
+
+class I64x2LeSInst: public ImmNoneInst {
+	public:
+	I64x2LeSInst() : ImmNoneInst(WASM_OP_I64x2_LE_S) { }
+};
+
+class I64x2GeSInst: public ImmNoneInst {
+	public:
+	I64x2GeSInst() : ImmNoneInst(WASM_OP_I64x2_GE_S) { }
+};
+
+class I64x2ExtmulLowI32x4SInst: public ImmNoneInst {
+	public:
+	I64x2ExtmulLowI32x4SInst() : ImmNoneInst(WASM_OP_I64x2_EXTMUL_LOW_I32x4_S) { }
+};
+
+class I64x2ExtmulHighI32x4SInst: public ImmNoneInst {
+	public:
+	I64x2ExtmulHighI32x4SInst() : ImmNoneInst(WASM_OP_I64x2_EXTMUL_HIGH_I32x4_S) { }
+};
+
+class I64x2ExtmulLowI32x4UInst: public ImmNoneInst {
+	public:
+	I64x2ExtmulLowI32x4UInst() : ImmNoneInst(WASM_OP_I64x2_EXTMUL_LOW_I32x4_U) { }
+};
+
+class I64x2ExtmulHighI32x4UInst: public ImmNoneInst {
+	public:
+	I64x2ExtmulHighI32x4UInst() : ImmNoneInst(WASM_OP_I64x2_EXTMUL_HIGH_I32x4_U) { }
+};
+
+class F32x4AbsInst: public ImmNoneInst {
+	public:
+	F32x4AbsInst() : ImmNoneInst(WASM_OP_F32x4_ABS) { }
+};
+
+class F32x4NegInst: public ImmNoneInst {
+	public:
+	F32x4NegInst() : ImmNoneInst(WASM_OP_F32x4_NEG) { }
+};
+
+class F32x4SqrtInst: public ImmNoneInst {
+	public:
+	F32x4SqrtInst() : ImmNoneInst(WASM_OP_F32x4_SQRT) { }
+};
+
+class F32x4AddInst: public ImmNoneInst {
+	public:
+	F32x4AddInst() : ImmNoneInst(WASM_OP_F32x4_ADD) { }
+};
+
+class F32x4SubInst: public ImmNoneInst {
+	public:
+	F32x4SubInst() : ImmNoneInst(WASM_OP_F32x4_SUB) { }
+};
+
+class F32x4MulInst: public ImmNoneInst {
+	public:
+	F32x4MulInst() : ImmNoneInst(WASM_OP_F32x4_MUL) { }
+};
+
+class F32x4DivInst: public ImmNoneInst {
+	public:
+	F32x4DivInst() : ImmNoneInst(WASM_OP_F32x4_DIV) { }
+};
+
+class F32x4MinInst: public ImmNoneInst {
+	public:
+	F32x4MinInst() : ImmNoneInst(WASM_OP_F32x4_MIN) { }
+};
+
+class F32x4MaxInst: public ImmNoneInst {
+	public:
+	F32x4MaxInst() : ImmNoneInst(WASM_OP_F32x4_MAX) { }
+};
+
+class F32x4PminInst: public ImmNoneInst {
+	public:
+	F32x4PminInst() : ImmNoneInst(WASM_OP_F32x4_PMIN) { }
+};
+
+class F32x4PmaxInst: public ImmNoneInst {
+	public:
+	F32x4PmaxInst() : ImmNoneInst(WASM_OP_F32x4_PMAX) { }
+};
+
+class F64x2AbsInst: public ImmNoneInst {
+	public:
+	F64x2AbsInst() : ImmNoneInst(WASM_OP_F64x2_ABS) { }
+};
+
+class F64x2NegInst: public ImmNoneInst {
+	public:
+	F64x2NegInst() : ImmNoneInst(WASM_OP_F64x2_NEG) { }
+};
+
+class F64x2SqrtInst: public ImmNoneInst {
+	public:
+	F64x2SqrtInst() : ImmNoneInst(WASM_OP_F64x2_SQRT) { }
+};
+
+class F64x2AddInst: public ImmNoneInst {
+	public:
+	F64x2AddInst() : ImmNoneInst(WASM_OP_F64x2_ADD) { }
+};
+
+class F64x2SubInst: public ImmNoneInst {
+	public:
+	F64x2SubInst() : ImmNoneInst(WASM_OP_F64x2_SUB) { }
+};
+
+class F64x2MulInst: public ImmNoneInst {
+	public:
+	F64x2MulInst() : ImmNoneInst(WASM_OP_F64x2_MUL) { }
+};
+
+class F64x2DivInst: public ImmNoneInst {
+	public:
+	F64x2DivInst() : ImmNoneInst(WASM_OP_F64x2_DIV) { }
+};
+
+class F64x2MinInst: public ImmNoneInst {
+	public:
+	F64x2MinInst() : ImmNoneInst(WASM_OP_F64x2_MIN) { }
+};
+
+class F64x2MaxInst: public ImmNoneInst {
+	public:
+	F64x2MaxInst() : ImmNoneInst(WASM_OP_F64x2_MAX) { }
+};
+
+class F64x2PminInst: public ImmNoneInst {
+	public:
+	F64x2PminInst() : ImmNoneInst(WASM_OP_F64x2_PMIN) { }
+};
+
+class F64x2PmaxInst: public ImmNoneInst {
+	public:
+	F64x2PmaxInst() : ImmNoneInst(WASM_OP_F64x2_PMAX) { }
+};
+
+class I32x4TruncSatF32x4SInst: public ImmNoneInst {
+	public:
+	I32x4TruncSatF32x4SInst() : ImmNoneInst(WASM_OP_I32x4_TRUNC_SAT_F32x4_S) { }
+};
+
+class I32x4TruncSatF32x4UInst: public ImmNoneInst {
+	public:
+	I32x4TruncSatF32x4UInst() : ImmNoneInst(WASM_OP_I32x4_TRUNC_SAT_F32x4_U) { }
+};
+
+class F32x4TruncSatI32x4SInst: public ImmNoneInst {
+	public:
+	F32x4TruncSatI32x4SInst() : ImmNoneInst(WASM_OP_F32x4_TRUNC_SAT_I32x4_S) { }
+};
+
+class F32x4TruncSatI32x4UInst: public ImmNoneInst {
+	public:
+	F32x4TruncSatI32x4UInst() : ImmNoneInst(WASM_OP_F32x4_TRUNC_SAT_I32x4_U) { }
+};
+
+class I32x4TruncSatF64x2SZeroInst: public ImmNoneInst {
+	public:
+	I32x4TruncSatF64x2SZeroInst() : ImmNoneInst(WASM_OP_I32x4_TRUNC_SAT_F64x2_S_ZERO) { }
+};
+
+class I32x4TruncSatF64x2UZeroInst: public ImmNoneInst {
+	public:
+	I32x4TruncSatF64x2UZeroInst() : ImmNoneInst(WASM_OP_I32x4_TRUNC_SAT_F64x2_U_ZERO) { }
+};
+
+class F64x2ConvertLowI32x4SInst: public ImmNoneInst {
+	public:
+	F64x2ConvertLowI32x4SInst() : ImmNoneInst(WASM_OP_F64x2_CONVERT_LOW_I32x4_S) { }
+};
+
+class F64x2ConvertLowI32x4UInst: public ImmNoneInst {
+	public:
+	F64x2ConvertLowI32x4UInst() : ImmNoneInst(WASM_OP_F64x2_CONVERT_LOW_I32x4_U) { }
+};
+
+class MemoryAtomicNotifyInst: public ImmMemargInst {
+	public:
+	MemoryAtomicNotifyInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_NOTIFY, align,offset) { }
+};
+
+class MemoryAtomicWait32Inst: public ImmMemargInst {
+	public:
+	MemoryAtomicWait32Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_WAIT32, align,offset) { }
+};
+
+class MemoryAtomicWait64Inst: public ImmMemargInst {
+	public:
+	MemoryAtomicWait64Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_WAIT64, align,offset) { }
+};
+
+class AtomicFenceInst: public ImmNoneInst {
+	public:
+	AtomicFenceInst() : ImmNoneInst(WASM_OP_ATOMIC_FENCE) { }
+};
+
+class I32AtomicLoadInst: public ImmMemargInst {
+	public:
+	I32AtomicLoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD, align,offset) { }
+};
+
+class I64AtomicLoadInst: public ImmMemargInst {
+	public:
+	I64AtomicLoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD, align,offset) { }
+};
+
+class I32AtomicLoad8UInst: public ImmMemargInst {
+	public:
+	I32AtomicLoad8UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD8_U, align,offset) { }
+};
+
+class I32AtomicLoad16UInst: public ImmMemargInst {
+	public:
+	I32AtomicLoad16UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD16_U, align,offset) { }
+};
+
+class I64AtomicLoad8UInst: public ImmMemargInst {
+	public:
+	I64AtomicLoad8UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD8_U, align,offset) { }
+};
+
+class I64AtomicLoad16UInst: public ImmMemargInst {
+	public:
+	I64AtomicLoad16UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD16_U, align,offset) { }
+};
+
+class I64AtomicLoad32UInst: public ImmMemargInst {
+	public:
+	I64AtomicLoad32UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD32_U, align,offset) { }
+};
+
+class I32AtomicStoreInst: public ImmMemargInst {
+	public:
+	I32AtomicStoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE, align,offset) { }
+};
+
+class I64AtomicStoreInst: public ImmMemargInst {
+	public:
+	I64AtomicStoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE, align,offset) { }
+};
+
+class I32AtomicStore8Inst: public ImmMemargInst {
+	public:
+	I32AtomicStore8Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE8, align,offset) { }
+};
+
+class I32AtomicStore16Inst: public ImmMemargInst {
+	public:
+	I32AtomicStore16Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE16, align,offset) { }
+};
+
+class I64AtomicStore8Inst: public ImmMemargInst {
+	public:
+	I64AtomicStore8Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE8, align,offset) { }
+};
+
+class I64AtomicStore16Inst: public ImmMemargInst {
+	public:
+	I64AtomicStore16Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE16, align,offset) { }
+};
+
+class I64AtomicStore32Inst: public ImmMemargInst {
+	public:
+	I64AtomicStore32Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE32, align,offset) { }
+};
+
+class I32AtomicRmwAddInst: public ImmMemargInst {
+	public:
+	I32AtomicRmwAddInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_ADD, align,offset) { }
+};
+
+class I64AtomicRmwAddInst: public ImmMemargInst {
+	public:
+	I64AtomicRmwAddInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_ADD, align,offset) { }
+};
+
+class I32AtomicRmw8AddUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw8AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_ADD_U, align,offset) { }
+};
+
+class I32AtomicRmw16AddUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw16AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_ADD_U, align,offset) { }
+};
+
+class I64AtomicRmw8AddUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw8AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_ADD_U, align,offset) { }
+};
+
+class I64AtomicRmw16AddUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw16AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_ADD_U, align,offset) { }
+};
+
+class I64AtomicRmw32AddUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw32AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_ADD_U, align,offset) { }
+};
+
+class I32AtomicRmwSubInst: public ImmMemargInst {
+	public:
+	I32AtomicRmwSubInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_SUB, align,offset) { }
+};
+
+class I64AtomicRmwSubInst: public ImmMemargInst {
+	public:
+	I64AtomicRmwSubInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_SUB, align,offset) { }
+};
+
+class I32AtomicRmw8SubUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw8SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_SUB_U, align,offset) { }
+};
+
+class I32AtomicRmw16SubUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw16SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_SUB_U, align,offset) { }
+};
+
+class I64AtomicRmw8SubUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw8SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_SUB_U, align,offset) { }
+};
+
+class I64AtomicRmw16SubUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw16SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_SUB_U, align,offset) { }
+};
+
+class I64AtomicRmw32SubUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw32SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_SUB_U, align,offset) { }
+};
+
+class I32AtomicRmwAndInst: public ImmMemargInst {
+	public:
+	I32AtomicRmwAndInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_AND, align,offset) { }
+};
+
+class I64AtomicRmwAndInst: public ImmMemargInst {
+	public:
+	I64AtomicRmwAndInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_AND, align,offset) { }
+};
+
+class I32AtomicRmw8AndUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw8AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_AND_U, align,offset) { }
+};
+
+class I32AtomicRmw16AndUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw16AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_AND_U, align,offset) { }
+};
+
+class I64AtomicRmw8AndUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw8AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_AND_U, align,offset) { }
+};
+
+class I64AtomicRmw16AndUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw16AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_AND_U, align,offset) { }
+};
+
+class I64AtomicRmw32AndUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw32AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_AND_U, align,offset) { }
+};
+
+class I32AtomicRmwOrInst: public ImmMemargInst {
+	public:
+	I32AtomicRmwOrInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_OR, align,offset) { }
+};
+
+class I64AtomicRmwOrInst: public ImmMemargInst {
+	public:
+	I64AtomicRmwOrInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_OR, align,offset) { }
+};
+
+class I32AtomicRmw8OrUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw8OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_OR_U, align,offset) { }
+};
+
+class I32AtomicRmw16OrUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw16OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_OR_U, align,offset) { }
+};
+
+class I64AtomicRmw8OrUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw8OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_OR_U, align,offset) { }
+};
+
+class I64AtomicRmw16OrUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw16OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_OR_U, align,offset) { }
+};
+
+class I64AtomicRmw32OrUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw32OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_OR_U, align,offset) { }
+};
+
+class I32AtomicRmwXorInst: public ImmMemargInst {
+	public:
+	I32AtomicRmwXorInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_XOR, align,offset) { }
+};
+
+class I64AtomicRmwXorInst: public ImmMemargInst {
+	public:
+	I64AtomicRmwXorInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_XOR, align,offset) { }
+};
+
+class I32AtomicRmw8XorUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw8XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_XOR_U, align,offset) { }
+};
+
+class I32AtomicRmw16XorUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw16XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_XOR_U, align,offset) { }
+};
+
+class I64AtomicRmw8XorUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw8XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_XOR_U, align,offset) { }
+};
+
+class I64AtomicRmw16XorUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw16XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_XOR_U, align,offset) { }
+};
+
+class I64AtomicRmw32XorUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw32XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_XOR_U, align,offset) { }
+};
+
+class I32AtomicRmwXchgInst: public ImmMemargInst {
+	public:
+	I32AtomicRmwXchgInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_XCHG, align,offset) { }
+};
+
+class I64AtomicRmwXchgInst: public ImmMemargInst {
+	public:
+	I64AtomicRmwXchgInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_XCHG, align,offset) { }
+};
+
+class I32AtomicRmw8XchgUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw8XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_XCHG_U, align,offset) { }
+};
+
+class I32AtomicRmw16XchgUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw16XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_XCHG_U, align,offset) { }
+};
+
+class I64AtomicRmw8XchgUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw8XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_XCHG_U, align,offset) { }
+};
+
+class I64AtomicRmw16XchgUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw16XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_XCHG_U, align,offset) { }
+};
+
+class I64AtomicRmw32XchgUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw32XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_XCHG_U, align,offset) { }
+};
+
+class I32AtomicRmwCmpxchgInst: public ImmMemargInst {
+	public:
+	I32AtomicRmwCmpxchgInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_CMPXCHG, align,offset) { }
+};
+
+class I64AtomicRmwCmpxchgInst: public ImmMemargInst {
+	public:
+	I64AtomicRmwCmpxchgInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_CMPXCHG, align,offset) { }
+};
+
+class I32AtomicRmw8CmpxchgUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw8CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U, align,offset) { }
+};
+
+class I32AtomicRmw16CmpxchgUInst: public ImmMemargInst {
+	public:
+	I32AtomicRmw16CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U, align,offset) { }
+};
+
+class I64AtomicRmw8CmpxchgUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw8CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U, align,offset) { }
+};
+
+class I64AtomicRmw16CmpxchgUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw16CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U, align,offset) { }
+};
+
+class I64AtomicRmw32CmpxchgUInst: public ImmMemargInst {
+	public:
+	I64AtomicRmw32CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U, align,offset) { }
 };
 
