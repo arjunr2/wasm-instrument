@@ -98,7 +98,11 @@ typedef enum {
   IMM_DATA,
   IMM_MEMORYCP,
   IMM_DATA_TABLE,
-  IMM_TABLECP
+  IMM_TABLECP,
+  // SIMD
+  IMM_V128,
+  IMM_LANEIDX,
+  IMM_MEMARG_LANEIDX
 } opcode_imm_type;
 
 /* Information associated with each opcode */

@@ -10,6 +10,7 @@
 
 /*** Generic used typedefs ***/
 typedef uint8_t byte;
+typedef uint32_t Opcode_t;
 typedef std::vector<byte> bytearr;
 typedef std::deque<byte> bytedeque;
 /* Buffer for parsing/decoding */
@@ -58,6 +59,7 @@ extern int g_time;
 #define RD_U32_RAW()    read_u32(&buf)
 #define RD_U64_RAW()    read_u64(&buf)
 
+
 #define VALIDATE_OP(b) {  \
   opcode_entry_t op_entry = opcode_table[b]; \
   if (op_entry.invalid || (op_entry.mnemonic == 0)) { \
@@ -66,13 +68,24 @@ extern int g_time;
   } \
 }
 
-#define RD_OPCODE() ({  \
-  uint16_t lb = RD_BYTE();  \
-  VALIDATE_OP(lb); \
-  if ((lb >= 0xFB) && (lb <= 0xFE)) {  \
-    lb = ((lb << 8) + RD_BYTE()); \
-    VALIDATE_OP(lb); \
+#define RD_U32_RAW_BE() ({ \
+  uint32_t res = 0; \
+  byte opclass; \
+  byte by = opclass = res = RD_BYTE();  \
+  VALIDATE_OP(opclass); \
+  if ((opclass >= 0xFB) && (opclass <= 0xFE)) { \
+    while (by & 0x80) {  \
+      by = RD_BYTE(); \
+      res = ((res << 8) + by);  \
+    } \
   } \
+  res;  \
+})
+
+
+#define RD_OPCODE() ({  \
+  Opcode_t lb = RD_U32_RAW_BE();  \
+  VALIDATE_OP(lb);  \
   lb; \
 })
 /********************/
@@ -92,15 +105,26 @@ extern int g_time;
 #define WR_SECBYTE_PRE(val)   preencode_u8(secdeq, val)
 #define WR_SECLEN_PRE()       preencode_u32leb(secdeq, secdeq.size())
 
-#define WR_OPCODE(op_in) {  \
-  uint16_t lb = op_in;  \
-  byte opclass = ((lb >> 8) & 0xff);  \
-  if (opclass)  { \
-    VALIDATE_OP(opclass);  \
-    WR_BYTE(opclass);  \
+
+#define WR_U32_RAW_BE(val) ({ \
+  int32_t shf = 0; \
+  while ((val >> (shf+8)) & 0xFF) { shf += 8; } \
+  byte opclass = ((val >> shf) & 0xFF); \
+  VALIDATE_OP(opclass); \
+  WR_BYTE(opclass); \
+  shf -= 8; \
+  if ((opclass >= 0xFB) && (opclass <= 0xFE)) { \
+    while (shf >= 0) {  \
+      WR_BYTE((val >> shf) & 0xFF); \
+      shf -= 8; \
+    } \
   } \
-  VALIDATE_OP(lb); \
-  WR_BYTE(lb & 0xff);  \
+})
+
+#define WR_OPCODE(op_in) {  \
+  Opcode_t lb = op_in;  \
+  VALIDATE_OP(lb);  \
+  WR_U32_RAW_BE(lb);  \
 }
 /********************/
 

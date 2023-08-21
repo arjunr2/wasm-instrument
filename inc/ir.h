@@ -140,7 +140,7 @@ struct GlobalDecl {
 
 struct DataDecl {
   uint32_t flag;
-  uint16_t opcode_offset;
+  Opcode_t opcode_offset;
   uint32_t mem_offset;
   bytearr bytes;
 };
@@ -148,7 +148,7 @@ struct DataDecl {
 
 struct ElemDecl {
   uint32_t flag;
-  uint16_t opcode_offset;
+  Opcode_t opcode_offset;
   uint32_t table_offset;
   std::list <FuncDecl*> func_indices;
 };

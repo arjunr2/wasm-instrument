@@ -64,7 +64,7 @@ static void write_type_list (bytedeque &bdeq, typelist &tlist) {
     WR_BYTE(type);
 }
 
-static void encode_const_off_expr(bytedeque &bdeq, uint16_t opc, uint32_t offset) {
+static void encode_const_off_expr(bytedeque &bdeq, Opcode_t opc, uint32_t offset) {
   WR_OPCODE (opc);
   switch (opc) {
     case WASM_OP_I32_CONST: {
@@ -329,7 +329,7 @@ static void encode_locals(bytedeque &bdeq, wasm_localcsv_t &pure_locals) {
 void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytearr &code_bytes) {
   #if USE_INSTLIST
   for (auto &instruction : instlist) {
-    uint16_t opcode = instruction->getOpcode();
+    Opcode_t opcode = instruction->getOpcode();
     //TRACE("O: %s\n", opcode_table[opcode].mnemonic);
     /* Write instruction opcode and immediate */
     WR_OPCODE (opcode);
