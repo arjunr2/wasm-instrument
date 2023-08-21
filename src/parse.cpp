@@ -347,6 +347,7 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
     Opcode_t opcode = RD_OPCODE();
 
     opcode_imm_type imm_type = opcode_table[opcode].imm_type;
+    TRACE("O: %s\n", opcode_table[opcode].mnemonic);
 
     InstBasePtr instptr;
     #define ICS(cs, clsname) \
@@ -379,13 +380,13 @@ InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
       ICS (IMM_TABLECP, ImmTablecpInst);
       ICS (IMM_V128, ImmV128Inst);
       ICS (IMM_LANEIDX, ImmLaneidxInst);
+      ICS (IMM_LANEIDX16, ImmLaneidx16Inst);
       ICS (IMM_MEMARG_LANEIDX, ImmMemargLaneidxInst);
       default:
         ERR("Unknown imm type: %d\n", imm_type);
         throw std::runtime_error("Unknown imm");
     }
     ilist.push_back(instptr);
-    TRACE("O: %s\n", opcode_table[opcode].mnemonic);
   }
   if (buf.ptr != buf.end) {
     throw std::runtime_error("Unaligned end for instruction parsing\n");

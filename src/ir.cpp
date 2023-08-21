@@ -172,6 +172,7 @@ TIME_SECTION(3, "Time for func patching",
         PCS (IMM_TABLECP, ImmTablecpInst, REASSIGN(ispec->getDstTable(), Table, TableDecl), REASSIGN(ispec->getSrcTable(), Table, TableDecl));
         PCS (IMM_V128, ImmV128Inst, ispec->getValue());
         PCS (IMM_LANEIDX, ImmLaneidxInst, ispec->getLaneidx());
+        PCS (IMM_LANEIDX16, ImmLaneidx16Inst, ispec->getLaneidx16());
         PCS (IMM_MEMARG_LANEIDX, ImmMemargLaneidxInst, ispec->getAlign(), ispec->getOffset(), ispec->getLaneidx());
       }
     }

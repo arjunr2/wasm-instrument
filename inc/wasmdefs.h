@@ -76,6 +76,9 @@ typedef union V128_t {
 
 typedef uint32_t Opcode_t;
 typedef uint8_t Laneidx_t;
+typedef struct {
+  Laneidx_t l[16];
+} Laneidx16_t;
 
 static inline bool isReftype(wasm_type_t type) { 
   return (type == WASM_TYPE_EXTERNREF) || (type == WASM_TYPE_FUNCREF);
@@ -111,6 +114,7 @@ typedef enum {
   // SIMD
   IMM_V128,
   IMM_LANEIDX,
+  IMM_LANEIDX16,
   IMM_MEMARG_LANEIDX
 } opcode_imm_type;
 

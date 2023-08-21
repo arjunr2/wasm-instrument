@@ -24,5 +24,6 @@
   "ImmTablecpInst": ["TableDecl* dst", "TableDecl* src"],
   "ImmV128Inst": ["V128_t value"],
   "ImmLaneidxInst": ["Laneidx_t idx"],
-  "ImmMemargLaneidxInst": ["uint32_t align", "uint32_t offset", "Laneidx_t idx"
+  "ImmLaneidx16Inst": ["Laneidx16_t idxs"],
+  "ImmMemargLaneidxInst": ["uint32_t align", "uint32_t offset", "Laneidx_t idx"]
 }

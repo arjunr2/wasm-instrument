@@ -231,9 +231,9 @@
 #define WASM_OP_V128_LOAD64_SPLAT 0xFD0A /* "v128.load64_splat", ImmSigs.MEMARG */
 
 #define WASM_OP_V128_STORE 0xFD0B /* "v128.store", ImmSigs.MEMARG */
-#define WASM_OP_V128_CONST 0xFD0C /* "v128.store", ImmSigs.V128 */
+#define WASM_OP_V128_CONST 0xFD0C /* "v128.const", ImmSigs.V128 */
 
-#define WASM_OP_I8x16_SHUFFLE 0xFD0D /* "i8x16.shuffle", ImmSigs.LANEIDX */
+#define WASM_OP_I8x16_SHUFFLE 0xFD0D /* "i8x16.shuffle", ImmSigs.LANEIDX16 */
 #define WASM_OP_I8x16_SWIZZLE 0xFD0E /* "i8x16.swizzle", ImmSigs.NONE */
 
 #define WASM_OP_I8x16_SPLAT 0xFD0F /* "i8x16.splat", ImmSigs.NONE */

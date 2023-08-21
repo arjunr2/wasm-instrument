@@ -376,6 +376,19 @@ class ImmLaneidxInst: public InstBase {
 };
 
 
+class ImmLaneidx16Inst: public InstBase {
+  Laneidx16_t idxs;
+  public:
+    ImmLaneidx16Inst (WasmModule &module, Opcode_t opcode, buffer_t &buf);
+    ImmLaneidx16Inst (Opcode_t opcode, Laneidx16_t idxs) : 
+      InstBase(opcode), idxs(idxs) { }
+
+    inline Laneidx16_t getLaneidx16() { return idxs; }
+
+    void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+};
+
+
 class ImmMemargLaneidxInst: public InstBase {
   uint32_t align;
   uint32_t offset;

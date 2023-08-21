@@ -339,6 +339,21 @@ void ImmLaneidxInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
 }
 
 
+/* ImmLaneidx16Inst  */
+ImmLaneidx16Inst::ImmLaneidx16Inst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
+    : InstBase(opcode) {
+  for (int i = 0; i < 16; i++) {
+    this->idxs.l[i] = RD_BYTE();
+  }
+}
+
+void ImmLaneidx16Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
+  for (int i = 0; i < 16; i++) {
+    WR_BYTE (this->idxs.l[i]);
+  }
+}
+
+
 /* ImmMemargLaneidxInst  */
 ImmMemargLaneidxInst::ImmMemargLaneidxInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
     : InstBase(opcode) {
