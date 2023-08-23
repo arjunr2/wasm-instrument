@@ -987,7 +987,7 @@ class BrOnNonNullInst: public ImmLabelInst {
 
 class MemoryInitInst: public ImmDataMemoryInst {
 	public:
-	MemoryInitInst(DataDecl* data, MemoryDecl *mem) : ImmDataMemoryInst(WASM_OP_MEMORY_INIT, *mem) { }
+	MemoryInitInst(DataDecl* data,MemoryDecl* mem) : ImmDataMemoryInst(WASM_OP_MEMORY_INIT, data,mem) { }
 };
 
 class DataDropInst: public ImmDataInst {
@@ -997,7 +997,7 @@ class DataDropInst: public ImmDataInst {
 
 class MemoryCopyInst: public ImmMemorycpInst {
 	public:
-	MemoryCopyInst(MemoryDecl* dst, MemoryDecl* src) : ImmMemorycpInst(WASM_OP_MEMORY_COPY, src) { }
+	MemoryCopyInst(MemoryDecl* dst,MemoryDecl* src) : ImmMemorycpInst(WASM_OP_MEMORY_COPY, dst,src) { }
 };
 
 class MemoryFillInst: public ImmMemoryInst {
