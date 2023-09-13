@@ -420,12 +420,12 @@ void memaccess_instrument (WasmModule &module, const std::string& path) {
 /************************************************/
 
 
-#define THREADING 0
 /************************************************/
 /* Instrument random (percent) set of all memory accesses
 * across cluster size, filtered by path if given */
 std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, 
-    int percent, int cluster_size, const std::string& path) {
+    int percent, int cluster_size, const std::string& path,
+    void (*encode_callback)(WasmModule&, int)) {
 
   std::vector<uint32_t> inst_idx_filter;
   if (path.empty()) {
@@ -442,15 +442,16 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
   int partition_size = (num_accesses * percent) / 100;
 
   std::vector<WasmModule> module_set(cluster_size);
-  auto loop = [&module_set, &module, &inst_idx_filter, &partition_size](const int a, const int b) {
+  auto loop = [&module_set, &module, &inst_idx_filter, &partition_size, &encode_callback](const int a, const int b) {
     for (int i = a; i < b; i++) {
-      module_set[i] = module;
+      WasmModule module_copy = module;
       std::set<uint32_t> partition;
       /* Get a random sample */
       std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
                   std::inserter(partition, partition.end()), partition_size,
                   std::mt19937{std::random_device{}()});
-      memfiltered_instrument_internal (module_set[i], partition);
+      memfiltered_instrument_internal (module_copy, partition);
+      encode_callback(module_copy, i);
     }
   };
 

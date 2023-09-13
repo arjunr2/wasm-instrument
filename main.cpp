@@ -14,6 +14,8 @@
 #include "BS_thread_pool_light.hpp"
 
 int num_thread_workers = std::thread::hardware_concurrency() - 2;
+char *outfile_glob;
+
 
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
@@ -60,6 +62,8 @@ args_t parse_args(int argc, char* argv[]) {
     ERR("Executable requires outfile \"--out\"\n");
     exit(1);
   }
+
+  outfile_glob = args.outfile;
   
   // Run sample instrumentation by default
   //if (!args.scheme) { args.scheme = strdup("sample"); } 
@@ -74,8 +78,46 @@ void free_args (args_t args) {
 }
 
 
+
+
+/* Pass as function pointer for each routine to manage its own writes */
+static void encode_and_write_single (WasmModule &out_module, int index) {
+  std::string outfile_template(outfile_glob);
+  std::size_t splitidx = outfile_template.find_last_of("/");
+  outfile_template.insert(splitidx + 1, "part%d.");
+
+  char outfile[200];
+  sprintf(outfile, outfile_template.data(), index+1);
+  bytedeque bq = out_module.encode_module(outfile);
+}
+
+static void encode_and_write_modules (char *outfile, std::vector<WasmModule> out_modules) {
+  std::string outfile_template(outfile);
+  std::size_t splitidx = outfile_template.find_last_of("/");
+  outfile_template.insert(splitidx + 1, "part%d.");
+  auto loop = [&out_modules, &outfile_template](const int a, const int b) {
+    for (int i = a; i < b; i++) {
+      char outfile[200];
+      sprintf(outfile, outfile_template.data(), i+1);
+      bytedeque bq = out_modules[i].encode_module(outfile);
+    }
+  };
+
+  if (!g_threads) {
+    loop(0, out_modules.size());
+  }
+  /* Parallel write */
+  else {
+    BS::thread_pool_light pool(num_thread_workers);
+    pool.push_loop(out_modules.size(), loop);
+    pool.wait_for_tasks();
+  }
+}
+
+
+
 std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine, 
-    std::vector<std::string> args, bool &is_batch) {
+    std::vector<std::string> args, bool &is_batch, bool &uses_encode) {
 
   DEF_TIME_VAR();
   TRACE("Running instrumentation: %s\n", routine.c_str());
@@ -84,6 +126,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
 
   std::vector<WasmModule> out_modules;
   is_batch = false;
+  uses_encode = false;
 
   if (routine == "empty") { }
 
@@ -102,8 +145,9 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
     int percent = stoi(args[0]);
     int cluster_size = stoi(args[1]);
     std::string path = ((args.size() == 3) ? args[2] : std::string());
-    out_modules = memaccess_stochastic_instrument(module, percent, cluster_size, path);
+    out_modules = memaccess_stochastic_instrument(module, percent, cluster_size, path, encode_and_write_single);
     is_batch = true;
+    uses_encode = true;
   }
 
   else if (routine == "memaccess-balanced") {
@@ -171,8 +215,10 @@ TIME_SECTION(0, "Time to parse module",
   }
 
   bool is_batch;
+  bool uses_encode;
 TIME_SECTION(0, "Time to instrument",
-  std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec, is_batch);
+  std::vector<WasmModule> out_modules = instrument_call(module, args.scheme, arg_vec, 
+                                          is_batch, uses_encode);
 )
 
   /* Encode instrumented module */
@@ -180,27 +226,8 @@ TIME_SECTION(0, "Time to encode modules",
   if (!is_batch) {
     bytedeque bq = module.encode_module(args.outfile);
   }
-  else {
-    std::string outfile_template(args.outfile);
-    std::size_t splitidx = outfile_template.find_last_of("/");
-    outfile_template.insert(splitidx + 1, "part%d.");
-    auto loop = [&out_modules, &outfile_template](const int a, const int b) {
-      for (int i = a; i < b; i++) {
-        char outfile[200];
-        sprintf(outfile, outfile_template.data(), i+1);
-        bytedeque bq = out_modules[i].encode_module(outfile);
-      }
-    };
-
-    if (!g_threads) {
-      loop(0, out_modules.size());
-    }
-    /* Parallel write */
-    else {
-      BS::thread_pool_light pool(num_thread_workers);
-      pool.push_loop(out_modules.size(), loop);
-      pool.wait_for_tasks();
-    }
+  else if (!uses_encode) {
+    encode_and_write_modules(args.outfile, out_modules);
   }
 )
 

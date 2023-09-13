@@ -15,7 +15,8 @@ std::map<FuncDecl*, uint64_t> all_funcs_weight_instrument (WasmModule &module);
 void memaccess_instrument (WasmModule &module, const std::string& path);
 
 std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, 
-    int percent, int cluster_size, const std::string& path);
+    int percent, int cluster_size, const std::string& path, 
+    void (*encode_callback)(WasmModule&, int));
 
 std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module, 
     int cluster_size, const std::string& path);
