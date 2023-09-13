@@ -13,6 +13,7 @@
 #include "routines.h"
 #include "BS_thread_pool_light.hpp"
 
+int num_thread_workers = std::thread::hardware_concurrency() - 2;
 
 static struct option long_options[] = {
   {"trace", no_argument,  &g_trace, 1},
@@ -123,7 +124,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
     printf("Unsupported instrumentation scheme\n");
   }
 
-  if (out_modules.empty()) {
+  if (!is_batch) {
     auto module_vec = std::vector<WasmModule>(1);
     module_vec[0] = std::move(module);
     return module_vec;
@@ -196,7 +197,7 @@ TIME_SECTION(0, "Time to encode modules",
     }
     /* Parallel write */
     else {
-      BS::thread_pool_light pool;
+      BS::thread_pool_light pool(num_thread_workers);
       pool.push_loop(out_modules.size(), loop);
       pool.wait_for_tasks();
     }
@@ -213,7 +214,7 @@ TIME_SECTION(0, "Time to encode modules",
   }
   printf("--------------------------------------\n");
 
-  exit(0);
+  return 0;
 }
 
 
