@@ -83,22 +83,22 @@ void free_args (args_t args) {
 /* Pass as function pointer for each routine to manage its own writes */
 static void encode_and_write_single (WasmModule &out_module, int index) {
   std::string outfile_template(outfile_glob);
-  std::size_t splitidx = outfile_template.find_last_of("/");
-  outfile_template.insert(splitidx + 1, "part%d.");
+  std::size_t splitidx = outfile_template.find_last_of(".");
+  outfile_template.insert(splitidx + 1, "%d.");
 
   char outfile[200];
-  sprintf(outfile, outfile_template.data(), index+1);
+  sprintf(outfile, outfile_template.data(), index);
   bytedeque bq = out_module.encode_module(outfile);
 }
 
 static void encode_and_write_modules (char *outfile, std::vector<WasmModule> out_modules) {
   std::string outfile_template(outfile);
-  std::size_t splitidx = outfile_template.find_last_of("/");
-  outfile_template.insert(splitidx + 1, "part%d.");
+  std::size_t splitidx = outfile_template.find_last_of(".");
+  outfile_template.insert(splitidx + 1, "%d.");
   auto loop = [&out_modules, &outfile_template](const int a, const int b) {
     for (int i = a; i < b; i++) {
       char outfile[200];
-      sprintf(outfile, outfile_template.data(), i+1);
+      sprintf(outfile, outfile_template.data(), i);
       bytedeque bq = out_modules[i].encode_module(outfile);
     }
   };
