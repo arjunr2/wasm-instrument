@@ -48,17 +48,18 @@ $(INSTLIB): $(SRC_O) $(ROUTINES_O)
 	ar rcs build/$@ $^
 
 
-#---- Test LEB encoding/decoding ---- #
-TEST_CPP = test-leb.cpp src/common.cpp
+# --------- MICRO TESTS --------- #
+# Test LEB encoding/decoding 
+TEST_CPP = micro/test-leb.cpp src/common.cpp
+# Test Library
+INSTLIB_MAIN = micro/test-instlib.c
 
-test: $(TEST_CPP)
+microtests: dir build/test-instlib build/test-leb
+
+build/test-leb: $(TEST_CPP)
 	$(CXX) $(CPPFLAGS) -o $@ $^
 
-
-#--------- Test Library ---------- #
-INSTLIB_MAIN = test-instlib.c
-
-test-instlib: $(INSTLIB_MAIN) $(INSTLIB) 
+build/test-instlib: $(INSTLIB_MAIN) $(INSTLIB) 
 	$(CC) $(CFLAGS) $^ -lpthread -lstdc++ -o $@
 	
 #-------------------------------------#
