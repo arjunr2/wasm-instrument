@@ -45,7 +45,7 @@ instrument: $(SRC_O) build/main.o $(ROUTINES_O)
 
 # ---------- LIBRARY ------------- #
 $(INSTLIB): $(SRC_O) $(ROUTINES_O)
-	ar rcs build/$@ $^
+	ar rcs $@ $^
 
 
 # --------- MICRO TESTS --------- #

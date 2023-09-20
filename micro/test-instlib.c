@@ -13,6 +13,13 @@ int main() {
   wasm_instrument_mod_t mod = decode_instrument_module(start, end - start);
   unload_file(&start, &end);
 
+  const char *args[30] = {
+    "40",
+    "1"
+  };
+  int num_args = 2;
+  instrument_module (mod, "memaccess-stochastic", args, num_args);
+
   uint32_t enc_size = 0;
   byte* filebuf = encode_file_buf_from_module(mod, &enc_size);
   printf("Encode size: %d\n", enc_size);

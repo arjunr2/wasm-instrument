@@ -23,7 +23,7 @@ typedef struct {
 void memaccess_stochastic_insthandle (WasmModule &module, ArgVec args) {
   int percent = TO_INT(args[0]);
   int cluster_size = TO_INT(args[1]);
-  if (cluster_size > 0) {
+  if (cluster_size > 1) {
     throw std::runtime_error("Cluster size > 1 not supported yet");
   }
   std::string path = ((args.size() == 3) ? args[2] : std::string());
@@ -98,10 +98,11 @@ encode_file_buf_from_module (WasmModule* module, uint32_t* file_size) {
 
 /** Instrumentation (in-place). No batch mode supported yet **/
 void 
-instrument_module (WasmModule* mod, const char* scheme, char** args, uint32_t num_args) {
+instrument_module (WasmModule* mod, const char* scheme, const char** args, uint32_t num_args) {
   ArgVec arg_vec;
   for (int i = 0; i < num_args; i++) {
-    arg_vec.push_back(args[i]);
+    //printf("Arg %d = %s\n", i, args[i]);
+    arg_vec.push_back(std::string(args[i]));
   }
   bool match = false;
   for (auto &routine : inst_routines) {
