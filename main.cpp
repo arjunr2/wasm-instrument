@@ -10,10 +10,10 @@
 #include "views.h"
 #include "ir.h"
 #include "instructions.h"
-#include "routines.h"
+#include "api/routines.h"
 #include "BS_thread_pool_light.hpp"
 
-int num_thread_workers = std::thread::hardware_concurrency() - 2;
+static int num_thread_workers = std::thread::hardware_concurrency() - 2;
 char *outfile_glob;
 
 
@@ -48,7 +48,7 @@ args_t parse_args(int argc, char* argv[]) {
       default:
         ERR("Usage: %s [--trace (opt)] [--multithread (opt)] [--time (opt)] "
             "[--scheme SCHEME] [--args SCHEME_ARGS (opt)] [--out OUTFILE] input-file\n", argv[0]);
-        ERR("Supported schemes: \'empty\', \'sample\', \'loop-count\'\n");
+        ERR("Supported schemes: \'empty\', \'sample\', \'loop-count\', \'memaccess-stochastic\'\n");
         exit(opt != 'h');
     }
   }

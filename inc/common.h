@@ -3,16 +3,18 @@
 #include <stdbool.h>
 #include <sys/types.h>
 #include <string>
-#include <deque>
-#include <vector>
 #include <array>
 #include <list>
+#include <vector>
+#include <deque>
+
+#include "api/export/instrument_c_api.h"
 
 /*** Generic used typedefs ***/
 typedef uint8_t byte;
-typedef uint32_t Opcode_t;
 typedef std::vector<byte> bytearr;
 typedef std::deque<byte> bytedeque;
+typedef uint32_t Opcode_t;
 /* Buffer for parsing/decoding */
 typedef struct {
   const byte* start;

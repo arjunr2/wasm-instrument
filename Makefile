@@ -4,17 +4,23 @@ CC=gcc
 CXX=g++
 
 CFLAGS = -O3 -Iinc -I.
-CPPFLAGS = -O3 -g -std=c++2a -Iinc -I. -pthread
+CPPFLAGS = -O0 -g -std=c++2a -Iinc -I. -pthread
 
 SRC_C = $(notdir $(wildcard src/*.c))
-SRC_CPP = $(notdir $(wildcard src/*.cpp) main.cpp $(wildcard routines/*.cpp))
+SRC_CPP = $(notdir $(wildcard src/*.cpp))
+ROUTINES_CPP = $(notdir $(wildcard api/routines/*.cpp) $(wildcard api/*.cpp))
 
 SRC_O = $(addprefix build/, $(SRC_C:.c=.o) $(SRC_CPP:.cpp=.o))
+ROUTINES_O = $(addprefix build/, $(ROUTINES_CPP:.cpp=.o))
 
-all: dir instrument
+INSTLIB = build/libinstrument.a
+
+
+all: dir instrument $(INSTLIB)
 
 dir:
 	mkdir -p build
+
 
 build/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -22,23 +28,40 @@ build/%.o: src/%.c
 build/%.o: src/%.cpp
 	$(CXX) $(CPPFLAGS) -c -o $@ $<
 
-build/%.o: routines/%.cpp
+build/%.o: api/routines/%.cpp
+	$(CXX) $(CPPFLAGS) -c -o $@ $<
+
+build/%.o: api/%.cpp
 	$(CXX) $(CPPFLAGS) -c -o $@ $<
 
 build/%.o: %.cpp
 	$(CXX) $(CPPFLAGS) -c -o $@ $<
 
-instrument: $(SRC_O)
+
+# ---------- CORE FILES ------------- #
+instrument: $(SRC_O) build/main.o $(ROUTINES_O)
 	$(CXX) $(CPPFLAGS) -o $@ $^ -lm
 	cp $@ build/$@
 
+# ---------- LIBRARY ------------- #
+$(INSTLIB): $(SRC_O) $(ROUTINES_O)
+	ar rcs build/$@ $^
 
-# Test LEB encoding/decoding
+
+#---- Test LEB encoding/decoding ---- #
 TEST_CPP = test-leb.cpp src/common.cpp
 
 test: $(TEST_CPP)
 	$(CXX) $(CPPFLAGS) -o $@ $^
 
+
+#--------- Test Library ---------- #
+INSTLIB_MAIN = test-instlib.c
+
+test-instlib: $(INSTLIB_MAIN) $(INSTLIB) 
+	$(CC) $(CFLAGS) $^ -lpthread -lstdc++ -o $@
+	
+#-------------------------------------#
 
 build-test:
 	cd tests; ./build.sh

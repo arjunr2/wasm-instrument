@@ -1,15 +1,17 @@
 #include "routine_common.h"
+#include <pthread.h>
 #include "BS_thread_pool_light.hpp"
 #include <chrono>
 #include <thread>
 
-extern int num_thread_workers;
+static int num_thread_workers = std::thread::hardware_concurrency() - 2;
 
 /*****************/
 void memaccess_instrument (WasmModule &module, const std::string& path);
 
 std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, 
-    int percent, int cluster_size, const std::string& path);
+    int percent, int cluster_size, const std::string& path, 
+    void (*encode_callback)(WasmModule&, int));
 
 std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module, 
     int cluster_size, const std::string& path);
@@ -451,7 +453,10 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
                   std::inserter(partition, partition.end()), partition_size,
                   std::mt19937{std::random_device{}()});
       memfiltered_instrument_internal (module_copy, partition);
-      encode_callback(module_copy, i);
+      if (encode_callback) {
+        encode_callback(module_copy, i);
+      }
+      module_set[i] = std::move(module_copy);
     }
   };
 

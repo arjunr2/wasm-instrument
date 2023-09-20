@@ -16,7 +16,7 @@ void memaccess_instrument (WasmModule &module, const std::string& path);
 
 std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module, 
     int percent, int cluster_size, const std::string& path, 
-    void (*encode_callback)(WasmModule&, int));
+    void (*encode_callback)(WasmModule&, int) = NULL);
 
 std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module, 
     int cluster_size, const std::string& path);
