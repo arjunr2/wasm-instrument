@@ -15,3 +15,10 @@ add_executable (test-leb tests/test-leb.cpp src/common.cpp)
 
 add_executable (test-instlib tests/test-instlib.c)
 target_link_libraries (test-instlib instrumentlib -lpthread)
+
+add_custom_command(
+  TARGET instrument
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND}
+  ARGS -E create_symlink $<TARGET_FILE:instrument> ../instrument
+)
