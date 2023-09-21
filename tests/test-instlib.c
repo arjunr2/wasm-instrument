@@ -9,7 +9,7 @@ int main() {
     printf("Failed\n");
     exit(1);
   }
-  printf("Code size: %d\n", end - start);
+  printf("Code size: %ld\n", end - start);
   wasm_instrument_mod_t mod = decode_instrument_module(start, end - start);
   unload_file(&start, &end);
 
