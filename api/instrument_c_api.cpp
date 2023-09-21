@@ -124,6 +124,12 @@ instrument_module (WasmModule* mod, const char* scheme, const char** args, uint3
   }
 }
 
+/** Deep-Copy modules **/
+WasmModule* 
+copy_instrument_module (WasmModule *mod) {
+  return new WasmModule(*mod);
+}
+
 
 /** Free methods **/
 void 

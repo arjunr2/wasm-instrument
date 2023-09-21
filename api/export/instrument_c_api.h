@@ -25,6 +25,9 @@ void
 instrument_module (wasm_instrument_mod_t mod, const char* routine, 
                     const char** args, uint32_t num_args);
 
+/** Deep-Copy modules **/
+wasm_instrument_mod_t
+copy_instrument_module (wasm_instrument_mod_t mod);
 
 /** Free methods **/
 void 

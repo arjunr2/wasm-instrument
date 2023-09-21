@@ -10,7 +10,7 @@ int main() {
     exit(1);
   }
   printf("Code size: %ld\n", end - start);
-  wasm_instrument_mod_t mod = decode_instrument_module(start, end - start);
+  wasm_instrument_mod_t mod_base = decode_instrument_module(start, end - start);
   unload_file(&start, &end);
 
   const char *args[30] = {
@@ -18,6 +18,7 @@ int main() {
     "1"
   };
   int num_args = 2;
+  wasm_instrument_mod_t mod = copy_instrument_module(mod_base);
   instrument_module (mod, "memaccess-stochastic", args, num_args);
 
   uint32_t enc_size = 0;
@@ -33,4 +34,5 @@ int main() {
 
   destroy_file_buf(filebuf);
   destroy_instrument_module(mod);
+  destroy_instrument_module(mod_base);
 }
