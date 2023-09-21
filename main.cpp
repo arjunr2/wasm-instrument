@@ -7,9 +7,7 @@
 
 #include "common.h"
 #include "parse.h"
-#include "views.h"
 #include "ir.h"
-#include "instructions.h"
 #include "api/routines.h"
 #include "BS_thread_pool_light.hpp"
 

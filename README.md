@@ -4,6 +4,12 @@ A convenient library to read and freely instrument WASM code statically.
 The repository is mostly up-to-date with the latest WASM standards -- including support for 
 threading/atomics and bulk memory instructions
 
+### Building
+```shell
+cmake -B build
+make -C build
+```
+
 ## Sample instrumentation
 
 Examples of routines can be found in [routines.cpp](routines.cpp). Support for more complex views is still in progress, but currently implemented APIs can be found in 
