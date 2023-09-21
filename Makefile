@@ -4,7 +4,7 @@ CC=gcc
 CXX=g++
 
 CFLAGS = -O3 -Iinc -I.
-CPPFLAGS = -O0 -g -std=c++2a -Iinc -I. -pthread
+CPPFLAGS = -O3 -g -std=c++2a -Iinc -I. -pthread
 
 SRC_C = $(notdir $(wildcard src/*.c))
 SRC_CPP = $(notdir $(wildcard src/*.cpp))
@@ -50,25 +50,28 @@ $(INSTLIB): $(SRC_O) $(ROUTINES_O)
 
 # --------- MICRO TESTS --------- #
 # Test LEB encoding/decoding 
-TEST_CPP = micro/test-leb.cpp src/common.cpp
+TEST_CPP = tests/test-leb.cpp src/common.cpp
 # Test Library
-INSTLIB_MAIN = micro/test-instlib.c
+INSTLIB_MAIN = tests/test-instlib.c
 
-microtests: dir build/test-instlib build/test-leb
+tests: dir build/test-instlib build/test-leb
 
 build/test-leb: $(TEST_CPP)
 	$(CXX) $(CPPFLAGS) -o $@ $^
 
 build/test-instlib: $(INSTLIB_MAIN) $(INSTLIB) 
-	$(CC) $(CFLAGS) $^ -lpthread -lstdc++ -o $@
+	$(CC) $(CFLAGS) -Lbuild $^ -linstrument -lpthread -lstdc++ -o $@
 	
 #-------------------------------------#
 
-build-test:
-	cd tests; ./build.sh
+SAMPLE_DIR = samples
 
-clean-test:
-	cd tests; rm *.wasm
+.PHONY: samples clean-samples
+samples:
+	cd $(SAMPLE_DIR); ./build.sh
+
+clean-samples:
+	cd $(SAMPLE_DIR); rm *.wasm
 
 gen-insns:
 	python3 utility/generate_insns.py > instructions.h
