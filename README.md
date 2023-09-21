@@ -4,7 +4,7 @@ A convenient library to read and freely instrument WASM code statically.
 The repository is mostly up-to-date with the latest WASM standards -- including support for 
 threading/atomics and bulk memory instructions
 
-### Building
+## Building
 ```shell
 cmake -B build
 make -C build
