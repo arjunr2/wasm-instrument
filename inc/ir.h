@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sys/syscall.h>
 #include <cstdint>
 #include <cstddef>
 #include <list>
