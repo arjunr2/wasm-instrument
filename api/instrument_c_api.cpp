@@ -3,12 +3,13 @@
 #include "routines.h"
 
 #include <vector>
+#include <queue>
 #include <deque>
 #include <iostream>
 #include <string>
 
 
-typedef std::vector<std::string> ArgVec;
+typedef std::queue<instrument_arg_t> ArgVec;
 
 typedef struct {
   const char* name;
@@ -19,25 +20,35 @@ typedef struct {
 
 #define TO_INT(v) stoi(v)
 
+#define POP(q) ({ \
+  auto &v = q.front();  \
+  q.pop();  \
+  v;  \
+})
+
+#define POP_INT(k) POP(k).v.i32
+#define POP_STR(k) std::string(POP(k).v.str)
+
+
 /* Handlers for each instrumentation type */
 void memaccess_stochastic_insthandle (WasmModule &module, ArgVec args) {
-  int percent = TO_INT(args[0]);
-  int cluster_size = TO_INT(args[1]);
+  int percent = POP_INT(args);
+  int cluster_size = POP_INT(args);
   if (cluster_size > 1) {
     throw std::runtime_error("Cluster size > 1 not supported yet");
   }
-  std::string path = ((args.size() == 3) ? args[2] : std::string());
+  std::string path = (args.empty() ? std::string() : POP_STR(args));
   std::vector<WasmModule> outs = 
     memaccess_stochastic_instrument(module, percent, cluster_size, path);
   module = std::move(outs[0]);
 }
 
 void memaccess_balanced_insthandle (WasmModule &module, ArgVec args) {
-  int cluster_size = TO_INT(args[1]);
+  int cluster_size = POP_INT(args);
   if (cluster_size > 0) {
     throw std::runtime_error("Cluster size > 1 not supported yet");
   }
-  std::string path = ((args.size() == 3) ? args[2] : std::string());
+  std::string path = (args.empty() ? POP_STR(args) : std::string());
   std::vector<WasmModule> outs = 
     memaccess_balanced_instrument(module, cluster_size, path);
   module = std::move(outs[0]);
@@ -98,11 +109,10 @@ encode_file_buf_from_module (WasmModule* module, uint32_t* file_size) {
 
 /** Instrumentation (in-place). No batch mode supported yet **/
 void 
-instrument_module (WasmModule* mod, const char* scheme, const char** args, uint32_t num_args) {
+instrument_module (WasmModule* mod, const char* scheme, instrument_arg_t *args, uint32_t num_args) {
   ArgVec arg_vec;
   for (int i = 0; i < num_args; i++) {
-    //printf("Arg %d = %s\n", i, args[i]);
-    arg_vec.push_back(std::string(args[i]));
+    arg_vec.push(args[i]);
   }
   bool match = false;
   for (auto &routine : inst_routines) {

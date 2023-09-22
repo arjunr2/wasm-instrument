@@ -11,6 +11,20 @@ extern "C" {
 typedef uint8_t byte;
 typedef struct WasmModule* wasm_instrument_mod_t;
 
+typedef enum {
+  ARG_INT,
+  ARG_STR
+} instrument_arg_type;
+
+/** Instrument scheme arguments */
+typedef struct {
+  instrument_arg_type type;
+  union {
+    int i32;
+    const char* str;
+  } v;
+} instrument_arg_t;
+
 
 /** Decoding/Encoding: User is responsible for destroying **/
 wasm_instrument_mod_t 
@@ -23,7 +37,7 @@ encode_file_buf_from_module (wasm_instrument_mod_t mod, uint32_t* file_size);
 /** Instrumentation (in-place) **/
 void 
 instrument_module (wasm_instrument_mod_t mod, const char* routine, 
-                    const char** args, uint32_t num_args);
+                    instrument_arg_t *args, uint32_t num_args);
 
 /** Deep-Copy modules **/
 wasm_instrument_mod_t

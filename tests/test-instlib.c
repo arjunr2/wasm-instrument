@@ -13,11 +13,12 @@ int main() {
   wasm_instrument_mod_t mod_base = decode_instrument_module(start, end - start);
   unload_file(&start, &end);
 
-  const char *args[30] = {
-    "40",
-    "1"
+  instrument_arg_t args[] = {
+    { .type = ARG_INT, .v.i32 = 40 },
+    { .type = ARG_INT, .v.i32 = 1 }
   };
   int num_args = 2;
+
   wasm_instrument_mod_t mod = copy_instrument_module(mod_base);
   instrument_module (mod, "memaccess-stochastic", args, num_args);
 
