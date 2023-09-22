@@ -11,3 +11,5 @@ file (GLOB_RECURSE INSTRUMENT_LIB_SRCS
 
 add_library (instrumentlib ${INSTRUMENT_LIB_SRCS})
 target_include_directories (instrumentlib PRIVATE ${INSTRUMENT_DIR}/inc ${INSTRUMENT_DIR})
+
+set (INSTRUMENT_EXPORT_DIR ${INSTRUMENT_DIR}/api/export)
