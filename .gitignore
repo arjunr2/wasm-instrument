@@ -5,3 +5,4 @@
 *.wat.*
 build/
 testapps/
+instrument
