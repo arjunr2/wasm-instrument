@@ -13,9 +13,9 @@ int main() {
   wasm_instrument_mod_t mod_base = decode_instrument_module(start, end - start);
   unload_file(&start, &end);
 
-  instrument_arg_t args[] = {
-    { .type = ARG_INT, .v.i32 = 40 },
-    { .type = ARG_INT, .v.i32 = 1 }
+  const char *args[] = {
+    "40",
+    "1"
   };
   int num_args = 2;
 
