@@ -133,6 +133,19 @@ instrument_module (WasmModule* mod, const char* scheme, char** args, uint32_t nu
   }
 }
 
+
+/** Instrumentation from raw buffer.
+ * Copy returned that should be explicitly freed using 'destroy_file_buf' */
+byte*
+instrument_module_buffer (byte* inbuf, uint32_t insize, uint32_t *outsize,
+              const char* scheme, char** args, uint32_t num_args) {
+  WasmModule *mod = decode_instrument_module (inbuf, insize);
+  instrument_module (mod, scheme, args, num_args);
+  byte* outbuf = encode_file_buf_from_module (mod, outsize);
+  destroy_instrument_module(mod);
+  return outbuf;
+}
+
 /** Deep-Copy modules **/
 WasmModule* 
 copy_instrument_module (WasmModule *mod) {

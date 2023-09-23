@@ -25,6 +25,14 @@ void
 instrument_module (wasm_instrument_mod_t mod, const char* routine, 
                     char** args, uint32_t num_args);
 
+/** Instrumentation from raw buffer.
+ * @return output buffer
+ * @return[outsize] size of output buffer
+ * Copy returned that should be explicitly freed using 'destroy_file_buf' */
+byte*
+instrument_module_buffer (byte* inbuf, uint32_t insize, uint32_t *outsize,
+                    const char* routine, char** args, uint32_t num_args);
+
 /** Deep-Copy modules **/
 wasm_instrument_mod_t
 copy_instrument_module (wasm_instrument_mod_t mod);

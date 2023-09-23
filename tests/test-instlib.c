@@ -11,7 +11,6 @@ int main() {
   }
   printf("Code size: %ld\n", end - start);
   wasm_instrument_mod_t mod_base = decode_instrument_module(start, end - start);
-  unload_file(&start, &end);
 
   const char *args[] = {
     "40",
@@ -19,6 +18,7 @@ int main() {
   };
   int num_args = 2;
 
+  /** Method 1 */
   wasm_instrument_mod_t mod = copy_instrument_module(mod_base);
   instrument_module (mod, "memaccess-stochastic", args, num_args);
 
@@ -36,4 +36,20 @@ int main() {
   destroy_file_buf(filebuf);
   destroy_instrument_module(mod);
   destroy_instrument_module(mod_base);
+
+  /** Method 2 */
+  uint32_t outsize;
+  byte* filebuf2 = instrument_module_buffer (start, end - start, &outsize, "memaccess-stochastic", args, num_args);
+  printf("Encode size: %d\n", outsize);
+
+  FILE *g = fopen("out2.wasm", "wb");
+  if (!fwrite(filebuf2, sizeof(byte), outsize, g)) {
+    printf("Error writing to file\n");
+    exit(1);
+  }
+  fclose(g);
+
+  destroy_file_buf(filebuf2);
+
+  unload_file(&start, &end);
 }
