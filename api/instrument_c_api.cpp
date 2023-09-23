@@ -108,7 +108,7 @@ encode_file_buf_from_module (WasmModule* module, uint32_t* file_size) {
 
 /** Instrumentation (in-place). No batch mode supported yet **/
 void 
-instrument_module (WasmModule* mod, const char* scheme, const char** args, uint32_t num_args) {
+instrument_module (WasmModule* mod, const char* scheme, char** args, uint32_t num_args) {
   ArgVec arg_vec;
   for (int i = 0; i < num_args; i++) {
     arg_vec.push(std::string(args[i]));

@@ -23,7 +23,7 @@ encode_file_buf_from_module (wasm_instrument_mod_t mod, uint32_t* file_size);
 /** Instrumentation (in-place) **/
 void 
 instrument_module (wasm_instrument_mod_t mod, const char* routine, 
-                    const char** args, uint32_t num_args);
+                    char** args, uint32_t num_args);
 
 /** Deep-Copy modules **/
 wasm_instrument_mod_t
