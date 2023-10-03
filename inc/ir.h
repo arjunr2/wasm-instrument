@@ -338,6 +338,7 @@ class WasmModule {
     
     /* Addition */
     /* Module-internal values with optional export */
+    SigDecl*    add_sig     (SigDecl &sig, bool force_dup = false);
     GlobalDecl* add_global  (GlobalDecl &global, const char* export_name = NULL);
     TableDecl*  add_table   (TableDecl &table, const char* export_name = NULL);
     MemoryDecl* add_memory  (MemoryDecl &mem, const char* export_name = NULL);

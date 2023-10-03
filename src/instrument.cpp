@@ -20,6 +20,16 @@
 
 /*** Instrumentation Functions ***/
 
+SigDecl* WasmModule::add_sig (SigDecl &sig, bool force_dup) {
+  if (force_dup) {
+    this->sigs.push_back(sig);
+    return &(this->sigs.back());
+  } else {
+    return FIND_OR_CREATE_SIG(sig);
+  }
+}
+
+
 #define ADD_FIELD(field) { \
   this->field##s.push_back(field);  \
   auto &ref = this->field##s.back();  \
@@ -43,9 +53,7 @@ MemoryDecl* WasmModule::add_memory (MemoryDecl &mem, const char* export_name) {
 }
 
 FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name) {
-  SigDecl &sig = *(func.sig);
-  SigDecl* sigptr = FIND_OR_CREATE_SIG(sig);
-  func.sig = sigptr;
+  func.sig = this->add_sig(*(func.sig), false);
   ADD_FIELD (func);
 }
 
@@ -97,7 +105,7 @@ ImportDecl* WasmModule::add_import (ImportInfo &info, MemoryDecl &mem) {
 
 
 ImportDecl* WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
-  SigDecl* sigptr = FIND_OR_CREATE_SIG(sig);
+  SigDecl* sigptr = this->add_sig(sig, false);
   FuncDecl fdecl = { .sig = sigptr };
   IMPORT_ADD (KIND_FUNC, func, fdecl);
 }

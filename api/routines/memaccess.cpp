@@ -19,7 +19,8 @@ std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module,
 
 
 InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[7], FuncDecl *logaccess_import, uint32_t access_idx) {
+    uint32_t local_idxs[7], uint32_t sig_idxs[7], FuncDecl *logaccess_import, 
+    uint32_t access_idx, uint32_t mem_base) {
 
   uint32_t local_f64 = local_idxs[0];
   uint32_t local_f32 = local_idxs[1];
@@ -29,11 +30,29 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
   uint32_t local_i32_2 = local_idxs[5];
   uint32_t local_addr = local_idxs[6];
 
+  uint32_t sig_i32 = sig_idxs[0];
+  uint32_t sig_i32_2 = sig_idxs[1];
+  uint32_t sig_i32_i64 = sig_idxs[2];
+  uint32_t sig_i32_f32 = sig_idxs[3];
+  uint32_t sig_i32_f64 = sig_idxs[4];
+  uint32_t sig_i32_3 = sig_idxs[5];
+  uint32_t sig_i32_i64_2 = sig_idxs[6];
+
   InstBasePtr instruction = (*itr);
   std::shared_ptr<ImmMemargInst> mem_inst = static_pointer_cast<ImmMemargInst>(instruction);
-  
+
   InstList addinst;
+  bool insblock = false;
   #define PUSH_INST(inv)   addinst.push_back(InstBasePtr(new inv));
+  
+  #define BLOCK_INST(v) { \
+    insblock = true;  \
+    PUSH_INST (BlockInst(v));  \
+    PUSH_INST (I32ConstInst(mem_base)); \
+    PUSH_INST (I32Load8UInst(0, access_idx)); \
+    PUSH_INST (BrIfInst(0));  \
+  }
+
   #define SAVE_TOP(var) { \
     PUSH_INST (LocalSetInst(var)); \
   }
@@ -75,6 +94,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I64_ATOMIC_LOAD8_U:
     case WASM_OP_I64_ATOMIC_LOAD16_U:
     case WASM_OP_I64_ATOMIC_LOAD32_U: {
+                                        BLOCK_INST(sig_i32);
                                         IC_ROUTINE();
                                         break;
                                       }
@@ -104,6 +124,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I32_ATOMIC_RMW_XCHG:
     case WASM_OP_I32_ATOMIC_RMW8_XCHG_U:
     case WASM_OP_I32_ATOMIC_RMW16_XCHG_U: {
+                                            BLOCK_INST(sig_i32_2);
                                             SAVE_TOP (local_i32_1);
                                             IC_ROUTINE();
                                             RESTORE_TOP (local_i32_1);
@@ -143,6 +164,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I64_ATOMIC_RMW8_XCHG_U:
     case WASM_OP_I64_ATOMIC_RMW16_XCHG_U:
     case WASM_OP_I64_ATOMIC_RMW32_XCHG_U: {
+                                            BLOCK_INST(sig_i32_i64);
                                             SAVE_TOP (local_i64_1);
                                             IC_ROUTINE();
                                             RESTORE_TOP (local_i64_1);
@@ -151,6 +173,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
 
     /* Addr | F32 */
     case WASM_OP_F32_STORE: {
+                              BLOCK_INST(sig_i32_f32);
                               SAVE_TOP (local_f32);
                               IC_ROUTINE();
                               RESTORE_TOP (local_f32);
@@ -159,6 +182,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
 
     /* Addr | F64 */
     case WASM_OP_F64_STORE: {
+                              BLOCK_INST(sig_i32_f64);
                               SAVE_TOP (local_f64);
                               IC_ROUTINE();
                               RESTORE_TOP (local_f64);
@@ -169,6 +193,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I32_ATOMIC_RMW_CMPXCHG:
     case WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U:
     case WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U: {
+                                               BLOCK_INST(sig_i32_3);
                                                SAVE_TOP (local_i32_1);
                                                SAVE_TOP (local_i32_2);
                                                IC_ROUTINE();
@@ -182,6 +207,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U:
     case WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U:
     case WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U: {
+                                               BLOCK_INST(sig_i32_i64_2);
                                                SAVE_TOP (local_i64_1);
                                                SAVE_TOP (local_i64_2);
                                                IC_ROUTINE();
@@ -189,6 +215,10 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
                                                RESTORE_TOP (local_i64_1);
                                                break;
                                              }
+  }
+
+  if (insblock) {
+    PUSH_INST (EndInst());
   }
   return addinst;
 }
@@ -264,6 +294,7 @@ static std::unordered_map<InstBasePtr, uint32_t> memaccess_dry_run (WasmModule &
 
   std::unordered_map<InstBasePtr, uint32_t> access_idx_map;
   uint32_t local_indices[7];
+  uint32_t sig_indices[7];
   uint32_t access_idx = 0;
 
 TIME_SECTION(2, "Time for dry run",
@@ -274,7 +305,7 @@ TIME_SECTION(2, "Time for dry run",
       if (instruction->getImmType() == IMM_MEMARG) {
         /* Add instruction will be empty if we choose to ignore some access instructions
           * eg: atomic.notify, atomic.wait */
-        InstList addinst = setup_logappend_args(institr, local_indices, NULL, access_idx);
+        InstList addinst = setup_logappend_args(institr, local_indices, sig_indices, NULL, access_idx, 0);
         if (!addinst.empty()) {
           access_idx++; 
           access_idx_map[instruction] = access_idx;
@@ -321,6 +352,7 @@ static std::vector<uint32_t> read_binary_file(const std::string& filename) {
 static void memfiltered_instrument_internal (
     WasmModule &module, 
     std::set<uint32_t> &inst_idx_filter, 
+    uint32_t max_accesses,
     bool insert_global = true, 
     bool no_filter = false) {
 
@@ -346,6 +378,39 @@ static void memfiltered_instrument_internal (
   ImportDecl* logaccess_import_decl = module.add_import(iminfo, logaccess_sig);
   FuncDecl* logaccess_import = logaccess_import_decl->desc.func;
 
+  /* Memory space for instrument mask: Insert as global as well */
+  wasm_limits_t &memlimit = module.getMemory(0)->limits;
+  uint32_t memdata_end = memlimit.initial * PAGE_SIZE;
+
+  memlimit.initial += (max_accesses + (PAGE_SIZE - 1)) / PAGE_SIZE;
+  if (memlimit.has_max && (memlimit.initial > memlimit.max)) {
+    throw std::runtime_error("Not enough memory to instrument");
+  }
+
+  GlobalDecl global = {
+    .type = WASM_TYPE_I32,
+    .is_mutable = false,
+    .init_expr_bytes = INIT_EXPR (I32_CONST, memdata_end/PAGE_SIZE)
+  };
+  GlobalDecl* max_insts_globref = module.add_global(global, "__inst_membase");
+
+  /* Pre-compute sig indices since list indexing is expensive */
+  uint32_t sig_indices[7];
+  typelist blocktypes[7] = {
+    {WASM_TYPE_I32}, // Addr
+    {WASM_TYPE_I32, WASM_TYPE_I32}, // Addr | I32
+    {WASM_TYPE_I32, WASM_TYPE_I64}, // Addr | I64
+    {WASM_TYPE_I32, WASM_TYPE_F32}, // Addr | F32
+    {WASM_TYPE_I32, WASM_TYPE_F64}, // Addr | F64
+    {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32}, // Addr | I32 | I32
+    {WASM_TYPE_I32, WASM_TYPE_I64, WASM_TYPE_I64}, // Addr | I64 | I64
+  };
+  for (int i = 0; i < 7; i++) {
+    SigDecl s = { .params = blocktypes[i], .results = blocktypes[i] };
+    sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
+  }
+
+
   /* For memory access */
   uint32_t access_idx = 1;
   for (auto &func : module.Funcs()) {
@@ -367,7 +432,7 @@ static void memfiltered_instrument_internal (
         /* Add instruction will be empty if we choose to ignore some access instructions
           * eg: atomic.notify, atomic.wait */
         if (!no_filter && (filter_itr == inst_idx_filter.end())) { break; }
-        InstList addinst = setup_logappend_args(institr, local_indices, logaccess_import, access_idx);
+        InstList addinst = setup_logappend_args(institr, local_indices, sig_indices, logaccess_import, access_idx, memdata_end);
         if (!addinst.empty()) {
           // Add if no filtering; or if index matches
           bool filter_cond = (!no_filter && (*filter_itr == access_idx));
@@ -411,13 +476,19 @@ static void memfiltered_instrument_internal (
 /* Instrument all accesses, filtered by path if given */
 void memaccess_instrument (WasmModule &module, const std::string& path) {
   std::set<uint32_t> placeholder;
+  std::set<uint32_t> inst_idx_filterset;
+  uint32_t max_accesses = memaccess_dry_run(module).size();
   if (path.empty()) {
-    memfiltered_instrument_internal (module, placeholder, true, true);
+    for (int i = 1; i <= max_accesses; i++) {
+      inst_idx_filterset.insert(i);
+    }
   } else {
     std::vector<uint32_t> inst_idx_filter = read_binary_file(path);
-    std::set<uint32_t> inst_idx_filterset(inst_idx_filter.begin(), inst_idx_filter.end());
-    memfiltered_instrument_internal (module, inst_idx_filterset);
+    for (auto &elem: inst_idx_filter) {
+      inst_idx_filterset.insert(elem);
+    }
   }
+  memfiltered_instrument_internal (module, inst_idx_filterset, max_accesses);
 }
 /************************************************/
 
@@ -430,9 +501,9 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
     void (*encode_callback)(WasmModule&, int)) {
 
   std::vector<uint32_t> inst_idx_filter;
+  uint32_t max_accesses = memaccess_dry_run(module).size();
   if (path.empty()) {
-    uint32_t num_accesses = memaccess_dry_run(module).size();
-    inst_idx_filter.resize(num_accesses);
+    inst_idx_filter.resize(max_accesses);
     std::iota (inst_idx_filter.begin(), inst_idx_filter.end(), 1);
   }
   else {
@@ -444,7 +515,7 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
   int partition_size = (num_accesses * percent) / 100;
 
   std::vector<WasmModule> module_set(cluster_size);
-  auto loop = [&module_set, &module, &inst_idx_filter, &partition_size, &encode_callback](const int a, const int b) {
+  auto loop = [&module_set, &module, &inst_idx_filter, &max_accesses, &partition_size, &encode_callback](const int a, const int b) {
     for (int i = a; i < b; i++) {
       WasmModule module_copy = module;
       std::set<uint32_t> partition;
@@ -452,7 +523,7 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
       std::sample(inst_idx_filter.begin(), inst_idx_filter.end(), 
                   std::inserter(partition, partition.end()), partition_size,
                   std::mt19937{std::random_device{}()});
-      memfiltered_instrument_internal (module_copy, partition);
+      memfiltered_instrument_internal (module_copy, partition, max_accesses);
       if (encode_callback) {
         encode_callback(module_copy, i);
       }
@@ -577,10 +648,10 @@ std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module,
     int cluster_size, const std::string& path) {
 
   std::unordered_map<InstBasePtr, uint32_t> access_idx_map = memaccess_dry_run (module);
+  uint32_t max_accesses = access_idx_map.size();
   std::unordered_set<uint32_t> inst_idx_filter;
   if (path.empty()) {
-    uint32_t num_accesses = access_idx_map.size();
-    for (uint32_t i = 1; i <= num_accesses; i++) {
+    for (uint32_t i = 1; i <= max_accesses; i++) {
       inst_idx_filter.insert(i);
     }
   }
@@ -601,7 +672,7 @@ std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module,
 
   std::vector<WasmModule> module_set(cluster_size, module);
   for (int i = 0; i < cluster_size; i++) {
-    memfiltered_instrument_internal (module_set[i], inst_idx_partitions[i]);
+    memfiltered_instrument_internal (module_set[i], inst_idx_partitions[i], max_accesses);
   }
 
   return module_set;
