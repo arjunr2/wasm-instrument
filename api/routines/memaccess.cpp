@@ -50,6 +50,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     PUSH_INST (BlockInst(v));  \
     PUSH_INST (I32ConstInst(mem_base)); \
     PUSH_INST (I32Load8UInst(0, access_idx)); \
+    PUSH_INST (I32EqzInst()); \
     PUSH_INST (BrIfInst(0));  \
   }
 
