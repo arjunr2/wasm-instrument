@@ -7,6 +7,8 @@
 #include <deque>
 #include <iostream>
 #include <string>
+#include <cstring>
+#include <random>
 
 
 typedef std::queue<std::string> ArgVec;
@@ -162,6 +164,18 @@ destroy_instrument_module (WasmModule* mod) {
 void 
 destroy_file_buf (byte* file_buf) {
   free(file_buf);
+}
+
+
+byte* generate_rand_instmask(int percent, uint32_t len) {
+  std::vector<byte> v(len, 0);
+  uint32_t count = (len * percent) / 100;
+  std::fill_n(v.begin(), count, 1);
+  std::shuffle(v.begin(), v.end(), std::mt19937{std::random_device{}()});
+
+  byte *mask = (byte*) malloc(len);
+  memcpy(mask, v.data(), len);
+  return mask;
 }
 
 

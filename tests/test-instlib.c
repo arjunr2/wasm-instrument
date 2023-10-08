@@ -52,4 +52,16 @@ int main() {
   destroy_file_buf(filebuf2);
 
   unload_file(&start, &end);
+
+  /* Bitmask generator */
+  int len = 50;
+  for (int i = 10; i < 40; i+=10) {
+    byte *mask = generate_rand_instmask(i, len);
+    printf("V: ");
+    for (int j = 0; j < len; j++) {
+      printf("%d ", mask[j]);
+    }
+    printf("\n");
+    free(mask);
+  }
 }

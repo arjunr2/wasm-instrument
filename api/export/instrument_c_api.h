@@ -54,6 +54,11 @@ load_file(const char* path, byte** start, byte** end);
 ssize_t 
 unload_file(byte** start, byte** end);
 
+/* Helper methods */
+/* Generate random byte-vector of 0/1s
+ * Caller is responsible for freeing */
+byte* generate_rand_instmask(int percent, uint32_t len);
+
 
 #ifdef __cplusplus
 }
