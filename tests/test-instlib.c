@@ -55,13 +55,14 @@ int main() {
 
   /* Bitmask generator */
   int len = 50;
+  byte *mask = (byte*) malloc(len);
   for (int i = 10; i < 40; i+=10) {
-    byte *mask = generate_rand_instmask(i, len);
+    fill_rand_instmask(mask, i, len);
     printf("V: ");
     for (int j = 0; j < len; j++) {
       printf("%d ", mask[j]);
     }
     printf("\n");
-    free(mask);
   }
+  free(mask);
 }

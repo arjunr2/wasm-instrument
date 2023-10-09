@@ -55,9 +55,8 @@ ssize_t
 unload_file(byte** start, byte** end);
 
 /* Helper methods */
-/* Generate random byte-vector of 0/1s
- * Caller is responsible for freeing */
-byte* generate_rand_instmask(int percent, uint32_t len);
+/* Fill random byte-vector of size 'len' with 0/1s */
+void fill_rand_instmask(byte *mask, int percent, uint32_t len);
 
 
 #ifdef __cplusplus
