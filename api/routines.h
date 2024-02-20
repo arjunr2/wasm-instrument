@@ -20,3 +20,6 @@ std::vector<WasmModule> memaccess_stochastic_instrument (WasmModule &module,
 
 std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module, 
     int cluster_size, const std::string& path);
+
+void func_entry_instrument (WasmModule &module);
+
