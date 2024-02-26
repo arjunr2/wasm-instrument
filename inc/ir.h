@@ -324,6 +324,8 @@ class WasmModule {
     inline FuncDecl* get_start_fn() { return this->start_fn; }
     inline uint32_t get_num_customs() { return this->customs.size(); }
 
+    /* Debug Accessor */
+    inline std::list<DebugNameAssoc>* getFnDebugNames() { return this->fn_names_debug; }
 
     /* Scope view of function code */
     ScopeList gen_scopes_from_instructions(FuncDecl *func);

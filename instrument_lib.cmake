@@ -7,6 +7,7 @@ set (INSTRUMENT_DIR ${CMAKE_CURRENT_LIST_DIR})
 file (GLOB_RECURSE INSTRUMENT_LIB_SRCS 
             ${INSTRUMENT_DIR}/src/*.c 
             ${INSTRUMENT_DIR}/src/*.cpp 
+            ${INSTRUMENT_DIR}/api/*.c
             ${INSTRUMENT_DIR}/api/*.cpp)
 
 add_library (instrumentlib ${INSTRUMENT_LIB_SRCS})
