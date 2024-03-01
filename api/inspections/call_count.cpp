@@ -10,6 +10,7 @@ std::string call_count_inspect(WasmModule &module) {
     if (!module.isImport(entry.func)) {
       uint32_t calls = 0;
       uint32_t indirects = 0;
+      uint32_t num_inst = 0;
       for (auto &inst: entry.func->instructions) {
         switch(inst->getOpcode()) {
           case WASM_OP_CALL_INDIRECT:
@@ -20,10 +21,12 @@ std::string call_count_inspect(WasmModule &module) {
                       break;
           default:    {};
         }
+        num_inst++;
       }
       cJSON *js = cJSON_CreateObject();
       cJSON_AddNumberToObject(js, "calls", calls);
       cJSON_AddNumberToObject(js, "indirects", indirects);
+      cJSON_AddNumberToObject(js, "inst_count", num_inst);
       cJSON_AddItemToObject(json_out, entry.name.c_str(), js);
     }
   }
