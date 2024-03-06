@@ -10,7 +10,9 @@ file (GLOB_RECURSE INSTRUMENT_LIB_SRCS
             ${INSTRUMENT_DIR}/api/*.c
             ${INSTRUMENT_DIR}/api/*.cpp)
 
-add_library (instrumentlib ${INSTRUMENT_LIB_SRCS})
-target_include_directories (instrumentlib PRIVATE ${INSTRUMENT_DIR}/inc ${INSTRUMENT_DIR})
+add_library (wasminstrument ${INSTRUMENT_LIB_SRCS})
+target_include_directories (wasminstrument PRIVATE ${INSTRUMENT_DIR}/inc ${INSTRUMENT_DIR})
 
 set (INSTRUMENT_EXPORT_DIR ${INSTRUMENT_DIR}/api/export)
+
+install (TARGETS wasminstrument DESTINATION .)

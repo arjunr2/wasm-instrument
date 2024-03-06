@@ -7,16 +7,16 @@ include(instrument_lib.cmake)
 include_directories (inc . api/cjson)
 # --- Main executables --- #
 add_executable (instrument main.cpp)
-target_link_libraries (instrument instrumentlib -lm -lpthread)
+target_link_libraries (instrument wasminstrument -lm -lpthread)
 
 add_executable (inspect inspect.cpp)
-target_link_libraries (inspect instrumentlib -lm -lpthread)
+target_link_libraries (inspect wasminstrument -lm -lpthread)
 
 # --- Test executables --- #
 add_executable (test-leb tests/test-leb.cpp src/common.cpp)
 
 add_executable (test-instlib tests/test-instlib.c)
-target_link_libraries (test-instlib instrumentlib -lpthread)
+target_link_libraries (test-instlib wasminstrument -lpthread)
 
 add_custom_command(
   TARGET instrument
