@@ -8,7 +8,7 @@
   "ImmLocalInst": ["uint32_t idx"],
   "ImmGlobalInst": ["GlobalDecl* global"],
   "ImmTableInst": ["TableDecl* table"],
-  "ImmMemargInst": ["uint32_t align", "uint32_t offset"],
+  "ImmMemargInst": ["uint32_t align", "uint32_t offset", "MemoryDecl* mem"],
   "ImmI32Inst": ["uint32_t value"],
   "ImmF64Inst": ["double value"],
   "ImmMemoryInst": ["MemoryDecl* mem"],
@@ -25,5 +25,5 @@
   "ImmV128Inst": ["V128_t value"],
   "ImmLaneidxInst": ["Laneidx_t idx"],
   "ImmLaneidx16Inst": ["Laneidx16_t idxs"],
-  "ImmMemargLaneidxInst": ["uint32_t align", "uint32_t offset", "Laneidx_t idx"]
+  "ImmMemargLaneidxInst": ["uint32_t align", "uint32_t offset", "MemoryDecl* mem", "Laneidx_t idx"]
 }

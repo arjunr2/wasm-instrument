@@ -40,6 +40,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
 
   InstBasePtr instruction = (*itr);
   std::shared_ptr<ImmMemargInst> mem_inst = static_pointer_cast<ImmMemargInst>(instruction);
+  MemoryDecl *memory = mem_inst->getMemory();
 
   InstList addinst;
   bool insblock = false;
@@ -49,7 +50,7 @@ InstList setup_logappend_args (std::list<InstBasePtr>::iterator &itr,
     insblock = true;  \
     PUSH_INST (BlockInst(v));  \
     PUSH_INST (I32ConstInst(mem_base)); \
-    PUSH_INST (I32Load8UInst(0, access_idx)); \
+    PUSH_INST (I32Load8UInst(0, access_idx, memory)); \
     PUSH_INST (I32EqzInst()); \
     PUSH_INST (BrIfInst(0));  \
   }

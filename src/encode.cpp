@@ -386,10 +386,8 @@ bytedeque WasmModule::encode_data_section() {
     switch (data.flag) {
       case 0: encode_const_off_expr(bdeq, data.opcode_offset, data.mem_offset); break;
       case 1: break;
-      // Assume only 1 Memory possible
       case 2: {
-        ERR ("For data flag 2, will default to writing memidx=0\n");
-        WR_U32 (0);
+        WR_U32 (this->getMemoryIdx(data.mem));
         encode_const_off_expr(bdeq, data.opcode_offset, data.mem_offset);
         break;
       }

@@ -102,117 +102,117 @@ class GlobalSetInst: public ImmGlobalInst {
 
 class I64LoadInst: public ImmMemargInst {
 	public:
-	I64LoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_LOAD, align,offset) { }
+	I64LoadInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_LOAD, align,offset,mem) { }
 };
 
 class F32LoadInst: public ImmMemargInst {
 	public:
-	F32LoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_F32_LOAD, align,offset) { }
+	F32LoadInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_F32_LOAD, align,offset,mem) { }
 };
 
 class I32LoadInst: public ImmMemargInst {
 	public:
-	I32LoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_LOAD, align,offset) { }
+	I32LoadInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_LOAD, align,offset,mem) { }
 };
 
 class F64LoadInst: public ImmMemargInst {
 	public:
-	F64LoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_F64_LOAD, align,offset) { }
+	F64LoadInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_F64_LOAD, align,offset,mem) { }
 };
 
 class I32Load8SInst: public ImmMemargInst {
 	public:
-	I32Load8SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_LOAD8_S, align,offset) { }
+	I32Load8SInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_LOAD8_S, align,offset,mem) { }
 };
 
 class I32Load8UInst: public ImmMemargInst {
 	public:
-	I32Load8UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_LOAD8_U, align,offset) { }
+	I32Load8UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_LOAD8_U, align,offset,mem) { }
 };
 
 class I32Load16SInst: public ImmMemargInst {
 	public:
-	I32Load16SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_LOAD16_S, align,offset) { }
+	I32Load16SInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_LOAD16_S, align,offset,mem) { }
 };
 
 class I32Load16UInst: public ImmMemargInst {
 	public:
-	I32Load16UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_LOAD16_U, align,offset) { }
+	I32Load16UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_LOAD16_U, align,offset,mem) { }
 };
 
 class I64Load8SInst: public ImmMemargInst {
 	public:
-	I64Load8SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_LOAD8_S, align,offset) { }
+	I64Load8SInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_LOAD8_S, align,offset,mem) { }
 };
 
 class I64Load8UInst: public ImmMemargInst {
 	public:
-	I64Load8UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_LOAD8_U, align,offset) { }
+	I64Load8UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_LOAD8_U, align,offset,mem) { }
 };
 
 class I64Load16SInst: public ImmMemargInst {
 	public:
-	I64Load16SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_LOAD16_S, align,offset) { }
+	I64Load16SInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_LOAD16_S, align,offset,mem) { }
 };
 
 class I64Load16UInst: public ImmMemargInst {
 	public:
-	I64Load16UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_LOAD16_U, align,offset) { }
+	I64Load16UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_LOAD16_U, align,offset,mem) { }
 };
 
 class I64Load32SInst: public ImmMemargInst {
 	public:
-	I64Load32SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_LOAD32_S, align,offset) { }
+	I64Load32SInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_LOAD32_S, align,offset,mem) { }
 };
 
 class I64Load32UInst: public ImmMemargInst {
 	public:
-	I64Load32UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_LOAD32_U, align,offset) { }
+	I64Load32UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_LOAD32_U, align,offset,mem) { }
 };
 
 class I32StoreInst: public ImmMemargInst {
 	public:
-	I32StoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_STORE, align,offset) { }
+	I32StoreInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_STORE, align,offset,mem) { }
 };
 
 class I64StoreInst: public ImmMemargInst {
 	public:
-	I64StoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_STORE, align,offset) { }
+	I64StoreInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_STORE, align,offset,mem) { }
 };
 
 class F32StoreInst: public ImmMemargInst {
 	public:
-	F32StoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_F32_STORE, align,offset) { }
+	F32StoreInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_F32_STORE, align,offset,mem) { }
 };
 
 class F64StoreInst: public ImmMemargInst {
 	public:
-	F64StoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_F64_STORE, align,offset) { }
+	F64StoreInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_F64_STORE, align,offset,mem) { }
 };
 
 class I32Store8Inst: public ImmMemargInst {
 	public:
-	I32Store8Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_STORE8, align,offset) { }
+	I32Store8Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_STORE8, align,offset,mem) { }
 };
 
 class I32Store16Inst: public ImmMemargInst {
 	public:
-	I32Store16Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_STORE16, align,offset) { }
+	I32Store16Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_STORE16, align,offset,mem) { }
 };
 
 class I64Store8Inst: public ImmMemargInst {
 	public:
-	I64Store8Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_STORE8, align,offset) { }
+	I64Store8Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_STORE8, align,offset,mem) { }
 };
 
 class I64Store16Inst: public ImmMemargInst {
 	public:
-	I64Store16Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_STORE16, align,offset) { }
+	I64Store16Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_STORE16, align,offset,mem) { }
 };
 
 class I64Store32Inst: public ImmMemargInst {
 	public:
-	I64Store32Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_STORE32, align,offset) { }
+	I64Store32Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_STORE32, align,offset,mem) { }
 };
 
 class MemorySizeInst: public ImmMemoryInst {
@@ -1007,62 +1007,62 @@ class MemoryFillInst: public ImmMemoryInst {
 
 class V128LoadInst: public ImmMemargInst {
 	public:
-	V128LoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD, align,offset) { }
+	V128LoadInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD, align,offset,mem) { }
 };
 
 class V128Load8x8SInst: public ImmMemargInst {
 	public:
-	V128Load8x8SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD8x8_S, align,offset) { }
+	V128Load8x8SInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD8x8_S, align,offset,mem) { }
 };
 
 class V128Load8x8UInst: public ImmMemargInst {
 	public:
-	V128Load8x8UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD8x8_U, align,offset) { }
+	V128Load8x8UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD8x8_U, align,offset,mem) { }
 };
 
 class V128Load16x4SInst: public ImmMemargInst {
 	public:
-	V128Load16x4SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD16x4_S, align,offset) { }
+	V128Load16x4SInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD16x4_S, align,offset,mem) { }
 };
 
 class V128Load16x4UInst: public ImmMemargInst {
 	public:
-	V128Load16x4UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD16x4_U, align,offset) { }
+	V128Load16x4UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD16x4_U, align,offset,mem) { }
 };
 
 class V128Load32x2SInst: public ImmMemargInst {
 	public:
-	V128Load32x2SInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD32x2_S, align,offset) { }
+	V128Load32x2SInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD32x2_S, align,offset,mem) { }
 };
 
 class V128Load32x2UInst: public ImmMemargInst {
 	public:
-	V128Load32x2UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD32x2_U, align,offset) { }
+	V128Load32x2UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD32x2_U, align,offset,mem) { }
 };
 
 class V128Load8SplatInst: public ImmMemargInst {
 	public:
-	V128Load8SplatInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD8_SPLAT, align,offset) { }
+	V128Load8SplatInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD8_SPLAT, align,offset,mem) { }
 };
 
 class V128Load16SplatInst: public ImmMemargInst {
 	public:
-	V128Load16SplatInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD16_SPLAT, align,offset) { }
+	V128Load16SplatInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD16_SPLAT, align,offset,mem) { }
 };
 
 class V128Load32SplatInst: public ImmMemargInst {
 	public:
-	V128Load32SplatInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD32_SPLAT, align,offset) { }
+	V128Load32SplatInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD32_SPLAT, align,offset,mem) { }
 };
 
 class V128Load64SplatInst: public ImmMemargInst {
 	public:
-	V128Load64SplatInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD64_SPLAT, align,offset) { }
+	V128Load64SplatInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD64_SPLAT, align,offset,mem) { }
 };
 
 class V128StoreInst: public ImmMemargInst {
 	public:
-	V128StoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_STORE, align,offset) { }
+	V128StoreInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_STORE, align,offset,mem) { }
 };
 
 class V128ConstInst: public ImmV128Inst {
@@ -1427,52 +1427,52 @@ class V128AnyTrueInst: public ImmNoneInst {
 
 class V128Load8LaneInst: public ImmMemargLaneidxInst {
 	public:
-	V128Load8LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD8_LANE, align,offset,idx) { }
+	V128Load8LaneInst(uint32_t align,uint32_t offset,MemoryDecl* mem,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD8_LANE, align,offset,mem,idx) { }
 };
 
 class V128Load16LaneInst: public ImmMemargLaneidxInst {
 	public:
-	V128Load16LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD16_LANE, align,offset,idx) { }
+	V128Load16LaneInst(uint32_t align,uint32_t offset,MemoryDecl* mem,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD16_LANE, align,offset,mem,idx) { }
 };
 
 class V128Load32LaneInst: public ImmMemargLaneidxInst {
 	public:
-	V128Load32LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD32_LANE, align,offset,idx) { }
+	V128Load32LaneInst(uint32_t align,uint32_t offset,MemoryDecl* mem,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD32_LANE, align,offset,mem,idx) { }
 };
 
 class V128Load64LaneInst: public ImmMemargLaneidxInst {
 	public:
-	V128Load64LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD64_LANE, align,offset,idx) { }
+	V128Load64LaneInst(uint32_t align,uint32_t offset,MemoryDecl* mem,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_LOAD64_LANE, align,offset,mem,idx) { }
 };
 
 class V128Store8LaneInst: public ImmMemargLaneidxInst {
 	public:
-	V128Store8LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE8_LANE, align,offset,idx) { }
+	V128Store8LaneInst(uint32_t align,uint32_t offset,MemoryDecl* mem,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE8_LANE, align,offset,mem,idx) { }
 };
 
 class V128Store16LaneInst: public ImmMemargLaneidxInst {
 	public:
-	V128Store16LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE16_LANE, align,offset,idx) { }
+	V128Store16LaneInst(uint32_t align,uint32_t offset,MemoryDecl* mem,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE16_LANE, align,offset,mem,idx) { }
 };
 
 class V128Store32LaneInst: public ImmMemargLaneidxInst {
 	public:
-	V128Store32LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE32_LANE, align,offset,idx) { }
+	V128Store32LaneInst(uint32_t align,uint32_t offset,MemoryDecl* mem,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE32_LANE, align,offset,mem,idx) { }
 };
 
 class V128Store64LaneInst: public ImmMemargLaneidxInst {
 	public:
-	V128Store64LaneInst(uint32_t align,uint32_t offset,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE64_LANE, align,offset,idx) { }
+	V128Store64LaneInst(uint32_t align,uint32_t offset,MemoryDecl* mem,Laneidx_t idx) : ImmMemargLaneidxInst(WASM_OP_V128_STORE64_LANE, align,offset,mem,idx) { }
 };
 
 class V128Load32ZeroInst: public ImmMemargInst {
 	public:
-	V128Load32ZeroInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD32_ZERO, align,offset) { }
+	V128Load32ZeroInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD32_ZERO, align,offset,mem) { }
 };
 
 class V128Load64ZeroInst: public ImmMemargInst {
 	public:
-	V128Load64ZeroInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_V128_LOAD64_ZERO, align,offset) { }
+	V128Load64ZeroInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_V128_LOAD64_ZERO, align,offset,mem) { }
 };
 
 class F32x4DemoteF64x2ZeroInst: public ImmNoneInst {
@@ -2187,17 +2187,17 @@ class F64x2ConvertLowI32x4UInst: public ImmNoneInst {
 
 class MemoryAtomicNotifyInst: public ImmMemargInst {
 	public:
-	MemoryAtomicNotifyInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_NOTIFY, align,offset) { }
+	MemoryAtomicNotifyInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_NOTIFY, align,offset,mem) { }
 };
 
 class MemoryAtomicWait32Inst: public ImmMemargInst {
 	public:
-	MemoryAtomicWait32Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_WAIT32, align,offset) { }
+	MemoryAtomicWait32Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_WAIT32, align,offset,mem) { }
 };
 
 class MemoryAtomicWait64Inst: public ImmMemargInst {
 	public:
-	MemoryAtomicWait64Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_WAIT64, align,offset) { }
+	MemoryAtomicWait64Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_MEMORY_ATOMIC_WAIT64, align,offset,mem) { }
 };
 
 class AtomicFenceInst: public ImmNoneInst {
@@ -2207,316 +2207,316 @@ class AtomicFenceInst: public ImmNoneInst {
 
 class I32AtomicLoadInst: public ImmMemargInst {
 	public:
-	I32AtomicLoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD, align,offset) { }
+	I32AtomicLoadInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD, align,offset,mem) { }
 };
 
 class I64AtomicLoadInst: public ImmMemargInst {
 	public:
-	I64AtomicLoadInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD, align,offset) { }
+	I64AtomicLoadInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD, align,offset,mem) { }
 };
 
 class I32AtomicLoad8UInst: public ImmMemargInst {
 	public:
-	I32AtomicLoad8UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD8_U, align,offset) { }
+	I32AtomicLoad8UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD8_U, align,offset,mem) { }
 };
 
 class I32AtomicLoad16UInst: public ImmMemargInst {
 	public:
-	I32AtomicLoad16UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD16_U, align,offset) { }
+	I32AtomicLoad16UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_LOAD16_U, align,offset,mem) { }
 };
 
 class I64AtomicLoad8UInst: public ImmMemargInst {
 	public:
-	I64AtomicLoad8UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD8_U, align,offset) { }
+	I64AtomicLoad8UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD8_U, align,offset,mem) { }
 };
 
 class I64AtomicLoad16UInst: public ImmMemargInst {
 	public:
-	I64AtomicLoad16UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD16_U, align,offset) { }
+	I64AtomicLoad16UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD16_U, align,offset,mem) { }
 };
 
 class I64AtomicLoad32UInst: public ImmMemargInst {
 	public:
-	I64AtomicLoad32UInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD32_U, align,offset) { }
+	I64AtomicLoad32UInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_LOAD32_U, align,offset,mem) { }
 };
 
 class I32AtomicStoreInst: public ImmMemargInst {
 	public:
-	I32AtomicStoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE, align,offset) { }
+	I32AtomicStoreInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE, align,offset,mem) { }
 };
 
 class I64AtomicStoreInst: public ImmMemargInst {
 	public:
-	I64AtomicStoreInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE, align,offset) { }
+	I64AtomicStoreInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE, align,offset,mem) { }
 };
 
 class I32AtomicStore8Inst: public ImmMemargInst {
 	public:
-	I32AtomicStore8Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE8, align,offset) { }
+	I32AtomicStore8Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE8, align,offset,mem) { }
 };
 
 class I32AtomicStore16Inst: public ImmMemargInst {
 	public:
-	I32AtomicStore16Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE16, align,offset) { }
+	I32AtomicStore16Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_STORE16, align,offset,mem) { }
 };
 
 class I64AtomicStore8Inst: public ImmMemargInst {
 	public:
-	I64AtomicStore8Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE8, align,offset) { }
+	I64AtomicStore8Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE8, align,offset,mem) { }
 };
 
 class I64AtomicStore16Inst: public ImmMemargInst {
 	public:
-	I64AtomicStore16Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE16, align,offset) { }
+	I64AtomicStore16Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE16, align,offset,mem) { }
 };
 
 class I64AtomicStore32Inst: public ImmMemargInst {
 	public:
-	I64AtomicStore32Inst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE32, align,offset) { }
+	I64AtomicStore32Inst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_STORE32, align,offset,mem) { }
 };
 
 class I32AtomicRmwAddInst: public ImmMemargInst {
 	public:
-	I32AtomicRmwAddInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_ADD, align,offset) { }
+	I32AtomicRmwAddInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_ADD, align,offset,mem) { }
 };
 
 class I64AtomicRmwAddInst: public ImmMemargInst {
 	public:
-	I64AtomicRmwAddInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_ADD, align,offset) { }
+	I64AtomicRmwAddInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_ADD, align,offset,mem) { }
 };
 
 class I32AtomicRmw8AddUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw8AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_ADD_U, align,offset) { }
+	I32AtomicRmw8AddUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_ADD_U, align,offset,mem) { }
 };
 
 class I32AtomicRmw16AddUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw16AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_ADD_U, align,offset) { }
+	I32AtomicRmw16AddUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_ADD_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw8AddUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw8AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_ADD_U, align,offset) { }
+	I64AtomicRmw8AddUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_ADD_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw16AddUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw16AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_ADD_U, align,offset) { }
+	I64AtomicRmw16AddUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_ADD_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw32AddUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw32AddUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_ADD_U, align,offset) { }
+	I64AtomicRmw32AddUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_ADD_U, align,offset,mem) { }
 };
 
 class I32AtomicRmwSubInst: public ImmMemargInst {
 	public:
-	I32AtomicRmwSubInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_SUB, align,offset) { }
+	I32AtomicRmwSubInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_SUB, align,offset,mem) { }
 };
 
 class I64AtomicRmwSubInst: public ImmMemargInst {
 	public:
-	I64AtomicRmwSubInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_SUB, align,offset) { }
+	I64AtomicRmwSubInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_SUB, align,offset,mem) { }
 };
 
 class I32AtomicRmw8SubUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw8SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_SUB_U, align,offset) { }
+	I32AtomicRmw8SubUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_SUB_U, align,offset,mem) { }
 };
 
 class I32AtomicRmw16SubUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw16SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_SUB_U, align,offset) { }
+	I32AtomicRmw16SubUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_SUB_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw8SubUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw8SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_SUB_U, align,offset) { }
+	I64AtomicRmw8SubUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_SUB_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw16SubUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw16SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_SUB_U, align,offset) { }
+	I64AtomicRmw16SubUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_SUB_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw32SubUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw32SubUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_SUB_U, align,offset) { }
+	I64AtomicRmw32SubUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_SUB_U, align,offset,mem) { }
 };
 
 class I32AtomicRmwAndInst: public ImmMemargInst {
 	public:
-	I32AtomicRmwAndInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_AND, align,offset) { }
+	I32AtomicRmwAndInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_AND, align,offset,mem) { }
 };
 
 class I64AtomicRmwAndInst: public ImmMemargInst {
 	public:
-	I64AtomicRmwAndInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_AND, align,offset) { }
+	I64AtomicRmwAndInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_AND, align,offset,mem) { }
 };
 
 class I32AtomicRmw8AndUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw8AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_AND_U, align,offset) { }
+	I32AtomicRmw8AndUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_AND_U, align,offset,mem) { }
 };
 
 class I32AtomicRmw16AndUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw16AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_AND_U, align,offset) { }
+	I32AtomicRmw16AndUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_AND_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw8AndUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw8AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_AND_U, align,offset) { }
+	I64AtomicRmw8AndUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_AND_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw16AndUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw16AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_AND_U, align,offset) { }
+	I64AtomicRmw16AndUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_AND_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw32AndUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw32AndUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_AND_U, align,offset) { }
+	I64AtomicRmw32AndUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_AND_U, align,offset,mem) { }
 };
 
 class I32AtomicRmwOrInst: public ImmMemargInst {
 	public:
-	I32AtomicRmwOrInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_OR, align,offset) { }
+	I32AtomicRmwOrInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_OR, align,offset,mem) { }
 };
 
 class I64AtomicRmwOrInst: public ImmMemargInst {
 	public:
-	I64AtomicRmwOrInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_OR, align,offset) { }
+	I64AtomicRmwOrInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_OR, align,offset,mem) { }
 };
 
 class I32AtomicRmw8OrUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw8OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_OR_U, align,offset) { }
+	I32AtomicRmw8OrUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_OR_U, align,offset,mem) { }
 };
 
 class I32AtomicRmw16OrUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw16OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_OR_U, align,offset) { }
+	I32AtomicRmw16OrUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_OR_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw8OrUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw8OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_OR_U, align,offset) { }
+	I64AtomicRmw8OrUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_OR_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw16OrUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw16OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_OR_U, align,offset) { }
+	I64AtomicRmw16OrUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_OR_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw32OrUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw32OrUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_OR_U, align,offset) { }
+	I64AtomicRmw32OrUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_OR_U, align,offset,mem) { }
 };
 
 class I32AtomicRmwXorInst: public ImmMemargInst {
 	public:
-	I32AtomicRmwXorInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_XOR, align,offset) { }
+	I32AtomicRmwXorInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_XOR, align,offset,mem) { }
 };
 
 class I64AtomicRmwXorInst: public ImmMemargInst {
 	public:
-	I64AtomicRmwXorInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_XOR, align,offset) { }
+	I64AtomicRmwXorInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_XOR, align,offset,mem) { }
 };
 
 class I32AtomicRmw8XorUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw8XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_XOR_U, align,offset) { }
+	I32AtomicRmw8XorUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_XOR_U, align,offset,mem) { }
 };
 
 class I32AtomicRmw16XorUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw16XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_XOR_U, align,offset) { }
+	I32AtomicRmw16XorUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_XOR_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw8XorUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw8XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_XOR_U, align,offset) { }
+	I64AtomicRmw8XorUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_XOR_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw16XorUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw16XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_XOR_U, align,offset) { }
+	I64AtomicRmw16XorUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_XOR_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw32XorUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw32XorUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_XOR_U, align,offset) { }
+	I64AtomicRmw32XorUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_XOR_U, align,offset,mem) { }
 };
 
 class I32AtomicRmwXchgInst: public ImmMemargInst {
 	public:
-	I32AtomicRmwXchgInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_XCHG, align,offset) { }
+	I32AtomicRmwXchgInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_XCHG, align,offset,mem) { }
 };
 
 class I64AtomicRmwXchgInst: public ImmMemargInst {
 	public:
-	I64AtomicRmwXchgInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_XCHG, align,offset) { }
+	I64AtomicRmwXchgInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_XCHG, align,offset,mem) { }
 };
 
 class I32AtomicRmw8XchgUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw8XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_XCHG_U, align,offset) { }
+	I32AtomicRmw8XchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_XCHG_U, align,offset,mem) { }
 };
 
 class I32AtomicRmw16XchgUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw16XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_XCHG_U, align,offset) { }
+	I32AtomicRmw16XchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_XCHG_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw8XchgUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw8XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_XCHG_U, align,offset) { }
+	I64AtomicRmw8XchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_XCHG_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw16XchgUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw16XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_XCHG_U, align,offset) { }
+	I64AtomicRmw16XchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_XCHG_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw32XchgUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw32XchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_XCHG_U, align,offset) { }
+	I64AtomicRmw32XchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_XCHG_U, align,offset,mem) { }
 };
 
 class I32AtomicRmwCmpxchgInst: public ImmMemargInst {
 	public:
-	I32AtomicRmwCmpxchgInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_CMPXCHG, align,offset) { }
+	I32AtomicRmwCmpxchgInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW_CMPXCHG, align,offset,mem) { }
 };
 
 class I64AtomicRmwCmpxchgInst: public ImmMemargInst {
 	public:
-	I64AtomicRmwCmpxchgInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_CMPXCHG, align,offset) { }
+	I64AtomicRmwCmpxchgInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW_CMPXCHG, align,offset,mem) { }
 };
 
 class I32AtomicRmw8CmpxchgUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw8CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U, align,offset) { }
+	I32AtomicRmw8CmpxchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U, align,offset,mem) { }
 };
 
 class I32AtomicRmw16CmpxchgUInst: public ImmMemargInst {
 	public:
-	I32AtomicRmw16CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U, align,offset) { }
+	I32AtomicRmw16CmpxchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw8CmpxchgUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw8CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U, align,offset) { }
+	I64AtomicRmw8CmpxchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw16CmpxchgUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw16CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U, align,offset) { }
+	I64AtomicRmw16CmpxchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U, align,offset,mem) { }
 };
 
 class I64AtomicRmw32CmpxchgUInst: public ImmMemargInst {
 	public:
-	I64AtomicRmw32CmpxchgUInst(uint32_t align,uint32_t offset) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U, align,offset) { }
+	I64AtomicRmw32CmpxchgUInst(uint32_t align,uint32_t offset,MemoryDecl* mem) : ImmMemargInst(WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U, align,offset,mem) { }
 };
 

@@ -143,6 +143,7 @@ struct DataDecl {
   uint32_t flag;
   Opcode_t opcode_offset;
   uint32_t mem_offset;
+  MemoryDecl *mem;
   bytearr bytes;
 };
 

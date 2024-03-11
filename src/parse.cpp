@@ -458,13 +458,19 @@ void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
     data.flag = flag;
     /* Offset */
     uint32_t offset = -1;
+    /* Memory */
+    MemoryDecl *mem = NULL;
     switch (flag) {
-      case 0: offset = decode_const_off_expr(buf, data.opcode_offset); break;
+      case 0: {
+        offset = decode_const_off_expr(buf, data.opcode_offset);
+        mem = this->getMemory(0);
+        break;
+      }
       case 1: offset = 0; break;
       case 2: {
         uint32_t mem_idx = RD_U32();
-        if (mem_idx != 0) throw std::runtime_error("Flag error: Only memory 0 allowed\n");
         offset = decode_const_off_expr(buf, data.opcode_offset);
+        mem = this->getMemory(mem_idx);
         break;
       }
       default: {
@@ -473,6 +479,7 @@ void WasmModule::decode_data_section(buffer_t &buf, uint32_t len) {
       }
     }
     data.mem_offset = offset;
+    data.mem = mem;
     /* Size val */
     uint32_t num_bytes = RD_U32();
     data.bytes = RD_BYTESTR(num_bytes);

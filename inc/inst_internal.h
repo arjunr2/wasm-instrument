@@ -162,13 +162,15 @@ class ImmTableInst: public InstBase {
 class ImmMemargInst: public InstBase {
   uint32_t align;
   uint32_t offset;
+  MemoryDecl *mem;
   public:
     ImmMemargInst (WasmModule &module, Opcode_t opcode, buffer_t &buf);
-    ImmMemargInst (Opcode_t opcode, uint32_t align, uint32_t offset) : 
-      InstBase(opcode), align(align), offset(offset) { }
+    ImmMemargInst (Opcode_t opcode, uint32_t align, uint32_t offset, MemoryDecl *mem) : 
+      InstBase(opcode), align(align), offset(offset), mem(mem) { }
 
     inline uint32_t getOffset()  { return offset; }
     inline uint32_t getAlign()   { return align; }
+    inline MemoryDecl* getMemory() { return mem; }
 
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
@@ -393,13 +395,15 @@ class ImmMemargLaneidxInst: public InstBase {
   uint32_t align;
   uint32_t offset;
   Laneidx_t laneidx;
+  MemoryDecl *mem;
   public:
     ImmMemargLaneidxInst (WasmModule &module, Opcode_t opcode, buffer_t &buf);
-    ImmMemargLaneidxInst (Opcode_t opcode, uint32_t align, uint32_t offset, Laneidx_t laneidx) : 
-      InstBase(opcode), align(align), offset(offset), laneidx(laneidx) { }
+    ImmMemargLaneidxInst (Opcode_t opcode, uint32_t align, uint32_t offset, MemoryDecl *mem, Laneidx_t laneidx) : 
+      InstBase(opcode), align(align), offset(offset), mem(mem), laneidx(laneidx) { }
 
     inline uint32_t getOffset()  { return offset; }
     inline uint32_t getAlign()   { return align; }
+    inline MemoryDecl* getMemory() { return mem; }
     inline Laneidx_t getLaneidx() { return laneidx; }
 
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;

@@ -102,9 +102,16 @@ TIME_SECTION(2, log_str,
   DescriptorPatch<ImportDecl> (this->imports.list, mod, reassign_cache);
   DescriptorPatch<ExportDecl> (this->exports, mod, reassign_cache);
   FunctionPatch (mod, reassign_cache);
+  // Element Patch
   for (auto &elem : this->elems) {
     for (auto &fn_ptr : elem.func_indices) {
       fn_ptr = REASSIGN(fn_ptr, Func, FuncDecl);
+    }
+  }
+  // Data Patch
+  for (auto &data : this->datas) {
+    if (data.flag != 1) {
+      data.mem = REASSIGN(data.mem, Memory, MemoryDecl);
     }
   }
 
@@ -155,7 +162,7 @@ TIME_SECTION(3, "Time for func patching",
         PCS (IMM_LOCAL, ImmLocalInst, ispec->getLocal());
         PCS (IMM_GLOBAL, ImmGlobalInst, REASSIGN(ispec->getGlobal(), Global, GlobalDecl));
         PCS (IMM_TABLE, ImmTableInst, REASSIGN(ispec->getTable(), Table, TableDecl));
-        PCS (IMM_MEMARG, ImmMemargInst, ispec->getAlign(), ispec->getOffset());
+        PCS (IMM_MEMARG, ImmMemargInst, ispec->getAlign(), ispec->getOffset(), REASSIGN(ispec->getMemory(), Memory, MemoryDecl));
         PCS (IMM_I32, ImmI32Inst, ispec->getValue());
         PCS (IMM_F64, ImmF64Inst, ispec->getValue());
         PCS (IMM_MEMORY, ImmMemoryInst, REASSIGN(ispec->getMemory(), Memory, MemoryDecl));
@@ -173,7 +180,7 @@ TIME_SECTION(3, "Time for func patching",
         PCS (IMM_V128, ImmV128Inst, ispec->getValue());
         PCS (IMM_LANEIDX, ImmLaneidxInst, ispec->getLaneidx());
         PCS (IMM_LANEIDX16, ImmLaneidx16Inst, ispec->getLaneidx16());
-        PCS (IMM_MEMARG_LANEIDX, ImmMemargLaneidxInst, ispec->getAlign(), ispec->getOffset(), ispec->getLaneidx());
+        PCS (IMM_MEMARG_LANEIDX, ImmMemargLaneidxInst, ispec->getAlign(), ispec->getOffset(), REASSIGN(ispec->getMemory(), Memory, MemoryDecl), ispec->getLaneidx());
       }
     }
   }
