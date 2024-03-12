@@ -292,10 +292,7 @@ class WasmModule {
     inline FuncDecl* getFunc(uint32_t idx)      { return GET_DEQUE_ELEM(this->funcs, idx); }
     inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_DEQUE_ELEM(this->globals, idx); }
     inline TableDecl* getTable(uint32_t idx)    { return GET_LIST_ELEM(this->tables, idx); }
-    inline MemoryDecl* getMemory(uint32_t idx)  { 
-      if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
-      return GET_LIST_ELEM(this->mems, idx); 
-    }
+    inline MemoryDecl* getMemory(uint32_t idx)  { return GET_LIST_ELEM(this->mems, idx); }
     inline DataDecl* getData(uint32_t idx)      { return GET_LIST_ELEM(this->datas, idx); }
     inline ImportDecl* getImport(uint32_t idx)  { return GET_LIST_ELEM(this->imports.list, idx); }
 
@@ -304,11 +301,7 @@ class WasmModule {
     inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_DEQUE_IDX(this->funcs, func); }
     inline uint32_t getGlobalIdx(GlobalDecl *global)  const { return GET_DEQUE_IDX(this->globals, global); }
     inline uint32_t getTableIdx(TableDecl *table)     const { return GET_LIST_IDX(this->tables, table); }
-    inline uint32_t getMemoryIdx(MemoryDecl *mem)     const {
-      uint32_t idx = GET_LIST_IDX(this->mems, mem);
-      if (idx)  throw std::runtime_error("Memory Immediate must be 0\n");
-      return idx;
-    }
+    inline uint32_t getMemoryIdx(MemoryDecl *mem)     const { return GET_LIST_IDX(this->mems, mem); }
     inline uint32_t getDataIdx(DataDecl *data)        const { return GET_LIST_IDX(this->datas, data); }
     inline uint32_t getImportIdx(ImportDecl *import)  const { return GET_LIST_IDX(this->imports.list, import); }
 

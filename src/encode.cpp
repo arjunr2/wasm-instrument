@@ -203,9 +203,6 @@ bytedeque WasmModule::encode_memory_section() {
   if (num_mems == 0) {
     return {};
   }
-  if (mems.size() != 1) {
-    throw std::runtime_error ("Can only encode up to 1 Memory!");
-  }
 
   WR_U32 (num_mems);
   for (auto itr = std::next(mems.begin(), imports.num_mems);
