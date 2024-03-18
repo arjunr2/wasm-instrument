@@ -163,6 +163,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   else if (routine == "func-entry") { func_entry_instrument(module); }
   else if (routine == "loop-count") { loop_instrument(module); }
   else if (routine == "opcode-count") { opcode_count_instrument(module); }
+  else if (routine == "r3-record") { r3_record_instrument(module); }
   else {
     printf("Unsupported instrumentation scheme\n");
   }

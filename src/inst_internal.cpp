@@ -127,7 +127,7 @@ ImmMemargInst::ImmMemargInst (WasmModule &module, Opcode_t opcode, buffer_t &buf
     : InstBase(opcode) {
   uint32_t align = RD_U32();
   bool has_memidx = ((align >> 6) & 1);
-  this->align = (align & 0x4f);
+  this->align = (align & 0x3f);
   this->mem = module.getMemory (has_memidx ? (RD_U32()) : 0);
   this->offset = RD_U32();
 }
@@ -135,7 +135,7 @@ ImmMemargInst::ImmMemargInst (WasmModule &module, Opcode_t opcode, buffer_t &buf
 void ImmMemargInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t memidx = module.getMemoryIdx(this->mem);
   if (memidx) {
-    WR_U32 ((this->align | 0x70));
+    WR_U32 ((this->align | 0x40));
     WR_U32 (module.getMemoryIdx(this->mem));
   } else {
     WR_U32 (this->align);
@@ -368,7 +368,7 @@ ImmMemargLaneidxInst::ImmMemargLaneidxInst (WasmModule &module, Opcode_t opcode,
     : InstBase(opcode) {
   uint32_t align = RD_U32();
   bool has_memidx = ((align >> 6) & 1);
-  this->align = (align & 0x4f);
+  this->align = (align & 0x3f);
   this->mem = module.getMemory (has_memidx ? (RD_U32()) : 0);
   this->offset = RD_U32();
   this->laneidx = RD_BYTE();
@@ -377,7 +377,7 @@ ImmMemargLaneidxInst::ImmMemargLaneidxInst (WasmModule &module, Opcode_t opcode,
 void ImmMemargLaneidxInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t memidx = module.getMemoryIdx(this->mem);
   if (memidx) {
-    WR_U32 ((this->align | 0x70));
+    WR_U32 ((this->align | 0x40));
     WR_U32 (module.getMemoryIdx(this->mem));
   } else {
     WR_U32 (this->align);

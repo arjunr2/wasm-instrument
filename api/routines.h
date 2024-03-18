@@ -23,3 +23,4 @@ std::vector<WasmModule> memaccess_balanced_instrument (WasmModule &module,
 
 void func_entry_instrument (WasmModule &module);
 
+void r3_record_instrument (WasmModule &module);
