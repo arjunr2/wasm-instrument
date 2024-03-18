@@ -338,7 +338,7 @@ class WasmModule {
     GlobalDecl* add_global  (GlobalDecl &global, const char* export_name = NULL);
     TableDecl*  add_table   (TableDecl &table, const char* export_name = NULL);
     MemoryDecl* add_memory  (MemoryDecl &mem, const char* export_name = NULL);
-    FuncDecl*   add_func    (FuncDecl &func, const char* export_name = NULL);
+    FuncDecl*   add_func    (FuncDecl &func, const char* export_name = NULL, const char* debug_name = NULL);
 
     /* Imported values */
     ImportDecl* add_import (ImportInfo &info, GlobalInfo &global);

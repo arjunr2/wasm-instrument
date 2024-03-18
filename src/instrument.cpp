@@ -30,31 +30,36 @@ SigDecl* WasmModule::add_sig (SigDecl &sig, bool force_dup) {
 }
 
 
-#define ADD_FIELD(field) { \
+#define ADD_FIELD(field) ({ \
   this->field##s.push_back(field);  \
   auto &ref = this->field##s.back();  \
   if (export_name) {  \
     add_export(export_name, ref); \
   } \
-  return &ref; \
-}
+  &ref; \
+})
 
 /* Add a global to a module */
 GlobalDecl* WasmModule::add_global (GlobalDecl &global, const char* export_name) {
-  ADD_FIELD (global);
+  return ADD_FIELD (global);
 }
 
 TableDecl* WasmModule::add_table (TableDecl &table, const char* export_name) {
-  ADD_FIELD (table);
+  return ADD_FIELD (table);
 }
 
 MemoryDecl* WasmModule::add_memory (MemoryDecl &mem, const char* export_name) {
-  ADD_FIELD (mem); 
+  return ADD_FIELD (mem);
 }
 
-FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name) {
+FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name, const char* debug_name) {
   func.sig = this->add_sig(*(func.sig), false);
-  ADD_FIELD (func);
+  FuncDecl* ifn = ADD_FIELD (func);
+  if (this->fn_names_debug) {
+    DebugNameAssoc dname = { .func = ifn, .name = debug_name };
+    this->fn_names_debug->push_back (dname);
+  }
+  return ifn;
 }
 
 #define IMPORT_INJ_KIND_GLOBAL(objref)
