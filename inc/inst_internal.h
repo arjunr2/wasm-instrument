@@ -172,6 +172,8 @@ class ImmMemargInst: public InstBase {
     inline uint32_t getAlign()   { return align; }
     inline MemoryDecl* getMemory() { return mem; }
 
+    inline void setMemory(MemoryDecl *mem) { this->mem = mem; }
+
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
 
@@ -210,6 +212,8 @@ class ImmMemoryInst: public InstBase {
       InstBase(opcode), mem(mem) { }
 
     inline MemoryDecl* getMemory() { return mem; }
+
+    inline void setMemory(MemoryDecl *mem) { this->mem = mem; }
 
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
@@ -290,6 +294,8 @@ class ImmDataMemoryInst: public InstBase {
     inline DataDecl* getData()      { return data; }
     inline MemoryDecl* getMemory()  { return mem; }
 
+    inline void setMemory(MemoryDecl *mem) { this->mem = mem; }
+
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
 
@@ -317,6 +323,9 @@ class ImmMemorycpInst: public InstBase {
 
     inline MemoryDecl* getDstMemory()  { return dst; }
     inline MemoryDecl* getSrcMemory()  { return src; }
+
+    inline void setDstMemory(MemoryDecl *mem) { this->dst = mem; }
+    inline void setSrcMemory(MemoryDecl *mem) { this->src = mem; }
 
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };
@@ -405,6 +414,8 @@ class ImmMemargLaneidxInst: public InstBase {
     inline uint32_t getAlign()   { return align; }
     inline MemoryDecl* getMemory() { return mem; }
     inline Laneidx_t getLaneidx() { return laneidx; }
+
+    inline void setMemory(MemoryDecl *mem) { this->mem = mem; }
 
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };

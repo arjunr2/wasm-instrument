@@ -46,7 +46,7 @@ args_t parse_args(int argc, char* argv[]) {
       default:
         ERR("Usage: %s [--trace (opt)] [--multithread (opt)] [--time (opt)] "
             "[--scheme SCHEME] [--args SCHEME_ARGS (opt)] [--out OUTFILE] input-file\n", argv[0]);
-        ERR("Supported schemes: \'empty\', \'sample\', \'loop-count\', \'memaccess-stochastic\'\n");
+        ERR("Supported schemes: \'empty\', \'sample\', \'loop-count\', \'memaccess-stochastic\', \'r3-record\'\n");
         exit(opt != 'h');
     }
   }
