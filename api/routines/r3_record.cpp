@@ -42,7 +42,8 @@
                                                                                      \
   InstList addinst;                                                                  \
   bool insblock = false;                                                             \
-  int stackrets = 0;
+  int stackrets = 0;                                                                 \
+  uint16_t opcode = instruction->getOpcode();
 
 
 #define SETUP_END(_insttype, updater)                  \
@@ -57,14 +58,16 @@
   }
 
 
-#define DEFAULT_ERR_CASE() ERR("R3-Record-Error: Cannot support opcode %04X (%s)\n", instruction->getOpcode(), opcode_table[instruction->getOpcode()].mnemonic);
+#define DEFAULT_ERR_CASE() {  \
+  ERR("R3-Record-Error: Cannot support opcode %04X (%s)\n", opcode, opcode_table[opcode].mnemonic); \
+}
 
 InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[7], uint32_t sig_idxs[7], MemoryDecl *record_mem) {
 
   SETUP_INIT(ImmMemargLaneidxInst);
 
-  switch (instruction->getOpcode()) {
+  switch (opcode) {
     /*** ImmMemargLaneidx type ***/
     default: DEFAULT_ERR_CASE()
   }
@@ -82,7 +85,7 @@ InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
   SETUP_INIT(ImmMemoryInst);
 
-  switch (instruction->getOpcode()) {
+  switch (opcode) {
     /*** ImmMemory type ***/
     /* I32 | I32 | I32 */
     case WASM_OP_MEMORY_FILL: {
@@ -128,7 +131,7 @@ InstList setup_data_memory_record_instrument (std::list<InstBasePtr>::iterator &
 
   SETUP_INIT(ImmDataMemoryInst);
 
-  switch (instruction->getOpcode()) {
+  switch (opcode) {
     /*** ImmDataMemory type ***/
     /* I32 | I32 | I32 */
     case WASM_OP_MEMORY_INIT: {
@@ -160,7 +163,7 @@ InstList setup_memorycp_record_instrument (std::list<InstBasePtr>::iterator &itr
 
   SETUP_INIT(ImmMemorycpInst);
 
-  switch (instruction->getOpcode()) {
+  switch (opcode) {
     /*** ImmMemorycp type ***/
     /* I32 | I32 | I32 */
     case WASM_OP_MEMORY_COPY: {
@@ -192,7 +195,7 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
   SETUP_INIT(ImmMemargInst);
 
-  switch (instruction->getOpcode()) {
+  switch (opcode) {
     /*** ImmMemarg type ***/
     /* I32 */
     case WASM_OP_I32_LOAD:
@@ -401,6 +404,84 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 }
 
+/* Add pages of memory statically. Return the start page */
+uint32_t add_pages(WasmModule &module, uint32_t num_pages) {
+  wasm_limits_t &memlimit = module.getMemory(0)->limits;
+  uint32_t memdata_end = memlimit.initial * PAGE_SIZE;
+
+  uint32_t retval = memlimit.initial;
+  memlimit.initial += num_pages;
+  if (memlimit.has_max && (memlimit.initial > memlimit.max)) {
+    throw std::runtime_error("Not enough memory to instrument");
+  }
+  return retval;
+}
+
+
+/* Mutex Lock/Unlock function creation */
+void create_helper_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl *funcs[2]) {
+  MemoryDecl *memory = module.getMemory(0);
+  SigDecl sig = {.params= {}, .results = {}};
+  SigDecl *void_sig = module.add_sig(sig, false);
+  uint32_t void_sig_idx = module.getSigIdx(void_sig);
+
+#define INST(v) InstBasePtr(new v)
+  FuncDecl fn1 = {
+    .sig = void_sig,
+    .pure_locals = wasm_localcsv_t(),
+    .num_pure_locals = 0,
+    .instructions = {
+      INST (BlockInst(void_sig_idx)),
+      INST (LoopInst(void_sig_idx)),
+      // Try lock
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(0)),
+      INST (I32ConstInst(1)),
+      INST (I32AtomicRmwCmpxchgInst(2, 0, memory)),
+      //
+      INST (I32EqzInst()),
+      INST (BrIfInst(1)),
+      // Wait for notify
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(1)),
+      INST (I64ConstInst(-1)),
+      INST (MemoryAtomicWait32Inst(2, 0, memory)),
+      //
+      INST (DropInst()),
+      INST (BrInst(0)),
+
+      INST (EndInst()),
+      INST (EndInst()),
+      INST (EndInst())
+    }
+  };
+
+  FuncDecl fn2 = {
+    .sig = void_sig,
+    .pure_locals = wasm_localcsv_t(),
+    .num_pure_locals = 0,
+    .instructions = {
+      // Unlock
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(0)),
+      INST (I32AtomicStoreInst(2, 0, memory)),
+      // Notify 1 thread max
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(1)),
+      INST (MemoryAtomicNotifyInst(2, 0, memory)),
+      //
+      INST (DropInst()),
+      INST (EndInst())
+    }
+  };
+#undef INST
+
+  funcs[0] = module.add_func(fn1, NULL, "lock_hostcall");
+  funcs[1] = module.add_func(fn2, NULL, "unlock_hostcall");
+}
+
+
+/* Main R3 Record function */
 void r3_record_instrument (WasmModule &module) {
   MemoryDecl *def_mem = module.getMemory(0);
   MemoryDecl new_mem = *def_mem;
@@ -423,8 +504,20 @@ void r3_record_instrument (WasmModule &module) {
     sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
   }
 
+  /* Create custom mutex lock/unlock functions */
+  FuncDecl *mutex_funcs[2];
+  uint32_t mutex_addr = (add_pages(module, 1) * PAGE_SIZE);
+  create_helper_funcs(module, mutex_addr, mutex_funcs);
+
+  FuncDecl *lock_fn = mutex_funcs[0];
+  FuncDecl *unlock_fn = mutex_funcs[1];
+
   /* Instrument all functions */
   for (auto &func : module.Funcs()) {
+    /* Do not instrument the instrument-hook functions */
+    if ((&func == lock_fn) || (&func == unlock_fn)) {
+      continue;
+    }
     uint32_t local_indices[7] = {
       func.add_local(WASM_TYPE_F64),
       func.add_local(WASM_TYPE_F32),
@@ -438,7 +531,7 @@ void r3_record_instrument (WasmModule &module) {
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
       InstBasePtr &instruction = *institr;
       InstList addinst;
-      #define SETUP_CALL(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem)
+#define SETUP_CALL(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem)
       switch(instruction->getImmType()) {
         case IMM_MEMARG: 
           addinst = SETUP_CALL(memarg);
@@ -457,7 +550,15 @@ void r3_record_instrument (WasmModule &module) {
           break;
         default: {}; 
       }
-      insts.insert(institr, addinst.begin(), addinst.end());
+#undef SETUP_CALL
+      if (!addinst.empty()) {
+        /* Insert instructions guarded by mutex */
+        InstBasePtr lock_inst = InstBasePtr(new CallInst(lock_fn));
+        InstBasePtr unlock_inst = InstBasePtr(new CallInst(unlock_fn));
+        addinst.push_front(lock_inst);
+        insts.insert(institr, addinst.begin(), addinst.end());
+        insts.insert(std::next(institr), unlock_inst);
+      }
     }
   }
 
