@@ -71,6 +71,10 @@ void opcode_count_insthandle (WasmModule &module, ArgVec args) {
   opcode_count_instrument(module);
 }
 
+void r3_record_insthandle (WasmModule &module, ArgVec args) {
+  r3_record_instrument(module);
+}
+
 void empty_insthandle (WasmModule &module, ArgVec args) { return; }
 /* */
 
@@ -82,6 +86,7 @@ static std::vector<routines_t> inst_routines = {
   { "func-weight"         ,   0,  0,  func_weight_insthandle },
   { "loop-count"          ,   0,  0,  loop_count_insthandle },
   { "opcode-count"        ,   0,  0,  opcode_count_insthandle },
+  { "r3-record"           ,   0,  0,  r3_record_insthandle },
   { "empty"               ,   0,  0,  empty_insthandle }
 };
 

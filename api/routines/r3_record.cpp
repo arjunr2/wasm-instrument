@@ -476,8 +476,8 @@ void create_helper_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl *func
   };
 #undef INST
 
-  funcs[0] = module.add_func(fn1, NULL, "lock_hostcall");
-  funcs[1] = module.add_func(fn2, NULL, "unlock_hostcall");
+  funcs[0] = module.add_func(fn1, NULL, "lock_instrument");
+  funcs[1] = module.add_func(fn2, NULL, "unlock_instrument");
 }
 
 
@@ -548,6 +548,18 @@ void r3_record_instrument (WasmModule &module) {
         case IMM_MEMORYCP:
           addinst = SETUP_CALL(memorycp);
           break;
+        ///* Calls: Lock those to import functions */
+        //case IMM_FUNC: {
+        //                std::shared_ptr<ImmFuncInst> call_inst = static_pointer_cast<ImmFuncInst>(instruction);
+        //                if (module.isImport(call_inst->getFunc())) {
+        //                  PUSH_INST(NopInst());
+        //                }
+        //                break;
+        //               }
+        ///* Indirect Calls: Lock none */
+        //case IMM_SIG_TABLE: {
+        //                      break;
+        //                    }
         default: {}; 
       }
 #undef SETUP_CALL
