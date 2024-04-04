@@ -62,6 +62,93 @@
   ERR("R3-Record-Error: Cannot support opcode %04X (%s)\n", opcode, opcode_table[opcode].mnemonic); \
 }
 
+/* Add pages of memory statically. Return the start page */
+uint32_t add_pages(WasmModule &module, uint32_t num_pages) {
+  wasm_limits_t &memlimit = module.getMemory(0)->limits;
+  uint32_t memdata_end = memlimit.initial * PAGE_SIZE;
+
+  uint32_t retval = memlimit.initial;
+  memlimit.initial += num_pages;
+  if (memlimit.has_max && (memlimit.initial > memlimit.max)) {
+    throw std::runtime_error("Not enough memory to instrument");
+  }
+  return retval;
+}
+
+
+/* Mutex Lock/Unlock function creation */
+void create_helper_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl *funcs[2]) {
+  MemoryDecl *memory = module.getMemory(0);
+  SigDecl sig = {.params= {}, .results = {}};
+  SigDecl *void_sig = module.add_sig(sig, false);
+  uint32_t void_sig_idx = module.getSigIdx(void_sig);
+
+#define INST(v) InstBasePtr(new v)
+  FuncDecl fn1 = {
+    .sig = void_sig,
+    .pure_locals = wasm_localcsv_t(),
+    .num_pure_locals = 0,
+    .instructions = {
+      INST (BlockInst(void_sig_idx)),
+      INST (LoopInst(void_sig_idx)),
+      // Try lock
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(0)),
+      INST (I32ConstInst(1)),
+      INST (I32AtomicRmwCmpxchgInst(2, 0, memory)),
+      //
+      INST (I32EqzInst()),
+      INST (BrIfInst(1)),
+      // Wait for notify
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(1)),
+      INST (I64ConstInst(-1)),
+      INST (MemoryAtomicWait32Inst(2, 0, memory)),
+      //
+      INST (DropInst()),
+      INST (BrInst(0)),
+
+      INST (EndInst()),
+      INST (EndInst()),
+      INST (EndInst())
+    }
+  };
+
+  FuncDecl fn2 = {
+    .sig = void_sig,
+    .pure_locals = wasm_localcsv_t(),
+    .num_pure_locals = 0,
+    .instructions = {
+      // Unlock
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(0)),
+      INST (I32AtomicStoreInst(2, 0, memory)),
+      // Notify 1 thread max
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(1)),
+      INST (MemoryAtomicNotifyInst(2, 0, memory)),
+      //
+      INST (DropInst()),
+      INST (EndInst())
+    }
+  };
+#undef INST
+
+  funcs[0] = module.add_func(fn1, NULL, "lock_instrument");
+  funcs[1] = module.add_func(fn2, NULL, "unlock_instrument");
+}
+
+
+static void set_func_export_map(WasmModule &module, std::string name, std::map<FuncDecl*, std::string>& export_map) {
+  ExportDecl *exp = module.find_export(name);
+  if (exp && exp->kind == KIND_FUNC) {
+    export_map[exp->desc.func] = name;
+    return;
+  }
+  ERR("Could not find function export: \'%s\'", name.c_str());
+}
+
+
 InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[7], uint32_t sig_idxs[7], MemoryDecl *record_mem) {
 
@@ -404,89 +491,56 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 }
 
-/* Add pages of memory statically. Return the start page */
-uint32_t add_pages(WasmModule &module, uint32_t num_pages) {
-  wasm_limits_t &memlimit = module.getMemory(0)->limits;
-  uint32_t memdata_end = memlimit.initial * PAGE_SIZE;
 
-  uint32_t retval = memlimit.initial;
-  memlimit.initial += num_pages;
-  if (memlimit.has_max && (memlimit.initial > memlimit.max)) {
-    throw std::runtime_error("Not enough memory to instrument");
+InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr, 
+    uint32_t local_idxs[7], uint32_t sig_idxs[7], std::map<std::string, FuncDecl*> call_list, 
+    MemoryDecl *def_mem, MemoryDecl *record_mem, bool &post_insert) {
+
+  SETUP_INIT(ImmFuncInst);
+
+  std::shared_ptr<ImmFuncInst> call_inst = static_pointer_cast<ImmFuncInst>(instruction);
+  switch (opcode) {
+    /*** ImmMemarg type ***/
+    case WASM_OP_CALL:  {
+                          FuncDecl *target = call_inst->getFunc();
+                          if (target == call_list["SYS_mmap"]) {
+                            BLOCK_INST (-64);
+                            PUSH_INST (MemorySizeInst(def_mem));
+                            PUSH_INST (MemorySizeInst(record_mem));
+                            PUSH_INST (I32SubInst());
+                            PUSH_INST (MemoryGrowInst(record_mem));
+                            PUSH_INST (DropInst());
+                            PUSH_INST (EndInst());
+                          }
+                          post_insert = true;
+                          break;
+                        }
+      
+    default: DEFAULT_ERR_CASE();
   }
-  return retval;
-}
-
-
-/* Mutex Lock/Unlock function creation */
-void create_helper_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl *funcs[2]) {
-  MemoryDecl *memory = module.getMemory(0);
-  SigDecl sig = {.params= {}, .results = {}};
-  SigDecl *void_sig = module.add_sig(sig, false);
-  uint32_t void_sig_idx = module.getSigIdx(void_sig);
-
-#define INST(v) InstBasePtr(new v)
-  FuncDecl fn1 = {
-    .sig = void_sig,
-    .pure_locals = wasm_localcsv_t(),
-    .num_pure_locals = 0,
-    .instructions = {
-      INST (BlockInst(void_sig_idx)),
-      INST (LoopInst(void_sig_idx)),
-      // Try lock
-      INST (I32ConstInst(mutex_addr)),
-      INST (I32ConstInst(0)),
-      INST (I32ConstInst(1)),
-      INST (I32AtomicRmwCmpxchgInst(2, 0, memory)),
-      //
-      INST (I32EqzInst()),
-      INST (BrIfInst(1)),
-      // Wait for notify
-      INST (I32ConstInst(mutex_addr)),
-      INST (I32ConstInst(1)),
-      INST (I64ConstInst(-1)),
-      INST (MemoryAtomicWait32Inst(2, 0, memory)),
-      //
-      INST (DropInst()),
-      INST (BrInst(0)),
-
-      INST (EndInst()),
-      INST (EndInst()),
-      INST (EndInst())
-    }
-  };
-
-  FuncDecl fn2 = {
-    .sig = void_sig,
-    .pure_locals = wasm_localcsv_t(),
-    .num_pure_locals = 0,
-    .instructions = {
-      // Unlock
-      INST (I32ConstInst(mutex_addr)),
-      INST (I32ConstInst(0)),
-      INST (I32AtomicStoreInst(2, 0, memory)),
-      // Notify 1 thread max
-      INST (I32ConstInst(mutex_addr)),
-      INST (I32ConstInst(1)),
-      INST (MemoryAtomicNotifyInst(2, 0, memory)),
-      //
-      INST (DropInst()),
-      INST (EndInst())
-    }
-  };
-#undef INST
-
-  funcs[0] = module.add_func(fn1, NULL, "lock_instrument");
-  funcs[1] = module.add_func(fn2, NULL, "unlock_instrument");
+  return addinst;
 }
 
 
 /* Main R3 Record function */
 void r3_record_instrument (WasmModule &module) {
+  /* Create custom mutex lock/unlock functions */
+  FuncDecl *mutex_funcs[2];
+  uint32_t mutex_addr = (add_pages(module, 1) * PAGE_SIZE);
+  create_helper_funcs(module, mutex_addr, mutex_funcs);
+
+  FuncDecl *lock_fn = mutex_funcs[0];
+  FuncDecl *unlock_fn = mutex_funcs[1];
+
+  /* Create new memory: Must happen after adding all instrumentation pages */
   MemoryDecl *def_mem = module.getMemory(0);
   MemoryDecl new_mem = *def_mem;
 
   MemoryDecl *record_mem = module.add_memory(new_mem);
+
+  /* Generate quick lookup of ignored exported function idxs */
+  std::map<FuncDecl*, std::string> func_export_map;
+  set_func_export_map(module, "wasm_memory_grow", func_export_map);
 
   /* Pre-compute sig indices since list indexing is expensive */
   uint32_t sig_indices[7];
@@ -504,13 +558,8 @@ void r3_record_instrument (WasmModule &module) {
     sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
   }
 
-  /* Create custom mutex lock/unlock functions */
-  FuncDecl *mutex_funcs[2];
-  uint32_t mutex_addr = (add_pages(module, 1) * PAGE_SIZE);
-  create_helper_funcs(module, mutex_addr, mutex_funcs);
-
-  FuncDecl *lock_fn = mutex_funcs[0];
-  FuncDecl *unlock_fn = mutex_funcs[1];
+  std::map<std::string, FuncDecl*> instrument_call_map;
+  instrument_call_map["SYS_mmap"] = module.find_import_func("wali", "SYS_mmap");
 
   /* Instrument all functions */
   for (auto &func : module.Funcs()) {
@@ -528,8 +577,11 @@ void r3_record_instrument (WasmModule &module) {
       func.add_local(WASM_TYPE_I32)
     };
     InstList &insts = func.instructions;
+
+    /** Instrumenting memory-related instructions **/
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
       InstBasePtr &instruction = *institr;
+      bool post_insert = false;
       InstList addinst;
 #define SETUP_CALL(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem)
       switch(instruction->getImmType()) {
@@ -549,13 +601,10 @@ void r3_record_instrument (WasmModule &module) {
           addinst = SETUP_CALL(memorycp);
           break;
         ///* Calls: Lock those to import functions */
-        //case IMM_FUNC: {
-        //                std::shared_ptr<ImmFuncInst> call_inst = static_pointer_cast<ImmFuncInst>(instruction);
-        //                if (module.isImport(call_inst->getFunc())) {
-        //                  PUSH_INST(NopInst());
-        //                }
-        //                break;
-        //               }
+        case IMM_FUNC: 
+          addinst = setup_call_record_instrument(institr, local_indices, sig_indices, 
+              instrument_call_map, def_mem, record_mem, post_insert);
+          break;
         ///* Indirect Calls: Lock none */
         //case IMM_SIG_TABLE: {
         //                      break;
@@ -564,12 +613,22 @@ void r3_record_instrument (WasmModule &module) {
       }
 #undef SETUP_CALL
       if (!addinst.empty()) {
-        /* Insert instructions guarded by mutex */
+        auto next_institr = std::next(institr);
+        /* Insert instructions guarded by mutex (pre/post) */
         InstBasePtr lock_inst = InstBasePtr(new CallInst(lock_fn));
         InstBasePtr unlock_inst = InstBasePtr(new CallInst(unlock_fn));
-        addinst.push_front(lock_inst);
-        insts.insert(institr, addinst.begin(), addinst.end());
-        insts.insert(std::next(institr), unlock_inst);
+        if (post_insert) {
+          insts.insert(institr, lock_inst);
+          addinst.push_back(unlock_inst);
+          insts.insert(next_institr, addinst.begin(), addinst.end());
+        } 
+        else {
+          addinst.push_front(lock_inst);
+          insts.insert(institr, addinst.begin(), addinst.end());
+          insts.insert(next_institr, unlock_inst);
+        }
+        /* No need to iterate over our inserted instructions */
+        institr = std::prev(next_institr);
       }
     }
   }

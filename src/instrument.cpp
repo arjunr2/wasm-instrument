@@ -155,6 +155,30 @@ ExportDecl* WasmModule::find_export (std::string export_name) {
   return NULL;
 }
 
+#define IMPORT_FIND(kd, field) { \
+  for (auto &import: this->imports.list) { \
+    if (import.mod_name == mod_name && import.member_name == member_name && kd == import.kind)  \
+      return import.desc.field; \
+  } \
+  return NULL;  \
+}
+
+GlobalDecl* WasmModule::find_import_global (std::string mod_name, std::string member_name) {
+  IMPORT_FIND (KIND_GLOBAL, global);
+}
+
+TableDecl* WasmModule::find_import_table (std::string mod_name, std::string member_name) {
+  IMPORT_FIND (KIND_TABLE, table);
+}
+
+MemoryDecl* WasmModule::find_import_memory (std::string mod_name, std::string member_name) {
+  IMPORT_FIND (KIND_FUNC, mem);
+}
+
+FuncDecl* WasmModule::find_import_func (std::string mod_name, std::string member_name) {
+  IMPORT_FIND (KIND_FUNC, func);
+}
+
 
 /* Replace methods */
 void WasmModule::replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst) {}

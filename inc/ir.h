@@ -314,6 +314,7 @@ class WasmModule {
     /* Section Accessors */
     inline std::deque <FuncDecl> &Funcs() { return this->funcs; }
     inline std::deque <GlobalDecl> &Globals() { return this->globals; }
+    inline std::list  <ExportDecl> &Exports() { return this->exports; }
 
     inline FuncDecl* get_start_fn() { return this->start_fn; }
     inline uint32_t get_num_customs() { return this->customs.size(); }
@@ -354,6 +355,11 @@ class WasmModule {
 
     /* Find */
     ExportDecl* find_export (std::string export_name);
+
+    GlobalDecl* find_import_global (std::string mod_name, std::string member_name);
+    TableDecl* find_import_table (std::string mod_name, std::string member_name);
+    MemoryDecl* find_import_memory (std::string mod_name, std::string member_name);
+    FuncDecl* find_import_func (std::string mod_name, std::string member_name);
 
     /* Replace uses: UNIMPLEMENTED */
     void replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst);
