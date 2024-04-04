@@ -145,7 +145,7 @@ static void set_func_export_map(WasmModule &module, std::string name, std::map<F
     export_map[exp->desc.func] = name;
     return;
   }
-  ERR("Could not find function export: \'%s\'", name.c_str());
+  ERR("Could not find function export: \'%s\'\n", name.c_str());
 }
 
 
