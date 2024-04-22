@@ -190,6 +190,7 @@ InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr,
                               }
     /* */
     case WASM_OP_MEMORY_SIZE: {
+                                 BLOCK_INST (-0x40);
                                  stackrets = 1;
                                  break;
                               }
@@ -541,6 +542,7 @@ void r3_record_instrument (WasmModule &module) {
   /* Generate quick lookup of ignored exported function idxs */
   std::map<FuncDecl*, std::string> func_export_map;
   set_func_export_map(module, "wasm_memory_grow", func_export_map);
+  set_func_export_map(module, "wasm_memory_size", func_export_map);
 
   /* Pre-compute sig indices since list indexing is expensive */
   uint32_t sig_indices[7];
@@ -564,7 +566,7 @@ void r3_record_instrument (WasmModule &module) {
   /* Instrument all functions */
   for (auto &func : module.Funcs()) {
     /* Do not instrument the instrument-hook functions */
-    if ((&func == lock_fn) || (&func == unlock_fn)) {
+    if ((&func == lock_fn) || (&func == unlock_fn) || (func_export_map.count(&func))) {
       continue;
     }
     uint32_t local_indices[7] = {
@@ -600,7 +602,7 @@ void r3_record_instrument (WasmModule &module) {
         case IMM_MEMORYCP:
           addinst = SETUP_CALL(memorycp);
           break;
-        ///* Calls: Lock those to import functions */
+        /* Calls: Lock those to import functions */
         case IMM_FUNC: 
           addinst = setup_call_record_instrument(institr, local_indices, sig_indices, 
               instrument_call_map, def_mem, record_mem, post_insert);
