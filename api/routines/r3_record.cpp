@@ -719,7 +719,7 @@ void r3_record_instrument (WasmModule &module) {
     if ((&func == lock_fn) || (&func == unlock_fn) || (func_export_map.count(&func))) {
       continue;
     }
-    uint32_t local_indices[11] = {
+    uint32_t local_indices[15] = {
       func.add_local(WASM_TYPE_F64),
       func.add_local(WASM_TYPE_F32),
       func.add_local(WASM_TYPE_I64),
@@ -727,7 +727,12 @@ void r3_record_instrument (WasmModule &module) {
       func.add_local(WASM_TYPE_I32),
       func.add_local(WASM_TYPE_I32),
       func.add_local(WASM_TYPE_I32),
-      /* Save values for loads */
+      /* Save values for shadow loads */
+      func.add_local(WASM_TYPE_I32),
+      func.add_local(WASM_TYPE_I64),
+      func.add_local(WASM_TYPE_F32),
+      func.add_local(WASM_TYPE_F64),
+      /* Save values for original loads */
       func.add_local(WASM_TYPE_I32),
       func.add_local(WASM_TYPE_I64),
       func.add_local(WASM_TYPE_F32),
@@ -777,7 +782,7 @@ void r3_record_instrument (WasmModule &module) {
         /* Insert instructions guarded by mutex (pre/post) */
         InstList preinst, postinst;
 
-        InstList traceinst = gen_trace_instructions(instruction, access_tracker++, memaccess, ret, tracedump_fn, &local_indices[7]);
+        InstList traceinst = gen_trace_instructions(instruction, access_tracker++, memaccess, ret, tracedump_fn, &local_indices[11]);
         InstBasePtr lock_inst = InstBasePtr(new CallInst(lock_fn));
         InstBasePtr unlock_inst = InstBasePtr(new CallInst(unlock_fn));
 
