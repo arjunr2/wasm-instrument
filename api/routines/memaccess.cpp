@@ -382,9 +382,9 @@ static void memfiltered_instrument_internal (
 
   /* Memory space for instrument mask: Insert as global as well */
   wasm_limits_t &memlimit = module.getMemory(0)->limits;
-  uint32_t memdata_end = memlimit.initial * PAGE_SIZE;
+  uint32_t memdata_end = memlimit.initial * WASM_PAGE_SIZE;
 
-  memlimit.initial += (max_accesses + (PAGE_SIZE - 1)) / PAGE_SIZE;
+  memlimit.initial += (max_accesses + (WASM_PAGE_SIZE - 1)) / WASM_PAGE_SIZE;
   if (memlimit.has_max && (memlimit.initial > memlimit.max)) {
     throw std::runtime_error("Not enough memory to instrument");
   }
@@ -392,7 +392,7 @@ static void memfiltered_instrument_internal (
   GlobalDecl global = {
     .type = WASM_TYPE_I32,
     .is_mutable = false,
-    .init_expr_bytes = INIT_EXPR (I32_CONST, memdata_end/PAGE_SIZE)
+    .init_expr_bytes = INIT_EXPR (I32_CONST, memdata_end/WASM_PAGE_SIZE)
   };
   GlobalDecl* max_insts_globref = module.add_global(global, "__inst_membase");
 

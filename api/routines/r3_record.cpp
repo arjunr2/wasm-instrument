@@ -114,7 +114,7 @@ typedef struct {
 /* Add pages of memory statically. Return the start page */
 uint32_t add_pages(WasmModule &module, uint32_t num_pages) {
   wasm_limits_t &memlimit = module.getMemory(0)->limits;
-  uint32_t memdata_end = memlimit.initial * PAGE_SIZE;
+  uint32_t memdata_end = memlimit.initial * WASM_PAGE_SIZE;
 
   uint32_t retval = memlimit.initial;
   memlimit.initial += num_pages;
@@ -676,7 +676,7 @@ void r3_record_instrument (WasmModule &module) {
 
   /* Create custom mutex lock/unlock functions */
   FuncDecl *mutex_funcs[2];
-  uint32_t mutex_addr = (add_pages(module, 1) * PAGE_SIZE);
+  uint32_t mutex_addr = (add_pages(module, 1) * WASM_PAGE_SIZE);
   create_helper_funcs(module, mutex_addr, mutex_funcs);
 
   FuncDecl *lock_fn = mutex_funcs[0];

@@ -7,7 +7,7 @@
 #define WASM_MAGIC 0x6d736100u
 #define WASM_VERSION 1
 
-#define PAGE_SIZE 65536
+#define WASM_PAGE_SIZE 65536
 
 /* Other common defines/expressions */
 #define INIT_EXPR(type, val) ({  \
