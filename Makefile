@@ -1,21 +1,23 @@
 .PHONY: build build-wali
 
-WALI_DIR := 
+WALI := 
+
+-include $(WALI)/wali_config.mk
 
 build:
 	cmake -B build -DCMAKE_BUILD_TYPE=Debug
 	make -C build -j6
 
 build-wali:
-	cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DCMAKE_VERBOSE_MAKEFILE=True \
-    -DCMAKE_C_FLAGS="--target=wasm32-wasi-threads -pthread --sysroot=/$(WALI_DIR)/wali-musl/sysroot -matomics -mbulk-memory -mmutable-globals -msign-ext" \
-    -DCMAKE_CXX_FLAGS="-stdlib=libc++ --target=wasm32-wasi-threads -pthread --sysroot=/$(WALI_DIR)/wali-musl/sysroot -I/$(WALI_DIR)/libcxx/include/c++/v1 -matomics -mbulk-memory -mmutable-globals -msign-ext" \
-    -DCMAKE_LINKER=wasm-ld \
-		-DCMAKE_EXE_LINKER_FLAGS="-L/$(WALI_DIR)/wali-musl/sysroot/lib -L/$(WALI_DIR)/libcxx/lib -Wl,--shared-memory -Wl,--export-memory -Wl,--max-memory=2147483648" \
-    -DCMAKE_AR=/$(WALI_DIR)/llvm-project/build/bin/llvm-ar \
-    -DCMAKE_RANLIB=/$(WALI_DIR)/llvm-project/build/bin/llvm-ranlib
-	make -C build -j6
-
+	cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=$(WALI_CXX) -DCMAKE_C_COMPILER=$(WALI_CC) -DCMAKE_VERBOSE_MAKEFILE=True \
+    -DCMAKE_C_FLAGS="$(WALI_COMMON_CFLAGS)" \
+    -DCMAKE_CXX_FLAGS="$(WALI_COMMON_CXXFLAGS)" \
+    -DCMAKE_LINKER=$(WALI_LD) \
+		-DCMAKE_EXE_LINKER_FLAGS="$(WALI_COMMON_LDFLAGS)" \
+    -DCMAKE_AR=$(WALI_AR) \
+    -DCMAKE_RANLIB=$(WALI_RANLIB)
+	make -C build
 
 clean:
 	rm -r build
+
