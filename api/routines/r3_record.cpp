@@ -1,4 +1,6 @@
 #include "routine_common.h"
+#include "r3_memops_table.h"
+#include <cstring>
 
 typedef enum {
   RET_PH = 0,
@@ -9,23 +11,19 @@ typedef enum {
   RET_F64
 } WasmRet;
 
-typedef enum {
-  ACC_PH = 0,
-  ACC_LOAD,
-  ACC_STORE,
-  ACC_NONE
-} AccessType;
-
 typedef struct {
   WasmRet type;
   uint32_t local;
 } RetVal;
 
 typedef struct {
-  AccessType type;
-  uint32_t addr_local;
+  RetVal ret;
+  MemopProp prop;
   uint32_t offset;
-} Memaccess;
+  uint32_t base_addr_local;
+  uint32_t accwidth_local; // For prop.size = -1, the width is dynamically stored in this local
+  uint16_t opcode; // Opcode is kept for size=0, which handles special cases
+} RecordInstInfo;
 
 /* Instruction-generation macros */
 #define PUSH_INST(inv)      addinst.push_back(InstBasePtr(new inv));
@@ -69,24 +67,27 @@ typedef struct {
   uint32_t sig_i32_3 = sig_idxs[5];                                                  \
   uint32_t sig_i32_i64_2 = sig_idxs[6];                                              \
                                                                                      \
+  /* Only used for some operations that determine width */                           \
+  uint32_t local_accwidth = -1;                                                      \
+                                                                                     \
   InstBasePtr instruction = (*itr);                                                  \
   std::shared_ptr<_insttype> mem_inst = static_pointer_cast<_insttype>(instruction); \
                                                                                      \
   InstList addinst;                                                                  \
   bool insblock = false;                                                             \
   uint32_t mem_offset = 0;                                                           \
-  AccessType acc_type = ACC_PH;                                                      \
   WasmRet stackrets = RET_PH;                                                        \
   uint16_t opcode = instruction->getOpcode();
 
 
 #define SETUP_END(_insttype, updater)                                                           \
+  RetVal ret = { .type = stackrets, .local = (uint32_t)-1 };                                    \
   if (insblock) {                                                                               \
     _insttype *new_meminst = new _insttype(*mem_inst);                                          \
     { updater; }                                                                                \
     PUSH_INST_PTR (new_meminst);                                                                \
     ret.type = stackrets;                                                                       \
-    switch (stackrets) {                                                                        \
+    switch (ret.type) {                                                                         \
       case RET_I32: ret.local = local_idxs[7]; PUSH_INST (LocalSetInst(local_i32_ret)); break;  \
       case RET_I64: ret.local = local_idxs[8]; PUSH_INST (LocalSetInst(local_i64_ret)); break;  \
       case RET_F32: ret.local = local_idxs[9]; PUSH_INST (LocalSetInst(local_f32_ret)); break;  \
@@ -95,7 +96,9 @@ typedef struct {
     }                                                                                           \
     PUSH_INST (EndInst());                                                                      \
   }                                                                                             \
-  memaccess = { .type = acc_type, .addr_local = local_addr, .offset = mem_offset };
+  recinfo = { .ret = ret, .prop = memop_inst_table[opcode],                                     \
+    .offset = mem_offset, .base_addr_local = local_addr,                                        \
+    .accwidth_local = local_accwidth, .opcode = opcode };
 
 
 #define DEFAULT_ERR_CASE() {  \
@@ -104,10 +107,6 @@ typedef struct {
 
 #define SET_RET(r) {                                   \
   stackrets = ((stackrets == RET_PH) ? r : stackrets); \
-}
-
-#define SET_ACC(ty) {  \
-  acc_type = ((acc_type == ACC_PH) ? ty : acc_type);  \
 }
 
 
@@ -200,7 +199,7 @@ static void set_func_export_map(WasmModule &module, std::string name, std::map<F
 
 InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem,
-    uint32_t access_idx, FuncDecl *tracedump_fn, RetVal &ret, Memaccess &memaccess) {
+    uint32_t access_idx, RecordInstInfo &recinfo) {
 
   SETUP_INIT(ImmMemargLaneidxInst);
 
@@ -219,7 +218,7 @@ InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterato
 
 InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, FuncDecl *tracedump_fn, RetVal &ret, Memaccess &memaccess) {
+    uint32_t access_idx, RecordInstInfo &recinfo) {
 
   SETUP_INIT(ImmMemoryInst);
 
@@ -227,6 +226,9 @@ InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr,
     /*** ImmMemory type ***/
     /* I32 | I32 | I32 */
     case WASM_OP_MEMORY_FILL: {
+                                 local_accwidth = local_i32_1;
+                              }
+                              {
                                  BLOCK_INST(sig_i32_3);
                                  SAVE_TOP (local_i32_1);
                                  SAVE_TOP (local_i32_2);
@@ -271,7 +273,7 @@ InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 InstList setup_data_memory_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, FuncDecl *tracedump_fn, RetVal &ret, Memaccess &memaccess) {
+    uint32_t access_idx, RecordInstInfo &recinfo) {
 
   SETUP_INIT(ImmDataMemoryInst);
 
@@ -294,6 +296,8 @@ InstList setup_data_memory_record_instrument (std::list<InstBasePtr>::iterator &
     default: DEFAULT_ERR_CASE()
   }
 
+  local_accwidth = local_i32_1;
+
   SETUP_END(ImmDataMemoryInst,
     new_meminst->setMemory(record_mem)
   );
@@ -304,7 +308,7 @@ InstList setup_data_memory_record_instrument (std::list<InstBasePtr>::iterator &
 
 InstList setup_memorycp_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, FuncDecl *tracedump_fn, RetVal &ret, Memaccess &memaccess) {
+    uint32_t access_idx, RecordInstInfo &recinfo) {
 
   SETUP_INIT(ImmMemorycpInst);
 
@@ -327,6 +331,8 @@ InstList setup_memorycp_record_instrument (std::list<InstBasePtr>::iterator &itr
     default: DEFAULT_ERR_CASE()
   }
 
+  local_accwidth = local_i32_1;
+
   SETUP_END(ImmMemorycpInst,
     new_meminst->setDstMemory(record_mem)
   );
@@ -337,7 +343,7 @@ InstList setup_memorycp_record_instrument (std::list<InstBasePtr>::iterator &itr
 
 InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, FuncDecl *tracedump_fn, RetVal &ret, Memaccess &memaccess) {
+    uint32_t access_idx, RecordInstInfo &recinfo) {
 
   SETUP_INIT(ImmMemargInst);
 
@@ -376,7 +382,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
                              SET_RET (RET_F64);
                            }
                            {
-                              SET_ACC (ACC_LOAD);
                               BLOCK_INST(sig_i32);
                               TEE_TOP(local_addr);
 
@@ -404,7 +409,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I32_ATOMIC_RMW8_XCHG_U:
     case WASM_OP_I32_ATOMIC_RMW16_XCHG_U: {
                                             SET_RET (RET_I32);
-                                            SET_ACC (ACC_LOAD);
                                           }
     case WASM_OP_I32_STORE:
     case WASM_OP_I32_STORE8:
@@ -413,7 +417,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I32_ATOMIC_STORE8:
     case WASM_OP_I32_ATOMIC_STORE16: {
                                        SET_RET (RET_VOID);
-                                       SET_ACC (ACC_STORE);
                                      }
                                      {
                                         BLOCK_INST(sig_i32_2);
@@ -452,7 +455,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I64_ATOMIC_RMW16_XCHG_U:
     case WASM_OP_I64_ATOMIC_RMW32_XCHG_U: {
                                             SET_RET (RET_I64);
-                                            SET_ACC (ACC_LOAD);
                                           }
     case WASM_OP_I64_ATOMIC_STORE:
     case WASM_OP_I64_ATOMIC_STORE8:
@@ -463,7 +465,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I64_STORE16:
     case WASM_OP_I64_STORE32: {
                                 SET_RET (RET_VOID);
-                                SET_ACC (ACC_STORE);
                               }
                               {
                                 BLOCK_INST(sig_i32_i64);
@@ -478,7 +479,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
     /* I32 | F32 */
     case WASM_OP_F32_STORE: {
-                              SET_ACC (ACC_STORE);
                               BLOCK_INST(sig_i32_f32);
                               SAVE_TOP (local_f32);
                               TEE_TOP (local_addr);
@@ -491,7 +491,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
     /* I32 | F64 */
     case WASM_OP_F64_STORE: {
-                              SET_ACC (ACC_STORE);
                               BLOCK_INST(sig_i32_f64);
                               SAVE_TOP (local_f64);
                               TEE_TOP (local_addr);
@@ -507,7 +506,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U:
     case WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U: {
                                                SET_RET (RET_I32);
-                                               SET_ACC (ACC_LOAD);
                                              }
                                              {
                                                BLOCK_INST(sig_i32_3);
@@ -529,7 +527,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U:
     case WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U: {
                                                SET_RET (RET_I64);
-                                               SET_ACC (ACC_LOAD);
                                              }
                                              {
                                                BLOCK_INST(sig_i32_i64_2);
@@ -574,7 +571,7 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
   std::shared_ptr<ImmFuncInst> call_inst = static_pointer_cast<ImmFuncInst>(instruction);
   switch (opcode) {
-    /*** ImmMemarg type ***/
+    /*** ImmFunc type ***/
     case WASM_OP_CALL:  {
                           FuncDecl *target = call_inst->getFunc();
                           if (target == call_list["SYS_mmap"]) {
@@ -596,41 +593,49 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
 }
 
 
-InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, Memaccess memaccess, 
-    RetVal ret, FuncDecl *tracedump_fn, uint32_t local_ret_idxs[4]) {
+InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, RecordInstInfo recinfo,
+    FuncDecl *tracedump_fn, uint32_t local_ret_idxs[5], MemoryDecl *record_mem) {
   InstList addinst;
-  /* Get size and comparison operator */
-  uint32_t sz = 0;
-  InstBasePtr neq;
-  bool failed = false;
+  RetVal ret = recinfo.ret;
+  /* Perform comparison operator */
+  InstBasePtr neq, load_inst;
+  uint32_t main_value_local = local_ret_idxs[ret.type - RET_I32];
+  uint32_t i64_local = local_ret_idxs[RET_I64 - RET_I32];
+  uint32_t full_addr_local = local_ret_idxs[4];
+  uint16_t opcode = instruction->getOpcode();
+  bool no_ret = false;
   switch (ret.type) {
-    case RET_I32: { sz = 4; neq.reset(new I32NeInst()); break; }
-    case RET_I64: { sz = 8; neq.reset(new I64NeInst()); break; }
-    case RET_F32: { sz = 4; neq.reset(new F32NeInst()); break; }
-    case RET_F64: { sz = 8; neq.reset(new F64NeInst()); break; }
-    default: { sz = 0; failed = true; }
+    case RET_I32: { neq.reset(new I32NeInst()); break; }
+    case RET_I64: { neq.reset(new I64NeInst()); break; }
+    case RET_F32: { neq.reset(new F32NeInst()); break; }
+    case RET_F64: { neq.reset(new F64NeInst()); break; }
+    default: { no_ret = true; }
   }
 
-  if (failed) {
+  /* Differ */
+  // Only values that return trigger a difference writeback
+  if (no_ret) {
     PUSH_INST (I32ConstInst(0));
   } else {
-    uint32_t local_idx = local_ret_idxs[ret.type - RET_I32];
-    PUSH_INST (LocalTeeInst(local_idx));
-    /* Get differ */
-    PUSH_INST (LocalGetInst(local_idx));
+    PUSH_INST (LocalTeeInst(main_value_local));
+    PUSH_INST (LocalGetInst(main_value_local));
     PUSH_INST (LocalGetInst(ret.local));
     PUSH_INST_PTR (neq);
   }
   /* Acc Idx */
   PUSH_INST (I32ConstInst(access_idx));
   /* Opcode */
-  PUSH_INST (I32ConstInst(instruction->getOpcode()));
+  PUSH_INST (I32ConstInst(opcode));
 
-  /* Base Addr */
+  /* Addr for memops: Save in local too */
   switch (instruction->getImmType()) {
+    case IMM_MEMARG_LANEIDX:
+    case IMM_MEMORY:
+    case IMM_MEMORYCP:
+    case IMM_DATA_MEMORY:
     case IMM_MEMARG: {
-                       PUSH_INST (I32ConstInst(memaccess.offset));
-                       PUSH_INST (LocalGetInst(memaccess.addr_local));
+                       PUSH_INST (I32ConstInst(recinfo.offset));
+                       PUSH_INST (LocalGetInst(recinfo.base_addr_local));
                        PUSH_INST (I32AddInst());
                        break;
                      }
@@ -638,13 +643,44 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, M
                PUSH_INST (I32ConstInst(0)); 
              }; 
   }
+  PUSH_INST (LocalTeeInst(full_addr_local));
   
   /* Size */
-  PUSH_INST (I32ConstInst(sz));
+  if (recinfo.prop.size != -1) {
+    PUSH_INST (I32ConstInst(recinfo.prop.size));
+  } else {
+    PUSH_INST (LocalGetInst(recinfo.accwidth_local));
+  }
 
-  /* Main-Memory Load Value */
-  PUSH_INST (I32ConstInst(0));
+  /* Main-Memory Load Value with storeback to shadow */
+  if (!no_ret) {
+    PUSH_INST (LocalGetInst(full_addr_local));
+    PUSH_INST (LocalGetInst(main_value_local));
+    /* Typecast any value to I64 */
+    switch (ret.type) {
+      case RET_I32: PUSH_INST (I64ExtendI32UInst()); break;
+      case RET_I64: break;
+      case RET_F32: PUSH_INST (I32ReinterpretF32Inst());
+                    PUSH_INST (I64ExtendI32UInst()); break;
+      case RET_F64: PUSH_INST (I64ReinterpretF64Inst()); break;
+      default: { ERR("R3-Record-Error: Unsupported return type for %04X\n", opcode); }
+    }
+    // Store back main value to shadow memory
+    PUSH_INST (LocalTeeInst(i64_local));
+    switch (memop_inst_table[opcode].size) {
+      case 1: PUSH_INST (I64Store8Inst(0, 0, record_mem)); break;
+      case 2: PUSH_INST (I64Store16Inst(0, 0, record_mem)); break;
+      case 4: PUSH_INST (I64Store32Inst(0, 0, record_mem)); break;
+      case 8: PUSH_INST (I64StoreInst(0, 0, record_mem)); break;
+      default: { ERR("R3-Record-Error: Unsupported size %ld for %04X\n", 
+        memop_inst_table[opcode].size, opcode); }
+    }
+    PUSH_INST (LocalGetInst(i64_local));
+  } else {
+    PUSH_INST (I64ConstInst(0));
+  }
 
+  /* Tracedump call */
   PUSH_INST (CallInst(tracedump_fn));
 
   return addinst;
@@ -668,7 +704,7 @@ void r3_record_instrument (WasmModule &module) {
     .member_name = "tracedump"
   };
   SigDecl tracedump_sig = {
-    .params = {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32}, 
+    .params = {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I64},
     .results = {} 
   };
   ImportDecl* tracedump_import_decl = module.add_import(iminfo, tracedump_sig);
@@ -719,7 +755,7 @@ void r3_record_instrument (WasmModule &module) {
     if ((&func == lock_fn) || (&func == unlock_fn) || (func_export_map.count(&func))) {
       continue;
     }
-    uint32_t local_indices[15] = {
+    uint32_t local_indices[16] = {
       func.add_local(WASM_TYPE_F64),
       func.add_local(WASM_TYPE_F32),
       func.add_local(WASM_TYPE_I64),
@@ -737,6 +773,8 @@ void r3_record_instrument (WasmModule &module) {
       func.add_local(WASM_TYPE_I64),
       func.add_local(WASM_TYPE_F32),
       func.add_local(WASM_TYPE_F64),
+      /* Save value for address */
+      func.add_local(WASM_TYPE_I32),
     };
     InstList &insts = func.instructions;
 
@@ -744,26 +782,26 @@ void r3_record_instrument (WasmModule &module) {
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
       InstBasePtr &instruction = *institr;
       bool post_insert = false;
-      RetVal ret;
-      Memaccess memaccess;
+      RecordInstInfo recinfo;
+      memset(&recinfo, 0, sizeof(RecordInstInfo));
       InstList addinst;
-#define SETUP_CALL(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem, \
-    access_tracker, tracedump_fn, ret, memaccess)
+#define SETUP_INVOKE(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem, \
+    access_tracker, recinfo)
       switch(instruction->getImmType()) {
         case IMM_MEMARG: 
-          addinst = SETUP_CALL(memarg);
+          addinst = SETUP_INVOKE(memarg);
           break;
         case IMM_MEMARG_LANEIDX: 
-          addinst = SETUP_CALL(memarg_laneidx);
+          addinst = SETUP_INVOKE(memarg_laneidx);
           break;
         case IMM_MEMORY:
-          addinst = SETUP_CALL(memory);
+          addinst = SETUP_INVOKE(memory);
           break;
         case IMM_DATA_MEMORY:
-          addinst = SETUP_CALL(data_memory);
+          addinst = SETUP_INVOKE(data_memory);
           break;
         case IMM_MEMORYCP:
-          addinst = SETUP_CALL(memorycp);
+          addinst = SETUP_INVOKE(memorycp);
           break;
         /* Calls: Lock those to select import functions */
         case IMM_FUNC: 
@@ -776,13 +814,14 @@ void r3_record_instrument (WasmModule &module) {
         //                    }
         default: {}; 
       }
-#undef SETUP_CALL
+#undef SETUP_INVOKE
       if (!addinst.empty()) {
         auto next_institr = std::next(institr);
         /* Insert instructions guarded by mutex (pre/post) */
         InstList preinst, postinst;
 
-        InstList traceinst = gen_trace_instructions(instruction, access_tracker++, memaccess, ret, tracedump_fn, &local_indices[11]);
+        InstList traceinst = gen_trace_instructions(instruction, access_tracker++, recinfo, 
+            tracedump_fn, &local_indices[11], record_mem);
         InstBasePtr lock_inst = InstBasePtr(new CallInst(lock_fn));
         InstBasePtr unlock_inst = InstBasePtr(new CallInst(unlock_fn));
 
