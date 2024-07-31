@@ -332,7 +332,6 @@ void WasmModule::encode_expr_to_insts(bytedeque &bdeq, InstList &instlist, bytea
     WR_OPCODE (opcode);
     instruction->encode_imm(*this, bdeq);
   }
-  TRACE("=== Function encoded successfully ===\n");
   #else
   WR_BYTESTR (code_bytes);
   #endif
@@ -420,7 +419,15 @@ bytedeque WasmModule::encode_custom_section(CustomDecl &custom) {
 
   if (custom.name == "name") {
     DebugNameDecl &debug = custom.debug;
-
+    /* We have to write non-function subsections and function subsection (id: 1) in the correct
+     * order for faithful validation */
+    auto subsec = debug.subsections.begin();
+    /* Non-function subsections before function subsection: Just write section info */
+    for (; (subsec != debug.subsections.end()) && (subsec->id < 1); ++subsec) {
+      WR_BYTE(subsec->id);
+      WR_U32 (subsec->bytes.size());
+      WR_BYTESTR (subsec->bytes);
+    }
     /* Function subsection */
     if (!debug.func_assoc.empty()) {
       bytedeque secdeq;
@@ -438,11 +445,11 @@ bytedeque WasmModule::encode_custom_section(CustomDecl &custom) {
       WR_SECBYTE_PRE (0x01);  \
       bdeq.insert(bdeq.end(), secdeq.begin(), secdeq.end());
     }
-    /* Non-function subsections: Just write section info */
-    for (auto &subsec : debug.subsections) {
-      WR_BYTE(subsec.id);
-      WR_U32 (subsec.bytes.size());
-      WR_BYTESTR (subsec.bytes);
+    /* Non-function subsections after function subsection: Just write section info */
+    for (; subsec != debug.subsections.end(); ++subsec) {
+      WR_BYTE(subsec->id);
+      WR_U32 (subsec->bytes.size());
+      WR_BYTESTR (subsec->bytes);
     }
   }
   /* Non-name sections: Just write bytes */
