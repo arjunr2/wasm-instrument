@@ -593,8 +593,20 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
 }
 
 
+/* Typecast any value to I64 */
+#define push_i64_extend(type) { \
+  switch (type) { \
+    case RET_I32: PUSH_INST (I64ExtendI32UInst()); break; \
+    case RET_I64: break;  \
+    case RET_F32: PUSH_INST (I32ReinterpretF32Inst());  \
+                  PUSH_INST (I64ExtendI32UInst()); break; \
+    case RET_F64: PUSH_INST (I64ReinterpretF64Inst()); break; \
+    default: { ERR("R3-Record-Error: Unsupported return type for %04X\n", opcode); }  \
+  } \
+}
+
 InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, RecordInstInfo recinfo,
-    FuncDecl *tracedump_fn, uint32_t local_ret_idxs[5], MemoryDecl *record_mem) {
+    FuncDecl *tracedump_fn, uint32_t local_ret_idxs[8], MemoryDecl *record_mem) {
   InstList addinst;
   RetVal ret = recinfo.ret;
   /* Perform comparison operator */
@@ -602,6 +614,9 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, R
   uint32_t main_value_local = local_ret_idxs[ret.type - RET_I32];
   uint32_t i64_local = local_ret_idxs[RET_I64 - RET_I32];
   uint32_t full_addr_local = local_ret_idxs[4];
+  uint32_t differ_local = local_ret_idxs[5];
+  uint32_t i64_tmp_local_1 = local_ret_idxs[6];
+  uint32_t i64_tmp_local_2 = local_ret_idxs[7];
   uint16_t opcode = instruction->getOpcode();
   bool no_ret = false;
   switch (ret.type) {
@@ -622,6 +637,8 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, R
     PUSH_INST (LocalGetInst(ret.local));
     PUSH_INST_PTR (neq);
   }
+  PUSH_INST (LocalTeeInst(differ_local));
+
   /* Acc Idx */
   PUSH_INST (I32ConstInst(access_idx));
   /* Opcode */
@@ -652,19 +669,17 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, R
     PUSH_INST (LocalGetInst(recinfo.accwidth_local));
   }
 
-  /* Main-Memory Load Value with storeback to shadow */
   if (!no_ret) {
+    /* Main-Memory Load Value with storeback to shadow */
+    PUSH_INST (BlockInst(-64));
+    PUSH_INST (LocalGetInst(differ_local));
+    PUSH_INST (I32EqzInst());
+    PUSH_INST (BrIfInst(0));
+
     PUSH_INST (LocalGetInst(full_addr_local));
     PUSH_INST (LocalGetInst(main_value_local));
-    /* Typecast any value to I64 */
-    switch (ret.type) {
-      case RET_I32: PUSH_INST (I64ExtendI32UInst()); break;
-      case RET_I64: break;
-      case RET_F32: PUSH_INST (I32ReinterpretF32Inst());
-                    PUSH_INST (I64ExtendI32UInst()); break;
-      case RET_F64: PUSH_INST (I64ReinterpretF64Inst()); break;
-      default: { ERR("R3-Record-Error: Unsupported return type for %04X\n", opcode); }
-    }
+    // Typecast any value to I64
+    push_i64_extend(ret.type);
     // Store back main value to shadow memory
     PUSH_INST (LocalTeeInst(i64_local));
     switch (memop_inst_table[opcode].size) {
@@ -676,7 +691,18 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, R
         memop_inst_table[opcode].size, opcode); }
     }
     PUSH_INST (LocalGetInst(i64_local));
+
+    /* Expected Main-Memory Load Value */
+    PUSH_INST (LocalGetInst(ret.local));
+    push_i64_extend(ret.type);
+
+    PUSH_INST (LocalSetInst(i64_tmp_local_1));
+    PUSH_INST (LocalSetInst(i64_tmp_local_2));
+    PUSH_INST (EndInst());
+    PUSH_INST (LocalGetInst(i64_tmp_local_2));
+    PUSH_INST (LocalGetInst(i64_tmp_local_1));
   } else {
+    PUSH_INST (I64ConstInst(0));
     PUSH_INST (I64ConstInst(0));
   }
 
@@ -704,7 +730,7 @@ void r3_record_instrument (WasmModule &module) {
     .member_name = "tracedump"
   };
   SigDecl tracedump_sig = {
-    .params = {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I64},
+    .params = {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I64, WASM_TYPE_I64},
     .results = {} 
   };
   ImportDecl* tracedump_import_decl = module.add_import(iminfo, tracedump_sig);
@@ -755,7 +781,7 @@ void r3_record_instrument (WasmModule &module) {
     if ((&func == lock_fn) || (&func == unlock_fn) || (func_export_map.count(&func))) {
       continue;
     }
-    uint32_t local_indices[16] = {
+    uint32_t local_indices[19] = {
       func.add_local(WASM_TYPE_F64),
       func.add_local(WASM_TYPE_F32),
       func.add_local(WASM_TYPE_I64),
@@ -773,8 +799,13 @@ void r3_record_instrument (WasmModule &module) {
       func.add_local(WASM_TYPE_I64),
       func.add_local(WASM_TYPE_F32),
       func.add_local(WASM_TYPE_F64),
-      /* Save value for address */
+      /* Trace Temp value for address */
       func.add_local(WASM_TYPE_I32),
+      /* Trace Temp value for differ */
+      func.add_local(WASM_TYPE_I32),
+      /* Trace Temp for load values */
+      func.add_local(WASM_TYPE_I64),
+      func.add_local(WASM_TYPE_I64),
     };
     InstList &insts = func.instructions;
 
