@@ -23,7 +23,19 @@ typedef struct {
   uint32_t base_addr_local;
   uint32_t accwidth_local; // For prop.size = -1, the width is dynamically stored in this local
   uint16_t opcode; // Opcode is kept for size=0, which handles special cases
-} RecordInstInfo;
+} MemopInstInfo;
+
+struct CallInstInfo {
+  uint16_t opcode;
+  FuncDecl *target;
+};
+
+union RecordInstInfo {
+  enum { MEMOP, CALL } type;
+  MemopInstInfo Memop;
+  CallInstInfo Call;
+};
+
 
 /* Instruction-generation macros */
 #define PUSH_INST(inv)      addinst.push_back(InstBasePtr(new inv));
@@ -44,8 +56,15 @@ typedef struct {
   PUSH_INST (LocalTeeInst(var)); \
 }
 
+#define SETUP_INIT_COMMON(_insttype) \
+  InstList addinst;                                                                  \
+  InstBasePtr instruction = (*itr);                                                  \
+  bool insblock = false;                                                             \
+  WasmRet stackrets = RET_PH;                                                        \
+  uint16_t opcode = instruction->getOpcode();
 
-#define SETUP_INIT(_insttype)                                                        \
+#define MEMOP_SETUP_INIT(_insttype)                                                        \
+  SETUP_INIT_COMMON(_insttype)      \
   uint32_t local_f64 = local_idxs[0];                                                \
   uint32_t local_f32 = local_idxs[1];                                                \
   uint32_t local_i64_1 = local_idxs[2];                                              \
@@ -70,17 +89,14 @@ typedef struct {
   /* Only used for some operations that determine width */                           \
   uint32_t local_accwidth = -1;                                                      \
                                                                                      \
-  InstBasePtr instruction = (*itr);                                                  \
-  std::shared_ptr<_insttype> mem_inst = static_pointer_cast<_insttype>(instruction); \
-                                                                                     \
-  InstList addinst;                                                                  \
-  bool insblock = false;                                                             \
-  uint32_t mem_offset = 0;                                                           \
-  WasmRet stackrets = RET_PH;                                                        \
-  uint16_t opcode = instruction->getOpcode();
+  uint32_t mem_offset = 0; \
+  std::shared_ptr<_insttype> mem_inst = static_pointer_cast<_insttype>(instruction); 
 
+#define CALL_SETUP_INIT(_insttype)  \
+  SETUP_INIT_COMMON(_insttype)      \
+  std::shared_ptr<_insttype> call_inst = static_pointer_cast<_insttype>(instruction); 
 
-#define SETUP_END(_insttype, updater)                                                           \
+#define MEMOP_SETUP_END(_insttype, updater)                                                           \
   RetVal ret = { .type = stackrets, .local = (uint32_t)-1 };                                    \
   if (insblock) {                                                                               \
     _insttype *new_meminst = new _insttype(*mem_inst);                                          \
@@ -100,6 +116,11 @@ typedef struct {
     .offset = mem_offset, .base_addr_local = local_addr,                                        \
     .accwidth_local = local_accwidth, .opcode = opcode };
 
+
+#define CALL_SETUP_END(_insttype, updater)  \
+  recinfo = { .opcode = opcode, .target = target, }
+    
+//.mod_name = mod_name, .member_name = member_name, .args = args };
 
 #define DEFAULT_ERR_CASE() {  \
   ERR("R3-Record-Error: Cannot support opcode %04X (%s)\n", opcode, opcode_table[opcode].mnemonic); \
@@ -199,16 +220,16 @@ static void set_func_export_map(WasmModule &module, std::string name, std::map<F
 
 InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem,
-    uint32_t access_idx, RecordInstInfo &recinfo) {
+    uint32_t access_idx, MemopInstInfo &recinfo) {
 
-  SETUP_INIT(ImmMemargLaneidxInst);
+  MEMOP_SETUP_INIT(ImmMemargLaneidxInst);
 
   switch (opcode) {
     /*** ImmMemargLaneidx type ***/
     default: DEFAULT_ERR_CASE()
   }
 
-  SETUP_END(ImmMemargLaneidxInst,
+  MEMOP_SETUP_END(ImmMemargLaneidxInst,
     new_meminst->setMemory(record_mem)
   );
 
@@ -218,9 +239,9 @@ InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterato
 
 InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, RecordInstInfo &recinfo) {
+    uint32_t access_idx, MemopInstInfo &recinfo) {
 
-  SETUP_INIT(ImmMemoryInst);
+  MEMOP_SETUP_INIT(ImmMemoryInst);
 
   switch (opcode) {
     /*** ImmMemory type ***/
@@ -263,7 +284,7 @@ InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr,
     default: DEFAULT_ERR_CASE()
   }
 
-  SETUP_END(ImmMemoryInst,
+  MEMOP_SETUP_END(ImmMemoryInst,
     new_meminst->setMemory(record_mem)
   );
 
@@ -273,9 +294,9 @@ InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 InstList setup_data_memory_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, RecordInstInfo &recinfo) {
+    uint32_t access_idx, MemopInstInfo &recinfo) {
 
-  SETUP_INIT(ImmDataMemoryInst);
+  MEMOP_SETUP_INIT(ImmDataMemoryInst);
 
   switch (opcode) {
     /*** ImmDataMemory type ***/
@@ -298,7 +319,7 @@ InstList setup_data_memory_record_instrument (std::list<InstBasePtr>::iterator &
 
   local_accwidth = local_i32_1;
 
-  SETUP_END(ImmDataMemoryInst,
+  MEMOP_SETUP_END(ImmDataMemoryInst,
     new_meminst->setMemory(record_mem)
   );
 
@@ -308,9 +329,9 @@ InstList setup_data_memory_record_instrument (std::list<InstBasePtr>::iterator &
 
 InstList setup_memorycp_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, RecordInstInfo &recinfo) {
+    uint32_t access_idx, MemopInstInfo &recinfo) {
 
-  SETUP_INIT(ImmMemorycpInst);
+  MEMOP_SETUP_INIT(ImmMemorycpInst);
 
   switch (opcode) {
     /*** ImmMemorycp type ***/
@@ -333,7 +354,7 @@ InstList setup_memorycp_record_instrument (std::list<InstBasePtr>::iterator &itr
 
   local_accwidth = local_i32_1;
 
-  SETUP_END(ImmMemorycpInst,
+  MEMOP_SETUP_END(ImmMemorycpInst,
     new_meminst->setDstMemory(record_mem)
   );
 
@@ -343,9 +364,9 @@ InstList setup_memorycp_record_instrument (std::list<InstBasePtr>::iterator &itr
 
 InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, RecordInstInfo &recinfo) {
+    uint32_t access_idx, MemopInstInfo &recinfo) {
 
-  SETUP_INIT(ImmMemargInst);
+  MEMOP_SETUP_INIT(ImmMemargInst);
 
   switch (opcode) {
     /*** ImmMemarg type ***/
@@ -554,7 +575,7 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
   mem_offset = mem_inst->getOffset();
 
-  SETUP_END(ImmMemargInst,
+  MEMOP_SETUP_END(ImmMemargInst,
     new_meminst->setMemory(record_mem)
   );
 
@@ -562,39 +583,48 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 }
 
+#define SET_MODMEMBER_INFO(mod, member) \
+  recinfo.mod_name = mod; \
+  recinfo.member_name = member;
 
 InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], std::map<std::string, FuncDecl*> call_list, 
-    MemoryDecl *def_mem, MemoryDecl *record_mem, bool &post_insert) {
+    CallInstInfo &recinfo, MemoryDecl *def_mem, MemoryDecl *record_mem, 
+    bool &post_insert) {
 
-  SETUP_INIT(ImmFuncInst);
+  CALL_SETUP_INIT(ImmFuncInst);
 
-  std::shared_ptr<ImmFuncInst> call_inst = static_pointer_cast<ImmFuncInst>(instruction);
+  FuncDecl *target = call_inst->getFunc();
+  std::string mod_name;
+  std::string member_name;
+  std::vector<int64_t> args;
+
   switch (opcode) {
     /*** ImmFunc type ***/
     case WASM_OP_CALL:  {
-                          FuncDecl *target = call_inst->getFunc();
-                          if (target == call_list["SYS_mmap"]) {
-                            BLOCK_INST (-64);
-                            PUSH_INST (MemorySizeInst(def_mem));
-                            PUSH_INST (MemorySizeInst(record_mem));
-                            PUSH_INST (I32SubInst());
-                            PUSH_INST (MemoryGrowInst(record_mem));
-                            PUSH_INST (DropInst());
-                            PUSH_INST (EndInst());
-                          }
-                          post_insert = true;
-                          break;
-                        }
-      
+      if (target == call_list["SYS_mmap"]) {
+        BLOCK_INST (-64);
+        PUSH_INST (MemorySizeInst(def_mem));
+        PUSH_INST (MemorySizeInst(record_mem));
+        PUSH_INST (I32SubInst());
+        PUSH_INST (MemoryGrowInst(record_mem));
+        PUSH_INST (DropInst());
+        PUSH_INST (EndInst());
+      }
+      post_insert = true;
+      break;
+    }
+
     default: DEFAULT_ERR_CASE();
   }
+
+  CALL_SETUP_END(ImmFuncInst, {});
   return addinst;
 }
 
 
 /* Typecast any value to I64 */
-#define push_i64_extend(type) { \
+#define PUSH_I64_EXTEND(type) { \
   switch (type) { \
     case RET_I32: PUSH_INST (I64ExtendI32UInst()); break; \
     case RET_I64: break;  \
@@ -605,7 +635,25 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
   } \
 }
 
-InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, RecordInstInfo recinfo,
+InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, CallInstInfo &recinfo,
+    FuncDecl *tracedump_fn, std::map<std::string, FuncDecl*> call_list, WasmModule &module) {
+  InstList addinst;
+  uint16_t opcode = instruction->getOpcode();
+  /* Acc Idx */
+  PUSH_INST (I32ConstInst(access_idx));
+  /* Opcode */
+  PUSH_INST (I32ConstInst(opcode));
+  /* Function Index */
+  uint32_t func_idx = module.getFuncIdx(recinfo.target);
+  PUSH_INST (I32ConstInst(func_idx));
+  
+  /* Tracedump call */
+  PUSH_INST (CallInst(tracedump_fn));
+  
+  return addinst;
+}
+
+InstList gen_memop_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, MemopInstInfo &recinfo,
     FuncDecl *tracedump_fn, uint32_t local_ret_idxs[8], MemoryDecl *record_mem) {
   InstList addinst;
   RetVal ret = recinfo.ret;
@@ -619,6 +667,7 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, R
   uint32_t i64_tmp_local_2 = local_ret_idxs[7];
   uint16_t opcode = instruction->getOpcode();
   bool no_ret = false;
+
   switch (ret.type) {
     case RET_I32: { neq.reset(new I32NeInst()); break; }
     case RET_I64: { neq.reset(new I64NeInst()); break; }
@@ -645,21 +694,9 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, R
   PUSH_INST (I32ConstInst(opcode));
 
   /* Addr for memops: Save in local too */
-  switch (instruction->getImmType()) {
-    case IMM_MEMARG_LANEIDX:
-    case IMM_MEMORY:
-    case IMM_MEMORYCP:
-    case IMM_DATA_MEMORY:
-    case IMM_MEMARG: {
-                       PUSH_INST (I32ConstInst(recinfo.offset));
-                       PUSH_INST (LocalGetInst(recinfo.base_addr_local));
-                       PUSH_INST (I32AddInst());
-                       break;
-                     }
-    default: {
-               PUSH_INST (I32ConstInst(0)); 
-             }; 
-  }
+  PUSH_INST (I32ConstInst(recinfo.offset));
+  PUSH_INST (LocalGetInst(recinfo.base_addr_local));
+  PUSH_INST (I32AddInst());
   PUSH_INST (LocalTeeInst(full_addr_local));
   
   /* Size */
@@ -679,7 +716,7 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, R
     PUSH_INST (LocalGetInst(full_addr_local));
     PUSH_INST (LocalGetInst(main_value_local));
     // Typecast any value to I64
-    push_i64_extend(ret.type);
+    PUSH_I64_EXTEND(ret.type);
     // Store back main value to shadow memory
     PUSH_INST (LocalTeeInst(i64_local));
     switch (memop_inst_table[opcode].size) {
@@ -694,7 +731,7 @@ InstList gen_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, R
 
     /* Expected Main-Memory Load Value */
     PUSH_INST (LocalGetInst(ret.local));
-    push_i64_extend(ret.type);
+    PUSH_I64_EXTEND(ret.type);
 
     PUSH_INST (LocalSetInst(i64_tmp_local_1));
     PUSH_INST (LocalSetInst(i64_tmp_local_2));
@@ -725,16 +762,52 @@ void r3_record_instrument (WasmModule &module) {
    * Return:
    *    None
   */
-  ImportInfo iminfo = {
+  ImportInfo iminfo;
+  SigDecl tracedump_sig;
+
+  iminfo = {
     .mod_name = "instrument",
-    .member_name = "tracedump"
+    .member_name = "memop_tracedump"
   };
-  SigDecl tracedump_sig = {
-    .params = {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I64, WASM_TYPE_I64},
+  tracedump_sig = {
+    .params = {
+      // Differ?
+      WASM_TYPE_I32, 
+      // Access Index
+      WASM_TYPE_I32, 
+      // Opcode
+      WASM_TYPE_I32, 
+      // Address
+      WASM_TYPE_I32, 
+      // Size/Width of Access
+      WASM_TYPE_I32,
+      // Load value from Main Memory (only used if Differ == 1) 
+      WASM_TYPE_I64, 
+      // Expected value from Main Memory (only used if Differ == 1) 
+      WASM_TYPE_I64
+    },
     .results = {} 
   };
-  ImportDecl* tracedump_import_decl = module.add_import(iminfo, tracedump_sig);
-  FuncDecl* tracedump_fn = tracedump_import_decl->desc.func;
+  ImportDecl* memop_tracedump_import_decl = module.add_import(iminfo, tracedump_sig);
+  FuncDecl* memop_tracedump_fn = memop_tracedump_import_decl->desc.func;
+
+  iminfo = {
+    .mod_name = "instrument",
+    .member_name = "call_tracedump"
+  };
+  tracedump_sig = {
+    .params = {
+      // Access Index
+      WASM_TYPE_I32, 
+      // Opcode
+      WASM_TYPE_I32, 
+      // Function Index
+      WASM_TYPE_I32, 
+    },
+    .results = {} 
+  };
+  ImportDecl* call_tracedump_import_decl = module.add_import(iminfo, tracedump_sig);
+  FuncDecl* call_tracedump_fn = call_tracedump_import_decl->desc.func;
 
   /* Create custom mutex lock/unlock functions */
   FuncDecl *mutex_funcs[2];
@@ -813,11 +886,11 @@ void r3_record_instrument (WasmModule &module) {
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
       InstBasePtr &instruction = *institr;
       bool post_insert = false;
-      RecordInstInfo recinfo;
-      memset(&recinfo, 0, sizeof(RecordInstInfo));
+      RecordInstInfo record {};
+      memset(&record, 0, sizeof(RecordInstInfo));
       InstList addinst;
 #define SETUP_INVOKE(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem, \
-    access_tracker, recinfo)
+    access_tracker, record.Memop)
       switch(instruction->getImmType()) {
         case IMM_MEMARG: 
           addinst = SETUP_INVOKE(memarg);
@@ -837,7 +910,7 @@ void r3_record_instrument (WasmModule &module) {
         /* Calls: Lock those to select import functions */
         case IMM_FUNC: 
           addinst = setup_call_record_instrument(institr, local_indices, sig_indices, 
-              instrument_call_map, def_mem, record_mem, post_insert);
+              instrument_call_map, record.Call, def_mem, record_mem, post_insert);
           break;
         ///* Indirect Calls: Lock none */
         //case IMM_SIG_TABLE: {
@@ -851,8 +924,28 @@ void r3_record_instrument (WasmModule &module) {
         /* Insert instructions guarded by mutex (pre/post) */
         InstList preinst, postinst;
 
-        InstList traceinst = gen_trace_instructions(instruction, access_tracker++, recinfo, 
-            tracedump_fn, &local_indices[11], record_mem);
+        InstList traceinst;
+        switch (instruction->getImmType()) {
+          case IMM_MEMARG_LANEIDX:
+          case IMM_MEMORY:
+          case IMM_MEMORYCP:
+          case IMM_DATA_MEMORY:
+          case IMM_MEMARG: {
+            traceinst = gen_memop_trace_instructions(instruction, 
+              access_tracker++, record.Memop, memop_tracedump_fn, &local_indices[11], 
+              record_mem);
+            break;
+          }
+
+          case IMM_FUNC: {
+            traceinst = gen_call_trace_instructions(instruction,
+              access_tracker++, record.Call, call_tracedump_fn, instrument_call_map, module);
+            break;
+          }
+          default: {
+                    PUSH_INST (I32ConstInst(0)); 
+                  }; 
+        }
         InstBasePtr lock_inst = InstBasePtr(new CallInst(lock_fn));
         InstBasePtr unlock_inst = InstBasePtr(new CallInst(unlock_fn));
 
