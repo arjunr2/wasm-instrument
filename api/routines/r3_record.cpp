@@ -16,6 +16,13 @@ typedef struct {
   uint32_t local;
 } RetVal;
 
+/* Types of Call instructions */
+typedef enum {
+  SC_UNKNOWN = 0,
+  SC_MMAP,
+  SC_WRITEV
+} CallID;
+
 typedef struct {
   RetVal ret;
   MemopProp prop;
@@ -26,8 +33,10 @@ typedef struct {
 } MemopInstInfo;
 
 struct CallInstInfo {
+  RetVal ret;
   uint16_t opcode;
   FuncDecl *target;
+  CallID call_id;
 };
 
 union RecordInstInfo {
@@ -61,17 +70,14 @@ union RecordInstInfo {
   InstBasePtr instruction = (*itr);                                                  \
   bool insblock = false;                                                             \
   WasmRet stackrets = RET_PH;                                                        \
-  uint16_t opcode = instruction->getOpcode();
-
-#define MEMOP_SETUP_INIT(_insttype)                                                        \
-  SETUP_INIT_COMMON(_insttype)      \
+  uint16_t opcode = instruction->getOpcode(); \
   uint32_t local_f64 = local_idxs[0];                                                \
   uint32_t local_f32 = local_idxs[1];                                                \
   uint32_t local_i64_1 = local_idxs[2];                                              \
   uint32_t local_i64_2 = local_idxs[3];                                              \
   uint32_t local_i32_1 = local_idxs[4];                                              \
   uint32_t local_i32_2 = local_idxs[5];                                              \
-  uint32_t local_addr = local_idxs[6];                                               \
+  uint32_t local_i32_3 = local_idxs[6];                                               \
                                                                                      \
   uint32_t local_i32_ret = local_idxs[7];                                            \
   uint32_t local_i64_ret = local_idxs[8];                                            \
@@ -84,17 +90,15 @@ union RecordInstInfo {
   uint32_t sig_i32_f32 = sig_idxs[3];                                                \
   uint32_t sig_i32_f64 = sig_idxs[4];                                                \
   uint32_t sig_i32_3 = sig_idxs[5];                                                  \
-  uint32_t sig_i32_i64_2 = sig_idxs[6];                                              \
-                                                                                     \
+  uint32_t sig_i32_i64_2 = sig_idxs[6];
+
+#define MEMOP_SETUP_INIT(_insttype)                                                        \
+  SETUP_INIT_COMMON(_insttype)      \
   /* Only used for some operations that determine width */                           \
+  uint32_t local_addr = local_i32_3;                                                  \
   uint32_t local_accwidth = -1;                                                      \
-                                                                                     \
   uint32_t mem_offset = 0; \
   std::shared_ptr<_insttype> mem_inst = static_pointer_cast<_insttype>(instruction); 
-
-#define CALL_SETUP_INIT(_insttype)  \
-  SETUP_INIT_COMMON(_insttype)      \
-  std::shared_ptr<_insttype> call_inst = static_pointer_cast<_insttype>(instruction); 
 
 #define MEMOP_SETUP_END(_insttype, updater)                                                           \
   RetVal ret = { .type = stackrets, .local = (uint32_t)-1 };                                    \
@@ -104,10 +108,10 @@ union RecordInstInfo {
     PUSH_INST_PTR (new_meminst);                                                                \
     ret.type = stackrets;                                                                       \
     switch (ret.type) {                                                                         \
-      case RET_I32: ret.local = local_idxs[7]; PUSH_INST (LocalSetInst(local_i32_ret)); break;  \
-      case RET_I64: ret.local = local_idxs[8]; PUSH_INST (LocalSetInst(local_i64_ret)); break;  \
-      case RET_F32: ret.local = local_idxs[9]; PUSH_INST (LocalSetInst(local_f32_ret)); break;  \
-      case RET_F64: ret.local = local_idxs[10]; PUSH_INST (LocalSetInst(local_f64_ret)); break; \
+      case RET_I32: ret.local = local_i32_ret; PUSH_INST (LocalSetInst(local_i32_ret)); break;  \
+      case RET_I64: ret.local = local_i64_ret; PUSH_INST (LocalSetInst(local_i64_ret)); break;  \
+      case RET_F32: ret.local = local_f32_ret; PUSH_INST (LocalSetInst(local_f32_ret)); break;  \
+      case RET_F64: ret.local = local_f64_ret; PUSH_INST (LocalSetInst(local_f64_ret)); break; \
       default: {}                                                                               \
     }                                                                                           \
     PUSH_INST (EndInst());                                                                      \
@@ -117,8 +121,19 @@ union RecordInstInfo {
     .accwidth_local = local_accwidth, .opcode = opcode };
 
 
+/* localidx[]*/
+#define CALL_SETUP_INIT(_insttype)  \
+  SETUP_INIT_COMMON(_insttype)      \
+  uint32_t local_i32_4 = local_idxs[7]; \
+  uint32_t local_i32_5 = local_idxs[11]; \
+  uint32_t local_i64_3 = local_idxs[12]; \
+  uint32_t local_i32_6 = local_idxs[15]; \
+  std::shared_ptr<_insttype> call_inst = static_pointer_cast<_insttype>(instruction);
+
+
 #define CALL_SETUP_END(_insttype, updater)  \
-  recinfo = { .opcode = opcode, .target = target, }
+  RetVal ret = { .type = stackrets, .local = local_i64_ret };                                    \
+  recinfo = { .ret = ret, .opcode = opcode, .target = target, .call_id = call_id };
     
 //.mod_name = mod_name, .member_name = member_name, .args = args };
 
@@ -583,9 +598,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 }
 
-#define SET_MODMEMBER_INFO(mod, member) \
-  recinfo.mod_name = mod; \
-  recinfo.member_name = member;
 
 InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], std::map<std::string, FuncDecl*> call_list, 
@@ -595,6 +607,7 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
   CALL_SETUP_INIT(ImmFuncInst);
 
   FuncDecl *target = call_inst->getFunc();
+  CallID call_id = SC_UNKNOWN;
   std::string mod_name;
   std::string member_name;
   std::vector<int64_t> args;
@@ -602,16 +615,24 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
   switch (opcode) {
     /*** ImmFunc type ***/
     case WASM_OP_CALL:  {
+      SET_RET (RET_I64);
       if (target == call_list["SYS_mmap"]) {
-        BLOCK_INST (-64);
-        PUSH_INST (MemorySizeInst(def_mem));
-        PUSH_INST (MemorySizeInst(record_mem));
-        PUSH_INST (I32SubInst());
-        PUSH_INST (MemoryGrowInst(record_mem));
-        PUSH_INST (DropInst());
-        PUSH_INST (EndInst());
+        call_id = SC_MMAP;
+        // This is just to force us to trace the call
+        PUSH_INST (NopInst());
       }
-      post_insert = true;
+      // TODO: Store values to local here
+      else if (target == call_list["SYS_writev"]) {
+        call_id = SC_WRITEV;
+        PUSH_INST (LocalSetInst(local_i32_3));
+        PUSH_INST (LocalSetInst(local_i32_2));
+        PUSH_INST (LocalTeeInst(local_i32_1));
+        PUSH_INST (LocalGetInst(local_i32_2));
+        PUSH_INST (LocalGetInst(local_i32_3));
+      }
+      else {
+        break;
+      }
       break;
     }
 
@@ -635,10 +656,64 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
   } \
 }
 
+#define LOCAL_I64_EXTEND(local, type) { \
+  PUSH_INST (LocalGetInst(local)); \
+  PUSH_I64_EXTEND(type); \
+}
+
 InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, CallInstInfo &recinfo,
-    FuncDecl *tracedump_fn, std::map<std::string, FuncDecl*> call_list, WasmModule &module) {
+    FuncDecl *tracedump_fn, std::map<std::string, FuncDecl*> call_list,
+    uint32_t sig_indices[1], uint32_t local_idxs[19],
+    MemoryDecl *def_mem, MemoryDecl *record_mem, WasmModule &module)  {
+
   InstList addinst;
   uint16_t opcode = instruction->getOpcode();
+  CallID call_id = recinfo.call_id;
+
+  uint32_t local_i64_ret = local_idxs[8];
+
+  uint32_t local_f64 = local_idxs[0];
+  uint32_t local_f32 = local_idxs[1];
+  uint32_t local_i64_1 = local_idxs[2];
+  uint32_t local_i64_2 = local_idxs[3];
+  uint32_t local_i32_1 = local_idxs[4];
+  uint32_t local_i32_2 = local_idxs[5];
+  uint32_t local_i32_3 = local_idxs[6];
+  uint32_t local_i32_4 = local_idxs[7];
+  uint32_t local_i32_5 = local_idxs[11];
+  uint32_t local_i64_3 = local_idxs[12];
+  uint32_t local_i32_6 = local_idxs[15];
+  uint32_t i64_tmp_local_1 = local_idxs[17];
+  uint32_t i64_tmp_local_2 = local_idxs[18];
+
+  RetVal ret = recinfo.ret;
+  if (ret.type != RET_I64) {
+    ERR("Unexpected return value %d for call, not RET.I64", ret.type);
+  }
+
+  // Success Check: For instrumentation that operates only on success
+  // before pushing
+  PUSH_INST (BlockInst(sig_indices[0]));
+  PUSH_INST (LocalTeeInst(i64_tmp_local_1));
+  PUSH_INST (LocalGetInst(i64_tmp_local_1));
+  PUSH_INST (I64ConstInst(0));
+  PUSH_INST (I64LtSInst());
+  PUSH_INST (BrIfInst(0));
+  switch (call_id) {
+    // local_i32_1 records memory grow length
+    case SC_MMAP: {
+      PUSH_INST (MemorySizeInst(def_mem));
+      PUSH_INST (MemorySizeInst(record_mem));
+      PUSH_INST (I32SubInst());
+      PUSH_INST (LocalTeeInst(local_i32_1));
+      PUSH_INST (MemoryGrowInst(record_mem));
+      PUSH_INST (DropInst());
+      break;
+    }
+    default: {}
+  }
+  PUSH_INST (EndInst())
+
   /* Acc Idx */
   PUSH_INST (I32ConstInst(access_idx));
   /* Opcode */
@@ -646,7 +721,31 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
   /* Function Index */
   uint32_t func_idx = module.getFuncIdx(recinfo.target);
   PUSH_INST (I32ConstInst(func_idx));
-  
+  /* Call ID */
+  PUSH_INST (I32ConstInst(call_id));
+
+  /* Args for specific call */
+  int num_args = 0;
+  switch (call_id) {
+    case SC_MMAP: {
+      num_args = 1;
+      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
+      break;
+    }
+    case SC_WRITEV: {
+      num_args = 3;
+      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
+      LOCAL_I64_EXTEND(local_i32_2, RET_I32);
+      LOCAL_I64_EXTEND(local_i32_3, RET_I32);
+      break;
+    }
+    default: { ERR("R3-Record-Error: Unsupported call ID %d\n", call_id); }
+  }
+  // Push remaining placeholder args
+  for (int i = num_args; i < 3; i++) {
+    PUSH_INST (I64ConstInst(0));
+  }
+
   /* Tracedump call */
   PUSH_INST (CallInst(tracedump_fn));
   
@@ -698,7 +797,7 @@ InstList gen_memop_trace_instructions(InstBasePtr &instruction, uint32_t access_
   PUSH_INST (LocalGetInst(recinfo.base_addr_local));
   PUSH_INST (I32AddInst());
   PUSH_INST (LocalTeeInst(full_addr_local));
-  
+
   /* Size */
   if (recinfo.prop.size != -1) {
     PUSH_INST (I32ConstInst(recinfo.prop.size));
@@ -803,6 +902,10 @@ void r3_record_instrument (WasmModule &module) {
       WASM_TYPE_I32, 
       // Function Index
       WASM_TYPE_I32, 
+      // Call ID
+      WASM_TYPE_I32,
+      // Arguments (up to 3)
+      WASM_TYPE_I64, WASM_TYPE_I64, WASM_TYPE_I64,
     },
     .results = {} 
   };
@@ -844,8 +947,21 @@ void r3_record_instrument (WasmModule &module) {
     sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
   }
 
+  SigDecl s = {.params = {WASM_TYPE_I64}, .results = {}};
+  uint32_t call_trace_sig_indices[1];
+  typelist call_trace_blocktypes[1] = {
+    {WASM_TYPE_I64}
+  };
+  for (int i = 0; i < 1; i++) {
+    SigDecl s = { .params = call_trace_blocktypes[i], .results = call_trace_blocktypes[i] };
+    call_trace_sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
+  }
+
   std::map<std::string, FuncDecl*> instrument_call_map;
-  instrument_call_map["SYS_mmap"] = module.find_import_func("wali", "SYS_mmap");
+  const char *instrument_calls[2] = {"SYS_mmap", "SYS_writev"};
+  for (int i = 0; i < 2; i++) {
+    instrument_call_map[instrument_calls[i]] = module.find_import_func("wali", instrument_calls[i]);
+  }
 
   uint32_t access_tracker = 1;
   /* Instrument all functions */
@@ -855,6 +971,8 @@ void r3_record_instrument (WasmModule &module) {
       continue;
     }
     uint32_t local_indices[19] = {
+      /* For Call, all these locals are for call arg shepherding
+         For Memop, they are defined below */
       func.add_local(WASM_TYPE_F64),
       func.add_local(WASM_TYPE_F32),
       func.add_local(WASM_TYPE_I64),
@@ -876,7 +994,7 @@ void r3_record_instrument (WasmModule &module) {
       func.add_local(WASM_TYPE_I32),
       /* Trace Temp value for differ */
       func.add_local(WASM_TYPE_I32),
-      /* Trace Temp for load values */
+      /* Trace Temp for load values / call args */
       func.add_local(WASM_TYPE_I64),
       func.add_local(WASM_TYPE_I64),
     };
@@ -939,7 +1057,9 @@ void r3_record_instrument (WasmModule &module) {
 
           case IMM_FUNC: {
             traceinst = gen_call_trace_instructions(instruction,
-              access_tracker++, record.Call, call_tracedump_fn, instrument_call_map, module);
+              access_tracker++, record.Call, call_tracedump_fn, 
+              instrument_call_map, call_trace_sig_indices, local_indices, 
+              def_mem, record_mem, module);
             break;
           }
           default: {
