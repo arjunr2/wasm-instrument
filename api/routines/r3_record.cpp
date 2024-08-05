@@ -65,19 +65,19 @@ union RecordInstInfo {
   PUSH_INST (LocalTeeInst(var)); \
 }
 
-#define SETUP_INIT_COMMON(_insttype) \
+#define SETUP_INIT_COMMON(_insttype)                                                 \
   InstList addinst;                                                                  \
   InstBasePtr instruction = (*itr);                                                  \
   bool insblock = false;                                                             \
   WasmRet stackrets = RET_PH;                                                        \
-  uint16_t opcode = instruction->getOpcode(); \
+  uint16_t opcode = instruction->getOpcode();                                        \
   uint32_t local_f64 = local_idxs[0];                                                \
   uint32_t local_f32 = local_idxs[1];                                                \
   uint32_t local_i64_1 = local_idxs[2];                                              \
   uint32_t local_i64_2 = local_idxs[3];                                              \
   uint32_t local_i32_1 = local_idxs[4];                                              \
   uint32_t local_i32_2 = local_idxs[5];                                              \
-  uint32_t local_i32_3 = local_idxs[6];                                               \
+  uint32_t local_i32_3 = local_idxs[6];                                              \
                                                                                      \
   uint32_t local_i32_ret = local_idxs[7];                                            \
   uint32_t local_i64_ret = local_idxs[8];                                            \
@@ -92,39 +92,39 @@ union RecordInstInfo {
   uint32_t sig_i32_3 = sig_idxs[5];                                                  \
   uint32_t sig_i32_i64_2 = sig_idxs[6];
 
-#define MEMOP_SETUP_INIT(_insttype)                                                        \
-  SETUP_INIT_COMMON(_insttype)      \
-  /* Only used for some operations that determine width */                           \
-  uint32_t local_addr = local_i32_3;                                                  \
-  uint32_t local_accwidth = -1;                                                      \
-  uint32_t mem_offset = 0; \
+#define MEMOP_SETUP_INIT(_insttype)                        \
+  SETUP_INIT_COMMON(_insttype)                             \
+  /* Only used for some operations that determine width */ \
+  uint32_t local_addr = local_i32_3;                       \
+  uint32_t local_accwidth = -1;                            \
+  uint32_t mem_offset = 0;                                 \
   std::shared_ptr<_insttype> mem_inst = static_pointer_cast<_insttype>(instruction); 
 
-#define MEMOP_SETUP_END(_insttype, updater)                                                           \
-  RetVal ret = { .type = stackrets, .local = (uint32_t)-1 };                                    \
-  if (insblock) {                                                                               \
-    _insttype *new_meminst = new _insttype(*mem_inst);                                          \
-    { updater; }                                                                                \
-    PUSH_INST_PTR (new_meminst);                                                                \
-    ret.type = stackrets;                                                                       \
-    switch (ret.type) {                                                                         \
-      case RET_I32: ret.local = local_i32_ret; PUSH_INST (LocalSetInst(local_i32_ret)); break;  \
-      case RET_I64: ret.local = local_i64_ret; PUSH_INST (LocalSetInst(local_i64_ret)); break;  \
-      case RET_F32: ret.local = local_f32_ret; PUSH_INST (LocalSetInst(local_f32_ret)); break;  \
+#define MEMOP_SETUP_END(_insttype, updater)                                                    \
+  RetVal ret = { .type = stackrets, .local = (uint32_t)-1 };                                   \
+  if (insblock) {                                                                              \
+    _insttype *new_meminst = new _insttype(*mem_inst);                                         \
+    { updater; }                                                                               \
+    PUSH_INST_PTR (new_meminst);                                                               \
+    ret.type = stackrets;                                                                      \
+    switch (ret.type) {                                                                        \
+      case RET_I32: ret.local = local_i32_ret; PUSH_INST (LocalSetInst(local_i32_ret)); break; \
+      case RET_I64: ret.local = local_i64_ret; PUSH_INST (LocalSetInst(local_i64_ret)); break; \
+      case RET_F32: ret.local = local_f32_ret; PUSH_INST (LocalSetInst(local_f32_ret)); break; \
       case RET_F64: ret.local = local_f64_ret; PUSH_INST (LocalSetInst(local_f64_ret)); break; \
-      default: {}                                                                               \
-    }                                                                                           \
-    PUSH_INST (EndInst());                                                                      \
-  }                                                                                             \
-  recinfo = { .ret = ret, .prop = memop_inst_table[opcode],                                     \
-    .offset = mem_offset, .base_addr_local = local_addr,                                        \
+      default: {}                                                                              \
+    }                                                                                          \
+    PUSH_INST (EndInst());                                                                     \
+  }                                                                                            \
+  recinfo = { .ret = ret, .prop = memop_inst_table[opcode],                                    \
+    .offset = mem_offset, .base_addr_local = local_addr,                                       \
     .accwidth_local = local_accwidth, .opcode = opcode };
 
 
 /* localidx[]*/
-#define CALL_SETUP_INIT(_insttype)  \
-  SETUP_INIT_COMMON(_insttype)      \
-  uint32_t local_i32_4 = local_idxs[7]; \
+#define CALL_SETUP_INIT(_insttype)       \
+  SETUP_INIT_COMMON(_insttype)           \
+  uint32_t local_i32_4 = local_idxs[7];  \
   uint32_t local_i32_5 = local_idxs[11]; \
   uint32_t local_i64_3 = local_idxs[12]; \
   uint32_t local_i32_6 = local_idxs[15]; \
@@ -645,15 +645,15 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 
 /* Typecast any value to I64 */
-#define PUSH_I64_EXTEND(type) { \
-  switch (type) { \
-    case RET_I32: PUSH_INST (I64ExtendI32UInst()); break; \
-    case RET_I64: break;  \
-    case RET_F32: PUSH_INST (I32ReinterpretF32Inst());  \
-                  PUSH_INST (I64ExtendI32UInst()); break; \
-    case RET_F64: PUSH_INST (I64ReinterpretF64Inst()); break; \
-    default: { ERR("R3-Record-Error: Unsupported return type for %04X\n", opcode); }  \
-  } \
+#define PUSH_I64_EXTEND(type) {                                      \
+  switch (type) {                                                    \
+    case RET_I32: PUSH_INST (I64ExtendI32UInst()); break;            \
+    case RET_I64: break;                                             \
+    case RET_F32: PUSH_INST (I32ReinterpretF32Inst());               \
+                  PUSH_INST (I64ExtendI32UInst()); break;            \
+    case RET_F64: PUSH_INST (I64ReinterpretF64Inst()); break;        \
+    default: { ERR("R3-Record-Error: Unsupported return type for %04X\n", opcode); } \
+  }                                                                  \
 }
 
 #define LOCAL_I64_EXTEND(local, type) { \
