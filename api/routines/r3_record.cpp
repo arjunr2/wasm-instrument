@@ -1004,6 +1004,7 @@ void r3_record_instrument (WasmModule &module) {
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
       InstBasePtr &instruction = *institr;
       bool post_insert = false;
+      bool inc_access_tracker = true;
       RecordInstInfo record {};
       memset(&record, 0, sizeof(RecordInstInfo));
       InstList addinst;
@@ -1034,7 +1035,7 @@ void r3_record_instrument (WasmModule &module) {
         //case IMM_SIG_TABLE: {
         //                      break;
         //                    }
-        default: {}; 
+        default: { inc_access_tracker = false; }; 
       }
 #undef SETUP_INVOKE
       if (!addinst.empty()) {
@@ -1050,14 +1051,14 @@ void r3_record_instrument (WasmModule &module) {
           case IMM_DATA_MEMORY:
           case IMM_MEMARG: {
             traceinst = gen_memop_trace_instructions(instruction, 
-              access_tracker++, record.Memop, memop_tracedump_fn, &local_indices[11], 
+              access_tracker, record.Memop, memop_tracedump_fn, &local_indices[11], 
               record_mem);
             break;
           }
 
           case IMM_FUNC: {
             traceinst = gen_call_trace_instructions(instruction,
-              access_tracker++, record.Call, call_tracedump_fn, 
+              access_tracker, record.Call, call_tracedump_fn, 
               instrument_call_map, call_trace_sig_indices, local_indices, 
               def_mem, record_mem, module);
             break;
@@ -1082,6 +1083,9 @@ void r3_record_instrument (WasmModule &module) {
         insts.insert(next_institr, postinst.begin(), postinst.end());
         /* No need to iterate over our inserted instructions */
         institr = std::prev(next_institr);
+      }
+      if (inc_access_tracker) {
+        access_tracker++;
       }
     }
   }
