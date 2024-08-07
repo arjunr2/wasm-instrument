@@ -19,8 +19,15 @@ typedef struct {
 /* Types of Call instructions */
 typedef enum {
   SC_UNKNOWN = 0,
+  /* Specialized Calls */
   SC_MMAP,
-  SC_WRITEV
+  SC_WRITEV,
+  /* Lockless Calls */
+  //SC_THREAD_SPAWN,
+  //SC_FUTEX,
+  //SC_EXIT,
+  /* All other generic imports */
+  SC_GENERIC
 } CallID;
 
 typedef struct {
@@ -92,6 +99,17 @@ union RecordInstInfo {
   uint32_t sig_i32_3 = sig_idxs[5];                                                  \
   uint32_t sig_i32_i64_2 = sig_idxs[6];
 
+
+#define LOCAL_RET_SET_COMMON() \
+    switch (ret.type) {                                                                        \
+      case RET_I32: ret.local = local_idxs[7]; PUSH_INST (LocalSetInst(local_i32_ret)); break; \
+      case RET_I64: ret.local = local_idxs[8]; PUSH_INST (LocalSetInst(local_i64_ret)); break; \
+      case RET_F32: ret.local = local_idxs[9]; PUSH_INST (LocalSetInst(local_f32_ret)); break; \
+      case RET_F64: ret.local = local_idxs[10]; PUSH_INST (LocalSetInst(local_f64_ret)); break; \
+      default: {}                                                                              \
+    }
+
+
 #define MEMOP_SETUP_INIT(_insttype)                        \
   SETUP_INIT_COMMON(_insttype)                             \
   /* Only used for some operations that determine width */ \
@@ -106,14 +124,7 @@ union RecordInstInfo {
     _insttype *new_meminst = new _insttype(*mem_inst);                                         \
     { updater; }                                                                               \
     PUSH_INST_PTR (new_meminst);                                                               \
-    ret.type = stackrets;                                                                      \
-    switch (ret.type) {                                                                        \
-      case RET_I32: ret.local = local_i32_ret; PUSH_INST (LocalSetInst(local_i32_ret)); break; \
-      case RET_I64: ret.local = local_i64_ret; PUSH_INST (LocalSetInst(local_i64_ret)); break; \
-      case RET_F32: ret.local = local_f32_ret; PUSH_INST (LocalSetInst(local_f32_ret)); break; \
-      case RET_F64: ret.local = local_f64_ret; PUSH_INST (LocalSetInst(local_f64_ret)); break; \
-      default: {}                                                                              \
-    }                                                                                          \
+    LOCAL_RET_SET_COMMON(); \
     PUSH_INST (EndInst());                                                                     \
   }                                                                                            \
   recinfo = { .ret = ret, .prop = memop_inst_table[opcode],                                    \
@@ -121,18 +132,16 @@ union RecordInstInfo {
     .accwidth_local = local_accwidth, .opcode = opcode };
 
 
-/* localidx[]*/
 #define CALL_SETUP_INIT(_insttype)       \
   SETUP_INIT_COMMON(_insttype)           \
-  uint32_t local_i32_4 = local_idxs[7];  \
-  uint32_t local_i32_5 = local_idxs[11]; \
+  uint32_t local_i32_4 = local_idxs[11]; \
   uint32_t local_i64_3 = local_idxs[12]; \
-  uint32_t local_i32_6 = local_idxs[15]; \
+  uint32_t local_i32_5 = local_idxs[15]; \
   std::shared_ptr<_insttype> call_inst = static_pointer_cast<_insttype>(instruction);
 
-
+// Local rets are ordered by RET_I32, RET_I64, RET_F32, RET_F64
 #define CALL_SETUP_END(_insttype, updater)  \
-  RetVal ret = { .type = stackrets, .local = local_i64_ret };                                    \
+  RetVal ret = { .type = stackrets, .local = local_idxs[7 + ret.type - RET_I32] };                                   \
   recinfo = { .ret = ret, .opcode = opcode, .target = target, .call_id = call_id };
     
 //.mod_name = mod_name, .member_name = member_name, .args = args };
@@ -599,10 +608,23 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 }
 
 
+bool import_exclude_list(FuncDecl *target, WasmModule &module) {
+  if (
+    //(target == module.find_import_func("wali", "__wasm_thread_spawn")) || 
+    (target == module.find_import_func("wali", "SYS_futex"))
+  ) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[11], uint32_t sig_idxs[7], std::map<std::string, FuncDecl*> call_list, 
+    uint32_t local_idxs[11], uint32_t sig_idxs[7], 
+    std::map<FuncDecl*, std::string> &specialized_calls, 
+    std::map<FuncDecl*, std::string> &lockless_calls,
     CallInstInfo &recinfo, MemoryDecl *def_mem, MemoryDecl *record_mem, 
-    bool &post_insert) {
+    WasmModule &module) {
 
   CALL_SETUP_INIT(ImmFuncInst);
 
@@ -615,23 +637,66 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
   switch (opcode) {
     /*** ImmFunc type ***/
     case WASM_OP_CALL:  {
-      SET_RET (RET_I64);
-      if (target == call_list["SYS_mmap"]) {
-        call_id = SC_MMAP;
+      auto spec_it = specialized_calls.find(target);
+      auto ll_it = lockless_calls.find(target);
+      if (spec_it != specialized_calls.end()) {
+        /* Handle return local + instructions for specialized calls */
+        std::string call_name = spec_it->second;
+        SET_RET (RET_I64);
+        if (call_name == "SYS_mmap") {
+          call_id = SC_MMAP;
+          // This is just to force us to trace the call
+          PUSH_INST (NopInst());
+        }
+        else if (call_name == "SYS_writev") {
+          call_id = SC_WRITEV;
+          PUSH_INST (LocalSetInst(local_i32_3));
+          PUSH_INST (LocalSetInst(local_i32_2));
+          PUSH_INST (LocalTeeInst(local_i32_1));
+          PUSH_INST (LocalGetInst(local_i32_2));
+          PUSH_INST (LocalGetInst(local_i32_3));
+        }
+      }
+      //else if (ll_it != lockless_calls.end()) {
+      //  /* Handle return local for lockless calls */
+      //  std::string call_name = ll_it->second;
+      //  if (call_name == "__wasm_thread_spawn") {
+      //    call_id = SC_THREAD_SPAWN;
+      //  }
+      //  else if (call_name == "SYS_futex") {
+      //    call_id = SC_FUTEX;
+      //  }
+      //  else if (call_name == "SYS_exit") {
+      //    call_id = SC_EXIT;
+      //  }
+      //}
+      else if (module.isImport(target) && (ll_it == lockless_calls.end())) {
+        /* Handle return local for generic import calls */
+        call_id = SC_GENERIC;
+        typelist result_types = target->sig->results;
+        if (result_types.size() > 1) {
+          ERR("R3-Record-Error: Unsupported return types larger than 1 "
+            "Got %lu for Func[%d]\n", result_types.size(), module.getFuncIdx(target));
+        }
+        else if (result_types.size() == 0) {
+          SET_RET (RET_VOID);
+        }
+        else {
+          switch (result_types.front()) {
+            case WASM_TYPE_I32: SET_RET (RET_I32); break;
+            case WASM_TYPE_I64: SET_RET (RET_I64); break;
+            case WASM_TYPE_F32: SET_RET (RET_F32); break;
+            case WASM_TYPE_F64: SET_RET (RET_F64); break;
+            default: { ERR("R3-Record-Error: Unsupported return type %d (opc: %04X)\n", 
+                        result_types.front(), opcode); }
+          }
+        }
         // This is just to force us to trace the call
         PUSH_INST (NopInst());
       }
-      // TODO: Store values to local here
-      else if (target == call_list["SYS_writev"]) {
-        call_id = SC_WRITEV;
-        PUSH_INST (LocalSetInst(local_i32_3));
-        PUSH_INST (LocalSetInst(local_i32_2));
-        PUSH_INST (LocalTeeInst(local_i32_1));
-        PUSH_INST (LocalGetInst(local_i32_2));
-        PUSH_INST (LocalGetInst(local_i32_3));
-      }
       else {
-        break;
+        /* Handle return for internal calls */
+
       }
       break;
     }
@@ -652,7 +717,8 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case RET_F32: PUSH_INST (I32ReinterpretF32Inst());               \
                   PUSH_INST (I64ExtendI32UInst()); break;            \
     case RET_F64: PUSH_INST (I64ReinterpretF64Inst()); break;        \
-    default: { ERR("R3-Record-Error: Unsupported return type for %04X\n", opcode); } \
+    default: { ERR("R3-Record-Error: Unsupported type %d for I64 Extend (opc: %04X)\n", \
+      type, opcode); } \
   }                                                                  \
 }
 
@@ -661,16 +727,24 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
   PUSH_I64_EXTEND(type); \
 }
 
+#define I64_SUCCESS_CHECK(code) { \
+  PUSH_INST (BlockInst(sig_indices[1])); \
+  PUSH_INST (LocalTeeInst(i64_tmp_local_1)); \
+  PUSH_INST (LocalGetInst(i64_tmp_local_1)); \
+  PUSH_INST (I64ConstInst(0)); \
+  PUSH_INST (I64LtSInst()); \
+  PUSH_INST (BrIfInst(0)); \
+  { code } \
+  PUSH_INST (EndInst()); \
+}
+
 InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, CallInstInfo &recinfo,
-    FuncDecl *tracedump_fn, std::map<std::string, FuncDecl*> call_list,
-    uint32_t sig_indices[1], uint32_t local_idxs[19],
+    FuncDecl *tracedump_fn, uint32_t sig_indices[4], uint32_t local_idxs[19],
     MemoryDecl *def_mem, MemoryDecl *record_mem, WasmModule &module)  {
 
   InstList addinst;
   uint16_t opcode = instruction->getOpcode();
   CallID call_id = recinfo.call_id;
-
-  uint32_t local_i64_ret = local_idxs[8];
 
   uint32_t local_f64 = local_idxs[0];
   uint32_t local_f32 = local_idxs[1];
@@ -679,40 +753,42 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
   uint32_t local_i32_1 = local_idxs[4];
   uint32_t local_i32_2 = local_idxs[5];
   uint32_t local_i32_3 = local_idxs[6];
-  uint32_t local_i32_4 = local_idxs[7];
-  uint32_t local_i32_5 = local_idxs[11];
+  uint32_t local_i32_4 = local_idxs[11];
   uint32_t local_i64_3 = local_idxs[12];
-  uint32_t local_i32_6 = local_idxs[15];
+  uint32_t local_i32_5 = local_idxs[15];
   uint32_t i64_tmp_local_1 = local_idxs[17];
   uint32_t i64_tmp_local_2 = local_idxs[18];
 
   RetVal ret = recinfo.ret;
-  if (ret.type != RET_I64) {
-    ERR("Unexpected return value %d for call, not RET.I64", ret.type);
-  }
+  bool has_ret = (ret.type != RET_VOID);
 
-  // Success Check: For instrumentation that operates only on success
-  // before pushing
-  PUSH_INST (BlockInst(sig_indices[0]));
-  PUSH_INST (LocalTeeInst(i64_tmp_local_1));
-  PUSH_INST (LocalGetInst(i64_tmp_local_1));
-  PUSH_INST (I64ConstInst(0));
-  PUSH_INST (I64LtSInst());
-  PUSH_INST (BrIfInst(0));
+  // Instrumentation for after the call (but before trace data)
+  // Default (common) case involves getting the return value
   switch (call_id) {
-    // local_i32_1 records memory grow length
-    case SC_MMAP: {
-      PUSH_INST (MemorySizeInst(def_mem));
-      PUSH_INST (MemorySizeInst(record_mem));
-      PUSH_INST (I32SubInst());
-      PUSH_INST (LocalTeeInst(local_i32_1));
-      PUSH_INST (MemoryGrowInst(record_mem));
-      PUSH_INST (DropInst());
+    case SC_UNKNOWN: {
+      ERR("R3-Record-Error: Call ID %d not expected\n", call_id);
       break;
     }
-    default: {}
+    // mmap requires extra operation in addition to default for generic calls
+    // local_i32_1 records memory grow length
+    case SC_MMAP: {
+      I64_SUCCESS_CHECK(
+        PUSH_INST (MemorySizeInst(def_mem));
+        PUSH_INST (MemorySizeInst(record_mem));
+        PUSH_INST (I32SubInst());
+        PUSH_INST (LocalTeeInst(local_i32_1));
+        PUSH_INST (MemoryGrowInst(record_mem));
+        PUSH_INST (DropInst());
+      );
+    }
+    default: {
+      // Default case: Save return value if it has one
+      if (has_ret) {
+        PUSH_INST (LocalTeeInst(ret.local));
+      }
+      break; 
+    }
   }
-  PUSH_INST (EndInst())
 
   /* Acc Idx */
   PUSH_INST (I32ConstInst(access_idx));
@@ -723,6 +799,13 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
   PUSH_INST (I32ConstInst(func_idx));
   /* Call ID */
   PUSH_INST (I32ConstInst(call_id));
+  /* Return Value: For values without ret, it can be resolved at replay gen */
+  if (has_ret) {
+    PUSH_INST (LocalGetInst(ret.local));
+    PUSH_I64_EXTEND(ret.type);
+  } else {
+    PUSH_INST (I64ConstInst(0));
+  }
 
   /* Args for specific call */
   int num_args = 0;
@@ -739,6 +822,7 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
       LOCAL_I64_EXTEND(local_i32_3, RET_I32);
       break;
     }
+    case SC_GENERIC: { break; }
     default: { ERR("R3-Record-Error: Unsupported call ID %d\n", call_id); }
   }
   // Push remaining placeholder args
@@ -904,6 +988,8 @@ void r3_record_instrument (WasmModule &module) {
       WASM_TYPE_I32, 
       // Call ID
       WASM_TYPE_I32,
+      // Return value (up to 1)
+      WASM_TYPE_I64,
       // Arguments (up to 3)
       WASM_TYPE_I64, WASM_TYPE_I64, WASM_TYPE_I64,
     },
@@ -948,20 +1034,39 @@ void r3_record_instrument (WasmModule &module) {
   }
 
   SigDecl s = {.params = {WASM_TYPE_I64}, .results = {}};
-  uint32_t call_trace_sig_indices[1];
-  typelist call_trace_blocktypes[1] = {
-    {WASM_TYPE_I64}
+  uint32_t call_trace_sig_indices[4];
+  typelist call_trace_blocktypes[4] = {
+    {WASM_TYPE_I32},
+    {WASM_TYPE_I64},
+    {WASM_TYPE_F32},
+    {WASM_TYPE_F64}
   };
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 4; i++) {
     SigDecl s = { .params = call_trace_blocktypes[i], .results = call_trace_blocktypes[i] };
     call_trace_sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
   }
 
-  std::map<std::string, FuncDecl*> instrument_call_map;
-  const char *instrument_calls[2] = {"SYS_mmap", "SYS_writev"};
-  for (int i = 0; i < 2; i++) {
-    instrument_call_map[instrument_calls[i]] = module.find_import_func("wali", instrument_calls[i]);
+  /* Import calls that require extra non-generic instrumentation
+    This still use lock-based instrumentation */
+  std::map<FuncDecl*, std::string> specialized_calls;
+  {
+    const char *calls[2] = {"SYS_mmap", "SYS_writev"};
+    for (int i = 0; i < 2; i++) {
+      if (FuncDecl *f = module.find_import_func("wali", calls[i]))
+        specialized_calls[f] = calls[i];
+    }
   }
+  /* Import calls that are excluded from lock-based instrumentation 
+     Each are handled in a specialized manner */
+  std::map<FuncDecl*, std::string> lockless_calls;
+  {
+    const char *calls[3] = {"__wasm_thread_spawn", "SYS_futex", "SYS_exit"};
+    for (int i = 0; i < 3; i++) {
+      if (FuncDecl *f = module.find_import_func("wali", calls[i]))
+        lockless_calls[f] = calls[i];
+    }
+  }
+
 
   uint32_t access_tracker = 1;
   /* Instrument all functions */
@@ -1003,7 +1108,6 @@ void r3_record_instrument (WasmModule &module) {
     /** Instrumenting memory-related instructions **/
     for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
       InstBasePtr &instruction = *institr;
-      bool post_insert = false;
       bool inc_access_tracker = true;
       RecordInstInfo record {};
       memset(&record, 0, sizeof(RecordInstInfo));
@@ -1029,11 +1133,12 @@ void r3_record_instrument (WasmModule &module) {
         /* Calls: Lock those to select import functions */
         case IMM_FUNC: 
           addinst = setup_call_record_instrument(institr, local_indices, sig_indices, 
-              instrument_call_map, record.Call, def_mem, record_mem, post_insert);
+              specialized_calls, lockless_calls, record.Call, 
+              def_mem, record_mem, module);
           break;
         ///* Indirect Calls: Lock none */
         //case IMM_SIG_TABLE: {
-        //                      break;
+        //                      PUSH_INST(NopInst()); break;
         //                    }
         default: { inc_access_tracker = false; }; 
       }
@@ -1059,12 +1164,12 @@ void r3_record_instrument (WasmModule &module) {
           case IMM_FUNC: {
             traceinst = gen_call_trace_instructions(instruction,
               access_tracker, record.Call, call_tracedump_fn, 
-              instrument_call_map, call_trace_sig_indices, local_indices, 
+              call_trace_sig_indices, local_indices, 
               def_mem, record_mem, module);
             break;
           }
           default: {
-                    PUSH_INST (I32ConstInst(0)); 
+                    ERR("R3-Record-Error: Missupported Imm Type %d\n", instruction->getImmType()); \
                   }; 
         }
         InstBasePtr lock_inst = InstBasePtr(new CallInst(lock_fn));
@@ -1073,15 +1178,15 @@ void r3_record_instrument (WasmModule &module) {
         preinst.push_back(lock_inst);
         postinst.insert(postinst.begin(), traceinst.begin(), traceinst.end());
         postinst.push_back(unlock_inst);
-        if (post_insert) {
-          postinst.insert(postinst.begin(), addinst.begin(), addinst.end());
-        } 
-        else {
+        //if (post_insert) {
+        //  postinst.insert(postinst.begin(), addinst.begin(), addinst.end());
+        //} 
+        //else {
           preinst.insert(preinst.end(), addinst.begin(), addinst.end());
-        }
+        //}
         insts.insert(institr, preinst.begin(), preinst.end());
         insts.insert(next_institr, postinst.begin(), postinst.end());
-        /* No need to iterate over our inserted instructions */
+        /* Don't iterate over our inserted instructions */
         institr = std::prev(next_institr);
       }
       if (inc_access_tracker) {
