@@ -23,9 +23,10 @@ typedef enum {
   SC_MMAP,
   SC_WRITEV,
   /* Lockless Calls */
-  //SC_THREAD_SPAWN,
-  //SC_FUTEX,
-  //SC_EXIT,
+  SC_THREAD_SPAWN,
+  SC_FUTEX,
+  SC_EXIT,
+  SC_PROC_EXIT,
   /* All other generic imports */
   SC_GENERIC
 } CallID;
@@ -44,6 +45,11 @@ struct CallInstInfo {
   uint16_t opcode;
   FuncDecl *target;
   CallID call_id;
+};
+
+struct InstrumentType {
+  bool lockless;
+  bool force_trace;
 };
 
 union RecordInstInfo {
@@ -623,6 +629,7 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
     uint32_t local_idxs[11], uint32_t sig_idxs[7], 
     std::map<FuncDecl*, std::string> &specialized_calls, 
     std::map<FuncDecl*, std::string> &lockless_calls,
+    InstrumentType &instrument_type,
     CallInstInfo &recinfo, MemoryDecl *def_mem, MemoryDecl *record_mem, 
     WasmModule &module) {
 
@@ -637,16 +644,15 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
   switch (opcode) {
     /*** ImmFunc type ***/
     case WASM_OP_CALL:  {
+      bool internal_call = false;
       auto spec_it = specialized_calls.find(target);
       auto ll_it = lockless_calls.find(target);
       if (spec_it != specialized_calls.end()) {
-        /* Handle return local + instructions for specialized calls */
+        /* Specialized calls */
         std::string call_name = spec_it->second;
-        SET_RET (RET_I64);
         if (call_name == "SYS_mmap") {
           call_id = SC_MMAP;
-          // This is just to force us to trace the call
-          PUSH_INST (NopInst());
+          instrument_type = { .force_trace = true };
         }
         else if (call_name == "SYS_writev") {
           call_id = SC_WRITEV;
@@ -657,22 +663,34 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
           PUSH_INST (LocalGetInst(local_i32_3));
         }
       }
-      //else if (ll_it != lockless_calls.end()) {
-      //  /* Handle return local for lockless calls */
-      //  std::string call_name = ll_it->second;
-      //  if (call_name == "__wasm_thread_spawn") {
-      //    call_id = SC_THREAD_SPAWN;
-      //  }
-      //  else if (call_name == "SYS_futex") {
-      //    call_id = SC_FUTEX;
-      //  }
-      //  else if (call_name == "SYS_exit") {
-      //    call_id = SC_EXIT;
-      //  }
-      //}
+      else if (ll_it != lockless_calls.end()) {
+        /* Lockless calls */
+        std::string call_name = ll_it->second;
+        if (call_name == "__wasm_thread_spawn") {
+          call_id = SC_THREAD_SPAWN;
+        }
+        else if (call_name == "SYS_futex") {
+          call_id = SC_FUTEX;
+        }
+        else if (call_name == "SYS_exit") {
+          call_id = SC_EXIT;
+        }
+        else if ((call_name == "SYS_exit_group") || (call_name == "__proc_exit")) {
+          call_id = SC_PROC_EXIT;
+        }
+        instrument_type = { .lockless = true, .force_trace = true };
+      }
       else if (module.isImport(target) && (ll_it == lockless_calls.end())) {
-        /* Handle return local for generic import calls */
+        /* Generic import calls */
         call_id = SC_GENERIC;
+        instrument_type = { .force_trace = true };
+      }
+      else {
+        /* Handle return for internal calls */
+        internal_call = true;
+      }
+      /* Handle return local for all non-internal calls */
+      if (!internal_call) {
         typelist result_types = target->sig->results;
         if (result_types.size() > 1) {
           ERR("R3-Record-Error: Unsupported return types larger than 1 "
@@ -691,12 +709,6 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
                         result_types.front(), opcode); }
           }
         }
-        // This is just to force us to trace the call
-        PUSH_INST (NopInst());
-      }
-      else {
-        /* Handle return for internal calls */
-
       }
       break;
     }
@@ -822,6 +834,10 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
       LOCAL_I64_EXTEND(local_i32_3, RET_I32);
       break;
     }
+    case SC_THREAD_SPAWN:
+    case SC_FUTEX:
+    case SC_EXIT:
+    case SC_PROC_EXIT:
     case SC_GENERIC: { break; }
     default: { ERR("R3-Record-Error: Unsupported call ID %d\n", call_id); }
   }
@@ -1060,8 +1076,10 @@ void r3_record_instrument (WasmModule &module) {
      Each are handled in a specialized manner */
   std::map<FuncDecl*, std::string> lockless_calls;
   {
-    const char *calls[3] = {"__wasm_thread_spawn", "SYS_futex", "SYS_exit"};
-    for (int i = 0; i < 3; i++) {
+    const char *calls[5] = {"__wasm_thread_spawn", "SYS_futex", "SYS_exit", 
+      // proc_exit and exit_group are identical in behavior
+      "__proc_exit", "SYS_exit_group"};
+    for (int i = 0; i < 5; i++) {
       if (FuncDecl *f = module.find_import_func("wali", calls[i]))
         lockless_calls[f] = calls[i];
     }
@@ -1110,6 +1128,7 @@ void r3_record_instrument (WasmModule &module) {
       InstBasePtr &instruction = *institr;
       bool inc_access_tracker = true;
       RecordInstInfo record {};
+      InstrumentType instrument_type = { .lockless = false, .force_trace = false };
       memset(&record, 0, sizeof(RecordInstInfo));
       InstList addinst;
 #define SETUP_INVOKE(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem, \
@@ -1133,7 +1152,7 @@ void r3_record_instrument (WasmModule &module) {
         /* Calls: Lock those to select import functions */
         case IMM_FUNC: 
           addinst = setup_call_record_instrument(institr, local_indices, sig_indices, 
-              specialized_calls, lockless_calls, record.Call, 
+              specialized_calls, lockless_calls, instrument_type, record.Call, 
               def_mem, record_mem, module);
           break;
         ///* Indirect Calls: Lock none */
@@ -1143,7 +1162,7 @@ void r3_record_instrument (WasmModule &module) {
         default: { inc_access_tracker = false; }; 
       }
 #undef SETUP_INVOKE
-      if (!addinst.empty()) {
+      if (!addinst.empty() || instrument_type.force_trace) {
         auto next_institr = std::next(institr);
         /* Insert instructions guarded by mutex (pre/post) */
         InstList preinst, postinst;
@@ -1175,9 +1194,13 @@ void r3_record_instrument (WasmModule &module) {
         InstBasePtr lock_inst = InstBasePtr(new CallInst(lock_fn));
         InstBasePtr unlock_inst = InstBasePtr(new CallInst(unlock_fn));
 
-        preinst.push_back(lock_inst);
+        if (!instrument_type.lockless) {
+          preinst.push_back(lock_inst);
+        }
         postinst.insert(postinst.begin(), traceinst.begin(), traceinst.end());
-        postinst.push_back(unlock_inst);
+        if (!instrument_type.lockless) {
+          postinst.push_back(unlock_inst);
+        }
         //if (post_insert) {
         //  postinst.insert(postinst.begin(), addinst.begin(), addinst.end());
         //} 
