@@ -13,11 +13,22 @@
 
 typedef std::queue<std::string> ArgVec;
 
+typedef enum {
+  StringArgs,
+  AnonArrArgs
+} InstrumentArgType;
+
+typedef union {
+  void (*string_arg) (WasmModule&, ArgVec);
+  void (*anonarr_arg) (WasmModule&, void*, uint32_t);
+} InstrumentFn;
+
 typedef struct {
   const char* name;
   uint32_t min_args;
   uint32_t max_args;
-  void (*fn)(WasmModule&, ArgVec args);
+  InstrumentArgType args_type;
+  InstrumentFn fn;
 } routines_t;
 
 
@@ -80,14 +91,15 @@ void empty_insthandle (WasmModule &module, ArgVec args) { return; }
 
 
 static std::vector<routines_t> inst_routines = {
-  { "memaccess-stochastic",   2,  3,  memaccess_stochastic_insthandle },
-  { "memaccess-balanced"  ,   2,  3,  memaccess_balanced_insthandle },
-  { "sample"              ,   0,  0,  sample_insthandle },
-  { "func-weight"         ,   0,  0,  func_weight_insthandle },
-  { "loop-count"          ,   0,  0,  loop_count_insthandle },
-  { "opcode-count"        ,   0,  0,  opcode_count_insthandle },
-  { "r3-record"           ,   0,  0,  r3_record_insthandle },
-  { "empty"               ,   0,  0,  empty_insthandle }
+  { "memaccess-stochastic",   2,  3, StringArgs,  InstrumentFn { .string_arg = memaccess_stochastic_insthandle } },
+  { "memaccess-balanced"  ,   2,  3, StringArgs,  InstrumentFn { .string_arg = memaccess_balanced_insthandle } },
+  { "sample"              ,   0,  0, StringArgs,  InstrumentFn { .string_arg = sample_insthandle } },
+  { "func-weight"         ,   0,  0, StringArgs,  InstrumentFn { .string_arg = func_weight_insthandle } },
+  { "loop-count"          ,   0,  0, StringArgs,  InstrumentFn { .string_arg = loop_count_insthandle } },
+  { "opcode-count"        ,   0,  0, StringArgs,  InstrumentFn { .string_arg = opcode_count_insthandle } },
+  { "r3-record"           ,   0,  0, StringArgs,  InstrumentFn { .string_arg = r3_record_insthandle } },
+  { "r3-replay-generator" ,   0,  UINT32_MAX, AnonArrArgs, InstrumentFn { .anonarr_arg = r3_replay_instrument } },
+  { "empty"               ,   0,  0, StringArgs,  InstrumentFn { .string_arg = empty_insthandle   }}
 };
 
 
@@ -115,11 +127,7 @@ encode_file_buf_from_module (WasmModule* module, uint32_t* file_size) {
 
 /** Instrumentation (in-place). No batch mode supported yet **/
 void 
-instrument_module (WasmModule* mod, const char* scheme, char** args, uint32_t num_args) {
-  ArgVec arg_vec;
-  for (int i = 0; i < num_args; i++) {
-    arg_vec.push(std::string(args[i]));
-  }
+instrument_module (WasmModule* mod, const char* scheme, void* args, uint32_t num_args) {
   bool match = false;
   for (auto &routine : inst_routines) {
     if (routine.name == std::string(scheme)) {
@@ -130,7 +138,18 @@ instrument_module (WasmModule* mod, const char* scheme, char** args, uint32_t nu
         throw std::runtime_error("Invalid args");
       }
       else {
-        routine.fn(*mod, arg_vec);
+        // Found routine; call the handler function
+        if (routine.args_type == StringArgs) {
+          ArgVec arg_vec;
+          for (int i = 0; i < num_args; i++) {
+            arg_vec.push(std::string(((char**)args)[i]));
+          }
+          routine.fn.string_arg(*mod, arg_vec);
+        } else if (routine.args_type == AnonArrArgs) {
+          routine.fn.anonarr_arg(*mod, args, num_args);
+        } else {
+          throw std::runtime_error("Invalid instrumentation args type");
+        }
       }
     }
   }
@@ -145,7 +164,7 @@ instrument_module (WasmModule* mod, const char* scheme, char** args, uint32_t nu
  * Copy returned that should be explicitly freed using 'destroy_file_buf' */
 byte*
 instrument_module_buffer (byte* inbuf, uint32_t insize, uint32_t *outsize,
-              const char* scheme, char** args, uint32_t num_args) {
+              const char* scheme, void* args, uint32_t num_args) {
   WasmModule *mod = decode_instrument_module (inbuf, insize);
   instrument_module (mod, scheme, args, num_args);
   byte* outbuf = encode_file_buf_from_module (mod, outsize);

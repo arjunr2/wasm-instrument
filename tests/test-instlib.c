@@ -20,7 +20,7 @@ int main() {
 
   /** Method 1 */
   wasm_instrument_mod_t mod = copy_instrument_module(mod_base);
-  instrument_module (mod, "memaccess-stochastic", args, num_args);
+  instrument_module (mod, "memaccess-stochastic", (void*) args, num_args);
 
   uint32_t enc_size = 0;
   byte* filebuf = encode_file_buf_from_module(mod, &enc_size);
@@ -39,7 +39,7 @@ int main() {
 
   /** Method 2 */
   uint32_t outsize;
-  byte* filebuf2 = instrument_module_buffer (start, end - start, &outsize, "memaccess-stochastic", args, num_args);
+  byte* filebuf2 = instrument_module_buffer (start, end - start, &outsize, "memaccess-stochastic", (void*)args, num_args);
   printf("Encode size: %d\n", outsize);
 
   FILE *g = fopen("out2.wasm", "wb");
