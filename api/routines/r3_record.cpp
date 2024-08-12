@@ -152,7 +152,8 @@ uint32_t add_pages(WasmModule &module, uint32_t num_pages) {
 }
 
 
-/* Mutex Lock/Unlock function creation */
+/* Mutex Lock/Unlock function creation 
+   Returns the function declarations in 'func' */
 void create_helper_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl *funcs[2]) {
   MemoryDecl *memory = module.getMemory(0);
   SigDecl sig = {.params= {}, .results = {}};
@@ -582,17 +583,6 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 }
 
 
-bool import_exclude_list(FuncDecl *target, WasmModule &module) {
-  if (
-    //(target == module.find_import_func("wali", "__wasm_thread_spawn")) || 
-    (target == module.find_import_func("wali", "SYS_futex"))
-  ) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
 InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], 
     std::map<FuncDecl*, std::string> &specialized_calls, 
@@ -919,68 +909,12 @@ InstList gen_memop_trace_instructions(InstBasePtr &instruction, uint32_t access_
 /* Main R3 Record function */
 void r3_record_instrument (WasmModule &module) {
   /* Engine callback for tracing */
-  /* Tracing Parameters:
-   *    Differ? (I32)
-   *    Access Index (I32)
-   *    Opcode (I32)
-   *    Base Address (I32)
-   *    Size of access (I32)
-   *    Main-Memory Load Value (I32/optional)
-   * Return:
-   *    None
-  */
-  ImportInfo iminfo;
-  SigDecl tracedump_sig;
-
-  iminfo = {
-    .mod_name = "instrument",
-    .member_name = "memop_tracedump"
-  };
-  tracedump_sig = {
-    .params = {
-      // Differ?
-      WASM_TYPE_I32, 
-      // Access Index
-      WASM_TYPE_I32, 
-      // Opcode
-      WASM_TYPE_I32, 
-      // Address
-      WASM_TYPE_I32, 
-      // Size/Width of Access
-      WASM_TYPE_I32,
-      // Load value from Main Memory (only used if Differ == 1) 
-      WASM_TYPE_I64, 
-      // Expected value from Main Memory (only used if Differ == 1) 
-      WASM_TYPE_I64
-    },
-    .results = {} 
-  };
-  ImportDecl* memop_tracedump_import_decl = module.add_import(iminfo, tracedump_sig);
-  FuncDecl* memop_tracedump_fn = memop_tracedump_import_decl->desc.func;
-
-  iminfo = {
-    .mod_name = "instrument",
-    .member_name = "call_tracedump"
-  };
-  tracedump_sig = {
-    .params = {
-      // Access Index
-      WASM_TYPE_I32, 
-      // Opcode
-      WASM_TYPE_I32, 
-      // Function Index
-      WASM_TYPE_I32, 
-      // Call ID
-      WASM_TYPE_I32,
-      // Return value (up to 1)
-      WASM_TYPE_I64,
-      // Arguments (up to 3)
-      WASM_TYPE_I64, WASM_TYPE_I64, WASM_TYPE_I64,
-    },
-    .results = {} 
-  };
-  ImportDecl* call_tracedump_import_decl = module.add_import(iminfo, tracedump_sig);
-  FuncDecl* call_tracedump_fn = call_tracedump_import_decl->desc.func;
+  FuncDecl* trace_fns[NUM_RECORD_IMPORTS];
+  for (int i = 0; i < NUM_RECORD_IMPORTS; i++) {
+    trace_fns[i] = add_r3_import_function(module, record_imports[i]);
+  }
+  FuncDecl* memop_tracedump_fn = trace_fns[0];
+  FuncDecl* call_tracedump_fn = trace_fns[1];
 
   /* Create custom mutex lock/unlock functions */
   FuncDecl *mutex_funcs[2];
@@ -998,7 +932,7 @@ void r3_record_instrument (WasmModule &module) {
 
   /* Generate quick lookup of ignored exported function idxs */
   std::map<FuncDecl*, std::string> func_export_map;
-  for (const char *func_name: ignored_export_funcs) {
+  for (const char *func_name: ignored_export_funcnames) {
     if (!set_func_export_map(module, func_name, func_export_map)) {
       ERR("Could not find function export: \'%s\'\n", func_name);
     }
@@ -1020,7 +954,6 @@ void r3_record_instrument (WasmModule &module) {
     sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
   }
 
-  SigDecl s = {.params = {WASM_TYPE_I64}, .results = {}};
   uint32_t call_trace_sig_indices[4];
   typelist call_trace_blocktypes[4] = {
     {WASM_TYPE_I32},
@@ -1033,27 +966,18 @@ void r3_record_instrument (WasmModule &module) {
     call_trace_sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
   }
 
-  /* Import calls that require extra non-generic instrumentation
-    This still use lock-based instrumentation */
+  /* These import calls require extra non-generic instrumentation
+    This still uses lock-based instrumentation */
   std::map<FuncDecl*, std::string> specialized_calls;
-  {
-    const char *calls[2] = {"SYS_mmap", "SYS_writev"};
-    for (int i = 0; i < 2; i++) {
-      if (FuncDecl *f = module.find_import_func("wali", calls[i]))
-        specialized_calls[f] = calls[i];
-    }
+  for (int i = 0; i < sizeof(specialized_import_names) / sizeof(specialized_import_names[0]); i++) {
+    if (FuncDecl *f = module.find_import_func("wali", specialized_import_names[i]))
+      specialized_calls[f] = specialized_import_names[i];
   }
-  /* Import calls that are excluded from lock-based instrumentation 
-     Each are handled in a specialized manner */
+  /* These import calls that are excluded from lock-based instrumentation */
   std::map<FuncDecl*, std::string> lockless_calls;
-  {
-    const char *calls[5] = {"__wasm_thread_spawn", "SYS_futex", "SYS_exit", 
-      // proc_exit and exit_group are identical in behavior
-      "__proc_exit", "SYS_exit_group"};
-    for (int i = 0; i < 5; i++) {
-      if (FuncDecl *f = module.find_import_func("wali", calls[i]))
-        lockless_calls[f] = calls[i];
-    }
+  for (int i = 0; i < sizeof(lockless_import_names) / sizeof(specialized_import_names[0]); i++) {
+    if (FuncDecl *f = module.find_import_func("wali", lockless_import_names[i]))
+      lockless_calls[f] = lockless_import_names[i];
   }
 
 
