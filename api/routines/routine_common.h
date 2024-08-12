@@ -1,3 +1,6 @@
+#ifndef ROUTINE_COMMON_H
+#define ROUTINE_COMMON_H
+
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -21,3 +24,4 @@ static ExportDecl* get_main_export(WasmModule &module) {
   return main_fn_exp ? main_fn_exp : start_fn_exp;
 }
 
+#endif

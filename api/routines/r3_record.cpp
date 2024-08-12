@@ -215,15 +215,6 @@ void create_helper_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl *func
 }
 
 
-static void set_func_export_map(WasmModule &module, std::string name, std::map<FuncDecl*, std::string>& export_map) {
-  ExportDecl *exp = module.find_export(name);
-  if (exp && exp->kind == KIND_FUNC) {
-    export_map[exp->desc.func] = name;
-    return;
-  }
-  ERR("Could not find function export: \'%s\'\n", name.c_str());
-}
-
 
 InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem,
@@ -1007,8 +998,11 @@ void r3_record_instrument (WasmModule &module) {
 
   /* Generate quick lookup of ignored exported function idxs */
   std::map<FuncDecl*, std::string> func_export_map;
-  set_func_export_map(module, "wasm_memory_grow", func_export_map);
-  set_func_export_map(module, "wasm_memory_size", func_export_map);
+  for (const char *func_name: ignored_export_funcs) {
+    if (!set_func_export_map(module, func_name, func_export_map)) {
+      ERR("Could not find function export: \'%s\'\n", func_name);
+    }
+  }
 
   /* Pre-compute sig indices since list indexing is expensive */
   uint32_t sig_indices[7];
