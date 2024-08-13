@@ -65,6 +65,7 @@ static WasmRet to_wasmret(wasm_type_t type) {
 typedef struct {
   ImportInfo iminfo;
   SigDecl sig;
+  uint32_t key;
 } ImportFuncData;
 
 
@@ -123,7 +124,44 @@ static ImportFuncData record_imports[NUM_RECORD_IMPORTS] = {
 /**  */
 
 /** Replay Instrumentation Functions */
-#define NUM_REPLAY_IMPORTS 0
+#define NUM_REPLAY_IMPORTS 2
+static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
+  { // writev call replay
+    .iminfo = {
+      .mod_name = "r3-replay",
+      .member_name = "SC_writev"
+    },
+    .sig = {
+      .params = {
+        // File descriptor
+        WASM_TYPE_I32, 
+        // Iovec pointer
+        WASM_TYPE_I32, 
+        // Iovec count
+        WASM_TYPE_I32, 
+      },
+      .results = {
+        // Return value
+        WASM_TYPE_I64
+      } 
+    },
+    .key = SC_WRITEV
+  },
+  { // proc_exit call replay
+    .iminfo = {
+      .mod_name = "r3-replay",
+      .member_name = "SC_proc_exit"
+    },
+    .sig = {
+      .params = {
+        // Error Code
+        WASM_TYPE_I32, 
+      },
+      .results = { } 
+    },
+    .key = SC_PROC_EXIT
+  },
+};
 /** */
 
 static FuncDecl* add_r3_import_function(WasmModule &module, ImportFuncData &imdata) {

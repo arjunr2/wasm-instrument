@@ -62,11 +62,44 @@ static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
 }
 
 static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop, 
-        bool has_retval, wasm_type_t wasm_ret_type, MemoryDecl *def_mem) {
+        bool has_retval, wasm_type_t wasm_ret_type, MemoryDecl *def_mem,
+        std::map<uint32_t, FuncDecl*> &callid_handlers) {
     InstList addinst;
     // Return value for the arm
     if (has_retval) {
         PUSH_INSTBASE_PTR(get_replay_retval_inst(wasm_ret_type, prop.return_val));
+    }
+    // Side-effects for the arm
+    switch(prop.call_id) {
+        case SC_GENERIC: break;
+        case SC_MMAP: {
+            uint32_t grow_value = prop.call_args[0];
+            if (grow_value > 0) {
+                PUSH_INST (I32ConstInst(grow_value));
+                PUSH_INST (MemoryGrowInst(def_mem));
+                PUSH_INST (DropInst());
+            }
+            break;
+        }
+        case SC_WRITEV: {
+            int32_t fd = prop.call_args[0];
+            int32_t iov = prop.call_args[1];
+            uint32_t iovcnt = prop.call_args[2];
+            PUSH_INST (I32ConstInst(fd));
+            PUSH_INST (I32ConstInst(iov));
+            PUSH_INST (I32ConstInst(iovcnt));
+            PUSH_INST (CallInst(callid_handlers.at(SC_WRITEV)));
+            break;
+        }
+        case SC_PROC_EXIT: {
+            int32_t status = prop.call_args[0];
+            PUSH_INST (I32ConstInst(status));
+            PUSH_INST (CallInst(callid_handlers.at(SC_PROC_EXIT)));
+            break;
+        }
+        default: {
+            ERR("R3-Replay-Error: Side-effects unsupported for call_id %u\n", prop.call_id);
+        }
     }
     // Stores for the arm
     for (int i = 0; i < prop.num_stores; i++) {
@@ -84,23 +117,27 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
     PUSH_INST (BrInst(br_arm_idx));
     return addinst;
 }
+
+
 /* Inserts the return value and store replay operation 
    Removes the call to the respective function
    */
-static void insert_replay_op(WasmModule &module, FuncDecl &func, InstList::iterator &institr, 
-        InstList &insts, ReplayOp &op, uint32_t ret_sig_indices[4], 
-        std::set<FuncDecl*> &remove_importfuncs) {
-    InstBasePtr &instruction = *institr;
-    std::shared_ptr<ImmFuncInst> call_inst = static_pointer_cast<ImmFuncInst>(instruction);
-    
-    FuncDecl *call_func = call_inst->getFunc();
-    uint32_t replay_func_idx = module.getFuncIdx(call_func);
-    uint32_t record_func_idx = transform_to_record_func_idx(replay_func_idx);
+static void insert_replay_op(WasmModule &module, FuncDecl *call_func, 
+        InstList::iterator &institr, InstList &insts, 
+        ReplayOp &op, uint32_t ret_sig_indices[4], 
+        std::set<FuncDecl*> &remove_importfuncs, 
+        std::map<uint32_t, FuncDecl*> &callid_handlers) {
     SigDecl* call_func_sig = call_func->sig;
     uint32_t call_func_sigidx = module.getSigIdx(call_func->sig);
     // Verify that import function and the indices are consistent with record
     // before proceeding
-    assert((module.isImport(call_func) && (op.func_idx == record_func_idx)));
+    {
+        if (op.num_props != 0) {
+            uint32_t replay_func_idx = module.getFuncIdx(call_func);
+            uint32_t record_func_idx = transform_to_record_func_idx(replay_func_idx);
+            assert(op.func_idx == record_func_idx);
+        }
+    }
 
     static GlobalDecl br_tracker_decl = {
         .type = WASM_TYPE_I32, .is_mutable = true, 
@@ -138,19 +175,19 @@ static void insert_replay_op(WasmModule &module, FuncDecl &func, InstList::itera
     std::iota(labels.begin(), labels.end(), 0);
     // Insert switch table on the branch tracker
     PUSH_INST (BlockInst(ret_sigidx));
-    // This is a value for the default case; this should ideally not happen
+    // This is a value for the default case; this should never be used by valid replays
     if (has_retval) {
         PUSH_INSTBASE_PTR(get_replay_retval_inst(wasm_ret_type, (0xDEADBEEFULL)));
     }
     PUSH_INST (GlobalGetInst(br_tracker));
-    PUSH_INST (BrTableInst(labels, op.num_props));
-    //PUSH_INST (BrInst(op.num_props));
+    // Default skips global variable increment
+    PUSH_INST (BrTableInst(labels, op.num_props + 1));
     PUSH_INST (EndInst());
     for (int i = 0; i < op.num_props; i++) {
         // Assumes only single memory for now
         InstList propinsts = construct_single_replay_prop(
             op.num_props - i - 1, op.props[i], has_retval, wasm_ret_type,
-            module.getMemory(0));
+            module.getMemory(0), callid_handlers);
         addinst.insert(addinst.end(), propinsts.begin(), propinsts.end());
         PUSH_INST (EndInst());
     }
@@ -175,16 +212,13 @@ static void insert_replay_op(WasmModule &module, FuncDecl &func, InstList::itera
 void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_ops) {
     ReplayOp *ops = (ReplayOp *)replay_ops;
 
-    printf("In Replay instrument: %d\n", num_ops);
-    for (int i = 0; i < num_ops; i++) {
-        uint32_t total_stores = 0;
-        for (int j = 0; j < ops[i].num_props; j++) {
-            total_stores += ops[i].props[j].num_stores;
-        }
-        printf("Access[%d] | Func Idx: %u | PropOp[%u] | Total Stores: %d\n", 
-            ops[i].access_idx, ops[i].func_idx, ops[i].num_props, total_stores);
+    /* Engine callbacks for specialized replay handlers */
+    std::map<uint32_t, FuncDecl*> callid_handlers;
+    //callid_handlers[SC_WRITEV] = module.find_import_func ("wali", "SYS_writev");
+    for (int i = 0; i < NUM_REPLAY_IMPORTS; i++) {
+        callid_handlers[replay_imports[i].key] 
+            = add_r3_import_function(module, replay_imports[i]);
     }
-
 
     /* Pre-compute sig indices for replay blocks */
     uint32_t sig_indices[5];
@@ -204,14 +238,13 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_op
     std::map<FuncDecl*, std::string> func_export_map;
     for (const char *func_name: ignored_export_funcnames) {
         if (!set_func_export_map(module, func_name, func_export_map)) {
-        ERR("Could not find function export: \'%s\'\n", func_name);
+            ERR("Could not find function export: \'%s\'\n", func_name);
         }
     }
 
     // Initialize iterator indices
     uint32_t access_tracker = 1;
     uint32_t op_idx = 0;
-    bool replay_ops_done = false;
 
     std::set<FuncDecl*> remove_importfuncs;
 
@@ -227,16 +260,22 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_op
             switch (instruction->getImmType()) {
                 // Fallthrough here to increment access for this type as well
                 case IMM_FUNC: {
-                    ReplayOp curr_op = ops[op_idx];
-                    if (access_tracker == curr_op.access_idx) {
-                        insert_replay_op(module, func, institr, insts, curr_op, 
-                            sig_indices, remove_importfuncs);
-                        printf("Finshed Access %d\n", curr_op.access_idx);
-                        op_idx++;
-                        if (op_idx == num_ops) {
-                            printf("All replay ops done\n");
-                            replay_ops_done = true;
-                        }
+                    std::shared_ptr<ImmFuncInst> call_inst = 
+                        static_pointer_cast<ImmFuncInst>(instruction);
+                    FuncDecl *call_func = call_inst->getFunc();
+                    // Reinstrument all import calls to replay
+                    if (module.isImport(call_func)) {
+                        bool tracked_import = (op_idx < num_ops) && 
+                            (access_tracker == ops[op_idx].access_idx);
+                        // Untracked imports with no replay data use the empty replay-op
+                        ReplayOp curr_op = (tracked_import ? 
+                            ops[op_idx++] :
+                            (ReplayOp) { .access_idx = 0, .func_idx = 0, .props = nullptr, .num_props = 0 }
+                        );
+                        insert_replay_op(module, call_func, institr, insts, curr_op, 
+                            sig_indices, remove_importfuncs, callid_handlers);
+                        TRACE("[%s] Replaced Call Access %d\n", 
+                            (tracked_import ? "TRACKED" : "UNTRACKED"), access_tracker);
                     }
                 }
                 case IMM_MEMARG:
@@ -251,9 +290,10 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_op
             if (inc_access_tracker) {
                 access_tracker++;
             }
-            if (replay_ops_done) { break; }
         }
-        if (replay_ops_done) { break; }
     }
-
+    /* Remove all the replaced import functions */
+    for (auto &remfunc : remove_importfuncs) {
+        module.remove_func(remfunc);
+    }
 }
