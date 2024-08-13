@@ -206,7 +206,7 @@ class WasmModule {
     std::list <SigDecl>     sigs;
     ImportSet               imports;
     /* Func space */
-    std::deque <FuncDecl>    funcs;
+    std::list <FuncDecl>    funcs;
     /* Table space */
     std::list <TableDecl>   tables;
     /* Mem space */
@@ -269,6 +269,9 @@ class WasmModule {
     /* Code + local encoding for instructions */
     bytedeque encode_code (FuncDecl &func);
 
+    /* Instrumentation helper methods */
+    bool remove_func_core (uint32_t idx, FuncDecl *func);
+
     /* Descriptor patching for copy/assign */
     template<typename T>
     void DescriptorPatch (std::list<T> &list, const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
@@ -289,7 +292,7 @@ class WasmModule {
 
     /* Field Accessors */
     inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }
-    inline FuncDecl* getFunc(uint32_t idx)      { return GET_DEQUE_ELEM(this->funcs, idx); }
+    inline FuncDecl* getFunc(uint32_t idx)      { return GET_LIST_ELEM(this->funcs, idx); }
     inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_DEQUE_ELEM(this->globals, idx); }
     inline TableDecl* getTable(uint32_t idx)    { return GET_LIST_ELEM(this->tables, idx); }
     inline MemoryDecl* getMemory(uint32_t idx)  { return GET_LIST_ELEM(this->mems, idx); }
@@ -298,7 +301,7 @@ class WasmModule {
 
     /* Index Accessors */
     inline uint32_t getSigIdx(SigDecl *sig)           const { return GET_LIST_IDX(this->sigs, sig); }
-    inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_DEQUE_IDX(this->funcs, func); }
+    inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_LIST_IDX(this->funcs, func); }
     inline uint32_t getGlobalIdx(GlobalDecl *global)  const { return GET_DEQUE_IDX(this->globals, global); }
     inline uint32_t getTableIdx(TableDecl *table)     const { return GET_LIST_IDX(this->tables, table); }
     inline uint32_t getMemoryIdx(MemoryDecl *mem)     const { return GET_LIST_IDX(this->mems, mem); }
@@ -312,7 +315,7 @@ class WasmModule {
     inline bool isImport(MemoryDecl *mem)     { return getMemoryIdx(mem)    < this->imports.num_mems; }
 
     /* Section Accessors */
-    inline std::deque <FuncDecl> &Funcs() { return this->funcs; }
+    inline std::list  <FuncDecl> &Funcs() { return this->funcs; }
     inline std::deque <GlobalDecl> &Globals() { return this->globals; }
     inline std::list  <ExportDecl> &Exports() { return this->exports; }
 
@@ -360,6 +363,10 @@ class WasmModule {
     TableDecl* find_import_table (std::string mod_name, std::string member_name);
     MemoryDecl* find_import_memory (std::string mod_name, std::string member_name);
     FuncDecl* find_import_func (std::string mod_name, std::string member_name);
+
+    /* Removal */
+    bool remove_func (uint32_t idx);
+    bool remove_func (FuncDecl *func);
 
     /* Replace uses: UNIMPLEMENTED */
     void replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst);

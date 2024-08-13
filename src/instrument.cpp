@@ -172,13 +172,61 @@ TableDecl* WasmModule::find_import_table (std::string mod_name, std::string memb
 }
 
 MemoryDecl* WasmModule::find_import_memory (std::string mod_name, std::string member_name) {
-  IMPORT_FIND (KIND_FUNC, mem);
+  IMPORT_FIND (KIND_MEMORY, mem);
 }
 
 FuncDecl* WasmModule::find_import_func (std::string mod_name, std::string member_name) {
   IMPORT_FIND (KIND_FUNC, func);
 }
 
+
+/* Removal methods */
+bool WasmModule::remove_func_core (uint32_t idx, FuncDecl *func) {
+  auto &funcs = this->Funcs();
+  auto &imports = this->imports;
+  if (idx >= funcs.size()) {
+    return false;
+  }
+
+  auto func_itr = std::next(funcs.begin(), idx);
+  // Remove reference in import section (if applicable)
+  if (idx < imports.num_funcs) {
+    auto import_itr = imports.list.begin();
+    for (; import_itr != imports.list.end(); ++import_itr) {
+      auto &imp = *import_itr;
+      if ((imp.kind == KIND_FUNC) && (imp.desc.func == &(*func_itr))) {
+        imports.list.erase(import_itr);
+        imports.num_funcs--;
+        break;
+      }
+    }
+    // If no match, return false
+    if (import_itr == imports.list.end()) {
+      return false;
+    }
+  }
+  // Remove reference in custom name section
+  if (auto debug_names_ptr = this->getFnDebugNames()) {
+    auto &debug_names = *debug_names_ptr;
+    for (auto dname_itr = debug_names.begin(); dname_itr != debug_names.end(); ++dname_itr) {
+      if (dname_itr->func == func) {
+        debug_names.erase(dname_itr);
+        break;
+      }
+    }
+  }
+  // Remove function
+  funcs.erase(func_itr);
+  return true;
+}
+
+bool WasmModule::remove_func (uint32_t idx) {
+  return this->remove_func_core(idx, this->getFunc(idx));
+}
+
+bool WasmModule::remove_func (FuncDecl *func) {
+  return this->remove_func_core(this->getFuncIdx(func), func);
+}
 
 /* Replace methods */
 void WasmModule::replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst) {}
