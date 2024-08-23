@@ -212,9 +212,14 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
 void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_ops) {
     ReplayOp *ops = (ReplayOp *)replay_ops;
 
+    /* We actually don't use this added page at all (for now)
+    However, we need to add it purely to maintain address space consistency
+    with the recorded module which added a page for instrumentation */
+    MemoryDecl *def_mem = module.getMemory(0);
+    uint32_t old_init_pages = add_pages(def_mem, 1);
+
     /* Engine callbacks for specialized replay handlers */
     std::map<uint32_t, FuncDecl*> callid_handlers;
-    //callid_handlers[SC_WRITEV] = module.find_import_func ("wali", "SYS_writev");
     for (int i = 0; i < NUM_REPLAY_IMPORTS; i++) {
         callid_handlers[replay_imports[i].key] 
             = add_r3_import_function(module, replay_imports[i]);

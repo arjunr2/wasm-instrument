@@ -138,19 +138,6 @@ union RecordInstInfo {
 }
 
 
-/* Add pages of memory statically. Return the start page */
-uint32_t add_pages(WasmModule &module, uint32_t num_pages) {
-  wasm_limits_t &memlimit = module.getMemory(0)->limits;
-  uint32_t memdata_end = memlimit.initial * WASM_PAGE_SIZE;
-
-  uint32_t retval = memlimit.initial;
-  memlimit.initial += num_pages;
-  if (memlimit.has_max && (memlimit.initial > memlimit.max)) {
-    throw std::runtime_error("Not enough memory to instrument");
-  }
-  return retval;
-}
-
 
 /* Mutex Lock/Unlock function creation 
    Returns the function declarations in 'func' */
@@ -916,18 +903,17 @@ void r3_record_instrument (WasmModule &module) {
   FuncDecl* memop_tracedump_fn = trace_fns[0];
   FuncDecl* call_tracedump_fn = trace_fns[1];
 
+  MemoryDecl *def_mem = module.getMemory(0);
   /* Create custom mutex lock/unlock functions */
   FuncDecl *mutex_funcs[2];
-  uint32_t mutex_addr = (add_pages(module, 1) * WASM_PAGE_SIZE);
+  uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
   create_helper_funcs(module, mutex_addr, mutex_funcs);
 
   FuncDecl *lock_fn = mutex_funcs[0];
   FuncDecl *unlock_fn = mutex_funcs[1];
 
   /* Create new memory: Must happen after adding all instrumentation pages */
-  MemoryDecl *def_mem = module.getMemory(0);
   MemoryDecl new_mem = *def_mem;
-
   MemoryDecl *record_mem = module.add_memory(new_mem);
 
   /* Generate quick lookup of ignored exported function idxs */
