@@ -66,6 +66,7 @@ typedef struct {
   ImportInfo iminfo;
   SigDecl sig;
   uint32_t key;
+  bool debug;
 } ImportFuncData;
 
 
@@ -145,7 +146,8 @@ static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
         WASM_TYPE_I64
       } 
     },
-    .key = SC_WRITEV
+    .key = SC_WRITEV,
+    .debug = true
   },
   { // proc_exit call replay
     .iminfo = {

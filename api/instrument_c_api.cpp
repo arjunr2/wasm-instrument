@@ -20,7 +20,7 @@ typedef enum {
 
 typedef union {
   void (*string_arg) (WasmModule&, ArgVec);
-  void (*anonarr_arg) (WasmModule&, void*, uint32_t);
+  void (*anonarr_arg) (WasmModule&, void*, uint32_t, int64_t);
 } InstrumentFn;
 
 typedef struct {
@@ -127,7 +127,7 @@ encode_file_buf_from_module (WasmModule* module, uint32_t* file_size) {
 
 /** Instrumentation (in-place). No batch mode supported yet **/
 void 
-instrument_module (WasmModule* mod, const char* scheme, void* args, uint32_t num_args) {
+instrument_module (WasmModule* mod, const char* scheme, void* args, uint32_t num_args, int64_t flags) {
   bool match = false;
   for (auto &routine : inst_routines) {
     if (routine.name == std::string(scheme)) {
@@ -146,7 +146,7 @@ instrument_module (WasmModule* mod, const char* scheme, void* args, uint32_t num
           }
           routine.fn.string_arg(*mod, arg_vec);
         } else if (routine.args_type == AnonArrArgs) {
-          routine.fn.anonarr_arg(*mod, args, num_args);
+          routine.fn.anonarr_arg(*mod, args, num_args, flags);
         } else {
           throw std::runtime_error("Invalid instrumentation args type");
         }
@@ -164,9 +164,9 @@ instrument_module (WasmModule* mod, const char* scheme, void* args, uint32_t num
  * Copy returned that should be explicitly freed using 'destroy_file_buf' */
 byte*
 instrument_module_buffer (byte* inbuf, uint32_t insize, uint32_t *outsize,
-              const char* scheme, void* args, uint32_t num_args) {
+              const char* scheme, void* args, uint32_t num_args, int64_t flags) {
   WasmModule *mod = decode_instrument_module (inbuf, insize);
-  instrument_module (mod, scheme, args, num_args);
+  instrument_module (mod, scheme, args, num_args, flags);
   byte* outbuf = encode_file_buf_from_module (mod, outsize);
   destroy_instrument_module(mod);
   return outbuf;

@@ -32,7 +32,14 @@ typedef struct {
   uint32_t num_props;
 } ReplayOp;
 
+typedef struct ReplayImportFuncDecl {
+    FuncDecl *func;
+    bool debug;
 
+    bool operator<(const struct ReplayImportFuncDecl &other) const {
+        return func < other.func;
+    }
+} ReplayImportFuncDecl;
 
 static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
     uint32_t val32;
@@ -63,42 +70,58 @@ static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
 
 static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop, 
         bool has_retval, wasm_type_t wasm_ret_type, MemoryDecl *def_mem,
-        std::map<uint32_t, FuncDecl*> &callid_handlers) {
+        std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
+        std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
+        int64_t flags) {
     InstList addinst;
+    bool gen_debug_calls = flags;
     // Return value for the arm
     if (has_retval) {
         PUSH_INSTBASE_PTR(get_replay_retval_inst(wasm_ret_type, prop.return_val));
     }
     // Side-effects for the arm
-    switch(prop.call_id) {
-        case SC_GENERIC: break;
-        case SC_MMAP: {
-            uint32_t grow_value = prop.call_args[0];
-            if (grow_value > 0) {
-                PUSH_INST (I32ConstInst(grow_value));
-                PUSH_INST (MemoryGrowInst(def_mem));
-                PUSH_INST (DropInst());
+    bool gen_side_effects = true;
+    auto callid_func_it = callid_handlers.find(prop.call_id);
+    // For imports that require host calls for side-effects
+    if (callid_func_it != callid_handlers.end()) {
+        // Generate side effects for debug calls only if flags is set
+        gen_side_effects = !(callid_func_it->second.debug) ||
+             (callid_func_it->second.debug && gen_debug_calls);
+        if (gen_side_effects) {
+            unused_callid_handlers.erase(callid_func_it->second);
+        }
+    }
+    if (gen_side_effects) {
+        switch(prop.call_id) {
+            case SC_GENERIC: break;
+            case SC_MMAP: {
+                uint32_t grow_value = prop.call_args[0];
+                if (grow_value > 0) {
+                    PUSH_INST (I32ConstInst(grow_value));
+                    PUSH_INST (MemoryGrowInst(def_mem));
+                    PUSH_INST (DropInst());
+                }
+                break;
             }
-            break;
-        }
-        case SC_WRITEV: {
-            int32_t fd = prop.call_args[0];
-            int32_t iov = prop.call_args[1];
-            uint32_t iovcnt = prop.call_args[2];
-            PUSH_INST (I32ConstInst(fd));
-            PUSH_INST (I32ConstInst(iov));
-            PUSH_INST (I32ConstInst(iovcnt));
-            PUSH_INST (CallInst(callid_handlers.at(SC_WRITEV)));
-            break;
-        }
-        case SC_PROC_EXIT: {
-            int32_t status = prop.call_args[0];
-            PUSH_INST (I32ConstInst(status));
-            PUSH_INST (CallInst(callid_handlers.at(SC_PROC_EXIT)));
-            break;
-        }
-        default: {
-            ERR("R3-Replay-Error: Side-effects unsupported for call_id %u\n", prop.call_id);
+            case SC_WRITEV: {
+                int32_t fd = prop.call_args[0];
+                int32_t iov = prop.call_args[1];
+                uint32_t iovcnt = prop.call_args[2];
+                PUSH_INST (I32ConstInst(fd));
+                PUSH_INST (I32ConstInst(iov));
+                PUSH_INST (I32ConstInst(iovcnt));
+                PUSH_INST (CallInst(callid_func_it->second.func));
+                break;
+            }
+            case SC_PROC_EXIT: {
+                int32_t status = prop.call_args[0];
+                PUSH_INST (I32ConstInst(status));
+                PUSH_INST (CallInst(callid_func_it->second.func));
+                break;
+            }
+            default: {
+                ERR("R3-Replay-Error: Side-effects unsupported for call_id %u\n", prop.call_id);
+            }
         }
     }
     // Stores for the arm
@@ -126,7 +149,9 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         InstList::iterator &institr, InstList &insts, 
         ReplayOp &op, uint32_t ret_sig_indices[4], 
         std::set<FuncDecl*> &remove_importfuncs, 
-        std::map<uint32_t, FuncDecl*> &callid_handlers) {
+        std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
+        std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
+        int64_t flags) {
     SigDecl* call_func_sig = call_func->sig;
     uint32_t call_func_sigidx = module.getSigIdx(call_func->sig);
     // Verify that import function and the indices are consistent with record
@@ -187,7 +212,7 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         // Assumes only single memory for now
         InstList propinsts = construct_single_replay_prop(
             op.num_props - i - 1, op.props[i], has_retval, wasm_ret_type,
-            module.getMemory(0), callid_handlers);
+            module.getMemory(0), callid_handlers, unused_callid_handlers, flags);
         addinst.insert(addinst.end(), propinsts.begin(), propinsts.end());
         PUSH_INST (EndInst());
     }
@@ -209,9 +234,11 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
 
 
 
-void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_ops) {
+void r3_replay_instrument (WasmModule &module, void *replay_ops, 
+        uint32_t num_ops, int64_t flags) {
     ReplayOp *ops = (ReplayOp *)replay_ops;
 
+    printf("FLAGS: %ld\n", flags);
     /* We actually don't use this added page at all (for now)
     However, we need to add it purely to maintain address space consistency
     with the recorded module which added a page for instrumentation */
@@ -219,10 +246,15 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_op
     uint32_t old_init_pages = add_pages(def_mem, 1);
 
     /* Engine callbacks for specialized replay handlers */
-    std::map<uint32_t, FuncDecl*> callid_handlers;
+    std::map<uint32_t, ReplayImportFuncDecl> callid_handlers;
+    std::set<ReplayImportFuncDecl> unused_callid_handlers;
     for (int i = 0; i < NUM_REPLAY_IMPORTS; i++) {
-        callid_handlers[replay_imports[i].key] 
-            = add_r3_import_function(module, replay_imports[i]);
+        ReplayImportFuncDecl rep_imfunc = { 
+            .func = add_r3_import_function(module, replay_imports[i]), 
+            .debug = replay_imports[i].debug 
+        };
+        callid_handlers[replay_imports[i].key] = rep_imfunc; 
+        unused_callid_handlers.insert(rep_imfunc);
     }
 
     /* Pre-compute sig indices for replay blocks */
@@ -278,7 +310,8 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_op
                             (ReplayOp) { .access_idx = 0, .func_idx = 0, .props = nullptr, .num_props = 0 }
                         );
                         insert_replay_op(module, call_func, institr, insts, curr_op, 
-                            sig_indices, remove_importfuncs, callid_handlers);
+                            sig_indices, remove_importfuncs, callid_handlers, 
+                            unused_callid_handlers, flags);
                         TRACE("[%s] Replaced Call Access %d\n", 
                             (tracked_import ? "TRACKED" : "UNTRACKED"), access_tracker);
                     }
@@ -300,5 +333,11 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_op
     /* Remove all the replaced import functions */
     for (auto &remfunc : remove_importfuncs) {
         module.remove_func(remfunc);
+    }
+    /* Remove unused import functions */
+    for (auto &unused_func : unused_callid_handlers) {
+        FuncDecl *fn = unused_func.func;
+        TRACE("Removing unused callid handler: %d\n", module.getFuncIdx(fn));
+        module.remove_func(fn);
     }
 }
