@@ -238,7 +238,6 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
         uint32_t num_ops, int64_t flags) {
     ReplayOp *ops = (ReplayOp *)replay_ops;
 
-    printf("FLAGS: %ld\n", flags);
     /* We actually don't use this added page at all (for now)
     However, we need to add it purely to maintain address space consistency
     with the recorded module which added a page for instrumentation */
