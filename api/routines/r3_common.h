@@ -7,15 +7,15 @@
 typedef enum {
   SC_UNKNOWN = 0,
   /* Specialized Calls */
-  SC_MMAP,
-  SC_WRITEV,
+  SC_MMAP = 1,
+  SC_WRITEV = 2,
   /* Lockless Calls */
-  SC_THREAD_SPAWN,
-  SC_FUTEX,
-  SC_EXIT,
-  SC_PROC_EXIT,
+  SC_THREAD_SPAWN = 3,
+  SC_FUTEX = 4,
+  SC_THREAD_EXIT = 5,
+  SC_PROC_EXIT = 6,
   /* All other generic imports */
-  SC_GENERIC
+  SC_GENERIC = 0xFFFFFFFF
 } CallID;
 
 /* Types of Return Values for recorded instructions */

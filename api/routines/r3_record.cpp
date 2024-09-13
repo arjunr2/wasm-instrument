@@ -618,10 +618,12 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
           call_id = SC_FUTEX;
         }
         else if (call_name == "SYS_exit") {
-          call_id = SC_EXIT;
+          call_id = SC_THREAD_EXIT;
+          PUSH_INST (LocalTeeInst(local_i32_1));
         }
         else if ((call_name == "SYS_exit_group") || (call_name == "__proc_exit")) {
           call_id = SC_PROC_EXIT;
+          PUSH_INST (LocalTeeInst(local_i32_1));
         }
         instrument_type = { .lockless = true, .force_trace = true };
       }
@@ -781,8 +783,16 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
     }
     case SC_THREAD_SPAWN:
     case SC_FUTEX:
-    case SC_EXIT:
-    case SC_PROC_EXIT:
+    case SC_THREAD_EXIT: {
+      num_args = 1;
+      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
+      break;
+    }
+    case SC_PROC_EXIT: {
+      num_args = 1;
+      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
+      break;
+    }
     case SC_GENERIC: { break; }
     default: { ERR("R3-Record-Error: Unsupported call ID %d\n", call_id); }
   }
