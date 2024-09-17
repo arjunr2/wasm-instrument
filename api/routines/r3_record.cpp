@@ -21,7 +21,7 @@ struct CallInstInfo {
   RetVal ret;
   uint16_t opcode;
   FuncDecl *target;
-  CallID call_id;
+  RecordInterface::CallID call_id;
 };
 
 struct InstrumentType {
@@ -571,7 +571,7 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 
 InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[11], uint32_t sig_idxs[7], 
+    uint32_t local_idxs[16], uint32_t sig_idxs[7], 
     std::map<FuncDecl*, std::string> &specialized_calls, 
     std::map<FuncDecl*, std::string> &lockless_calls,
     InstrumentType &instrument_type,
@@ -581,7 +581,7 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
   CALL_SETUP_INIT(ImmFuncInst);
 
   FuncDecl *target = call_inst->getFunc();
-  CallID call_id = SC_UNKNOWN;
+  RecordInterface::CallID call_id = RecordInterface::SC_UNKNOWN;
   std::string mod_name;
   std::string member_name;
   std::vector<int64_t> args;
@@ -596,11 +596,11 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
         /* Specialized calls */
         std::string call_name = spec_it->second;
         if (call_name == "SYS_mmap") {
-          call_id = SC_MMAP;
+          call_id = RecordInterface::SC_MMAP;
           instrument_type = { .force_trace = true };
         }
         else if (call_name == "SYS_writev") {
-          call_id = SC_WRITEV;
+          call_id = RecordInterface::SC_WRITEV;
           PUSH_INST (LocalSetInst(local_i32_3));
           PUSH_INST (LocalSetInst(local_i32_2));
           PUSH_INST (LocalTeeInst(local_i32_1));
@@ -612,24 +612,40 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
         /* Lockless calls */
         std::string call_name = ll_it->second;
         if (call_name == "__wasm_thread_spawn") {
-          call_id = SC_THREAD_SPAWN;
+          call_id = RecordInterface::SC_THREAD_SPAWN;
+          PUSH_INST (LocalSetInst(local_i32_2));
+          PUSH_INST (LocalTeeInst(local_i32_1));
+          PUSH_INST (LocalGetInst(local_i32_2));
         }
         else if (call_name == "SYS_futex") {
-          call_id = SC_FUTEX;
+          call_id = RecordInterface::SC_FUTEX;
+          PUSH_INST (I64ExtendI32UInst());
+          PUSH_INST (LocalSetInst(local_i64_1));
+          PUSH_INST (LocalSetInst(local_i32_5));
+          PUSH_INST (LocalSetInst(local_i32_4));
+          PUSH_INST (LocalSetInst(local_i32_3));
+          PUSH_INST (LocalSetInst(local_i32_2));
+          PUSH_INST (LocalTeeInst(local_i32_1));
+          PUSH_INST (LocalGetInst(local_i32_2));
+          PUSH_INST (LocalGetInst(local_i32_3));
+          PUSH_INST (LocalGetInst(local_i32_4));
+          PUSH_INST (LocalGetInst(local_i32_5));
+          PUSH_INST (LocalGetInst(local_i64_1));
+          PUSH_INST (I32WrapI64Inst());
         }
         else if (call_name == "SYS_exit") {
-          call_id = SC_THREAD_EXIT;
+          call_id = RecordInterface::SC_THREAD_EXIT;
           PUSH_INST (LocalTeeInst(local_i32_1));
         }
         else if ((call_name == "SYS_exit_group") || (call_name == "__proc_exit")) {
-          call_id = SC_PROC_EXIT;
+          call_id = RecordInterface::SC_PROC_EXIT;
           PUSH_INST (LocalTeeInst(local_i32_1));
         }
         instrument_type = { .lockless = true, .force_trace = true };
       }
       else if (module.isImport(target) && (ll_it == lockless_calls.end())) {
         /* Generic import calls */
-        call_id = SC_GENERIC;
+        call_id = RecordInterface::SC_GENERIC;
         instrument_type = { .force_trace = true };
       }
       else {
@@ -703,7 +719,7 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
 
   InstList addinst;
   uint16_t opcode = instruction->getOpcode();
-  CallID call_id = recinfo.call_id;
+  RecordInterface::CallID call_id = recinfo.call_id;
 
   uint32_t local_f64 = local_idxs[0];
   uint32_t local_f32 = local_idxs[1];
@@ -724,13 +740,13 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
   // Instrumentation for after the call (but before trace data)
   // Default (common) case involves getting the return value
   switch (call_id) {
-    case SC_UNKNOWN: {
+    case RecordInterface::SC_UNKNOWN: {
       ERR("R3-Record-Error: Call ID %d not expected\n", call_id);
       break;
     }
     // mmap requires extra operation in addition to default for generic calls
     // local_i32_1 records memory grow length
-    case SC_MMAP: {
+    case RecordInterface::SC_MMAP: {
       I64_SUCCESS_CHECK(
         PUSH_INST (MemorySizeInst(def_mem));
         PUSH_INST (MemorySizeInst(record_mem));
@@ -769,31 +785,42 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
   /* Args for specific call */
   int num_args = 0;
   switch (call_id) {
-    case SC_MMAP: {
+    case RecordInterface::SC_MMAP: {
       num_args = 1;
       LOCAL_I64_EXTEND(local_i32_1, RET_I32);
       break;
     }
-    case SC_WRITEV: {
+    case RecordInterface::SC_WRITEV: {
       num_args = 3;
       LOCAL_I64_EXTEND(local_i32_1, RET_I32);
       LOCAL_I64_EXTEND(local_i32_2, RET_I32);
       LOCAL_I64_EXTEND(local_i32_3, RET_I32);
       break;
     }
-    case SC_THREAD_SPAWN:
-    case SC_FUTEX:
-    case SC_THREAD_EXIT: {
+    case RecordInterface::SC_THREAD_SPAWN: {
+      num_args = 2;
+      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
+      LOCAL_I64_EXTEND(local_i32_2, RET_I32);
+      break;
+    }
+    case RecordInterface::SC_FUTEX: {
+      num_args = 3;
+      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
+      LOCAL_I64_EXTEND(local_i32_2, RET_I32);
+      LOCAL_I64_EXTEND(local_i32_3, RET_I32);
+      break;
+    }
+    case RecordInterface::SC_THREAD_EXIT: {
       num_args = 1;
       LOCAL_I64_EXTEND(local_i32_1, RET_I32);
       break;
     }
-    case SC_PROC_EXIT: {
+    case RecordInterface::SC_PROC_EXIT: {
       num_args = 1;
       LOCAL_I64_EXTEND(local_i32_1, RET_I32);
       break;
     }
-    case SC_GENERIC: { break; }
+    case RecordInterface::SC_GENERIC: { break; }
     default: { ERR("R3-Record-Error: Unsupported call ID %d\n", call_id); }
   }
   // Push remaining placeholder args

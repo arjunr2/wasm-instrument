@@ -3,20 +3,28 @@
 
 #include "routine_common.h"
 
-/* Types of Call instructions */
-typedef enum {
-  SC_UNKNOWN = 0,
-  /* Specialized Calls */
-  SC_MMAP = 1,
-  SC_WRITEV = 2,
-  /* Lockless Calls */
-  SC_THREAD_SPAWN = 3,
-  SC_FUTEX = 4,
-  SC_THREAD_EXIT = 5,
-  SC_PROC_EXIT = 6,
-  /* All other generic imports */
-  SC_GENERIC = 0xFFFFFFFF
-} CallID;
+namespace RecordInterface {
+  /* Types of Call instructions */
+  typedef enum {
+    SC_UNKNOWN = 0,
+    /* Specialized Calls */
+    SC_MMAP = 1,
+    SC_WRITEV = 2,
+    /* Lockless Calls */
+    SC_THREAD_SPAWN = 3,
+    SC_FUTEX = 4,
+    SC_THREAD_EXIT = 5,
+    SC_PROC_EXIT = 6,
+    /* All other generic imports */
+    SC_GENERIC = 0xFFFFFFFF
+  } CallID;
+
+  typedef enum {
+    FutexWait = 0,
+    FutexWake = 1,
+    FutexUnknown = -1
+  } FutexOp;
+}
 
 /* Types of Return Values for recorded instructions */
 typedef enum {
@@ -44,7 +52,10 @@ static const char *specialized_import_names[2] = {"SYS_mmap", "SYS_writev"};
   NOTE: proc_exit and exit_group are identical in behavior
   */
 static const char *lockless_import_names[5] = {
-  "__wasm_thread_spawn", "SYS_futex", "SYS_exit", 
+  "__wasm_thread_spawn", 
+  // Futex doesn't need lock since it doesn't need to be ordered w.r.t. memory accesses
+  "SYS_futex", 
+  "SYS_exit", 
     "__proc_exit", "SYS_exit_group"};
 /** */
 
@@ -125,7 +136,7 @@ static ImportFuncData record_imports[NUM_RECORD_IMPORTS] = {
 /**  */
 
 /** Replay Instrumentation Functions */
-#define NUM_REPLAY_IMPORTS 2
+#define NUM_REPLAY_IMPORTS 4
 static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
   { // writev call replay
     .iminfo = {
@@ -146,7 +157,7 @@ static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
         WASM_TYPE_I64
       } 
     },
-    .key = SC_WRITEV,
+    .key = RecordInterface::SC_WRITEV,
     .debug = true
   },
   { // proc_exit call replay
@@ -161,8 +172,37 @@ static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
       },
       .results = { } 
     },
-    .key = SC_PROC_EXIT
+    .key = RecordInterface::SC_PROC_EXIT
   },
+  { // thread_spawn call replay
+    .iminfo = {
+      .mod_name = "wali",
+      .member_name = "__wasm_thread_spawn"
+    },
+    .sig = {
+      .params = {
+        // Initial setup function pointer
+        WASM_TYPE_I32,
+        // Arguments to thread
+        WASM_TYPE_I32
+      },
+      .results = { 
+        // Child thread ID
+        WASM_TYPE_I32
+      } 
+    },
+    .key = RecordInterface::SC_THREAD_SPAWN
+  },
+  { // thread yield call for forced context switches
+    .iminfo = {
+      .mod_name = "r3-replay",
+      .member_name = "SC_yield"
+    },
+    .sig = {
+      .params = {},
+      .results = {} 
+    },
+  }
 };
 /** */
 

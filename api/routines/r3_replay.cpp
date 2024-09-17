@@ -93,8 +93,8 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
     }
     if (gen_side_effects) {
         switch(prop.call_id) {
-            case SC_GENERIC: break;
-            case SC_MMAP: {
+            case RecordInterface::SC_GENERIC: break;
+            case RecordInterface::SC_MMAP: {
                 uint32_t grow_value = prop.call_args[0];
                 if (grow_value > 0) {
                     PUSH_INST (I32ConstInst(grow_value));
@@ -103,7 +103,7 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
                 }
                 break;
             }
-            case SC_WRITEV: {
+            case RecordInterface::SC_WRITEV: {
                 int32_t fd = prop.call_args[0];
                 int32_t iov = prop.call_args[1];
                 uint32_t iovcnt = prop.call_args[2];
@@ -113,11 +113,44 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
                 PUSH_INST (CallInst(callid_func_it->second.func));
                 break;
             }
-            case SC_PROC_EXIT: {
+            case RecordInterface::SC_PROC_EXIT: {
                 int32_t status = prop.call_args[0];
                 PUSH_INST (I32ConstInst(status));
                 PUSH_INST (CallInst(callid_func_it->second.func));
                 break;
+            }
+            case RecordInterface::SC_THREAD_SPAWN: {
+                int32_t setup_fn_ptr = prop.call_args[0];
+                int32_t thread_args_ptr = prop.call_args[1];
+                PUSH_INST (I32ConstInst(setup_fn_ptr));
+                PUSH_INST (I32ConstInst(thread_args_ptr));
+                PUSH_INST (CallInst(callid_func_it->second.func));
+                break;
+            }
+            case RecordInterface::SC_FUTEX: {
+                int32_t addr = prop.call_args[0];
+                RecordInterface::FutexOp futex_op = static_cast<RecordInterface::FutexOp>(prop.call_args[1]);
+                int32_t val = prop.call_args[2];
+                switch (futex_op) {
+                    case RecordInterface::FutexWait: {
+                        PUSH_INST (I32ConstInst(addr));
+                        PUSH_INST (I32ConstInst(val));
+                        PUSH_INST (I64ConstInst(-1));
+                        PUSH_INST (MemoryAtomicWait32Inst(2, 0, def_mem));
+                        PUSH_INST (DropInst());
+                        break;
+                    }
+                    case RecordInterface::FutexWake: {
+                        PUSH_INST (I32ConstInst(addr));
+                        PUSH_INST (I32ConstInst(val));
+                        PUSH_INST (MemoryAtomicNotifyInst(2, 0, def_mem));
+                        PUSH_INST (DropInst());
+                        break;
+                    }
+                    default: {
+                        ERR("R3-Replay-Error: Unsupported futex op %d\n", futex_op);
+                    }
+                }
             }
             default: {
                 ERR("R3-Replay-Error: Side-effects unsupported for call_id %u\n", prop.call_id);

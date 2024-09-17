@@ -31,7 +31,7 @@ extern int g_threads;
   char outerr[500]; \
   sprintf(internal_buf, __VA_ARGS__); \
   sprintf(outerr, "\033[0;31m%s", internal_buf);  \
-  fprintf(stderr, outerr);  \
+  fprintf(stderr, "%s", outerr);  \
 }
 extern int g_trace;
 /***************/
