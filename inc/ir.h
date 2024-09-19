@@ -359,6 +359,8 @@ class WasmModule {
     /* Find */
     ExportDecl* find_export (std::string export_name);
 
+    FuncDecl* find_func_from_debug_name (std::string debug_name);
+
     GlobalDecl* find_import_global (std::string mod_name, std::string member_name);
     TableDecl* find_import_table (std::string mod_name, std::string member_name);
     MemoryDecl* find_import_memory (std::string mod_name, std::string member_name);

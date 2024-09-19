@@ -607,17 +607,17 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
           PUSH_INST (LocalGetInst(local_i32_2));
           PUSH_INST (LocalGetInst(local_i32_3));
         }
-      }
-      else if (ll_it != lockless_calls.end()) {
-        /* Lockless calls */
-        std::string call_name = ll_it->second;
-        if (call_name == "__wasm_thread_spawn") {
+        else if (call_name == "__wasm_thread_spawn") {
           call_id = RecordInterface::SC_THREAD_SPAWN;
           PUSH_INST (LocalSetInst(local_i32_2));
           PUSH_INST (LocalTeeInst(local_i32_1));
           PUSH_INST (LocalGetInst(local_i32_2));
         }
-        else if (call_name == "SYS_futex") {
+      }
+      else if (ll_it != lockless_calls.end()) {
+        /* Lockless calls */
+        std::string call_name = ll_it->second;
+        if (call_name == "SYS_futex") {
           call_id = RecordInterface::SC_FUTEX;
           PUSH_INST (I64ExtendI32UInst());
           PUSH_INST (LocalSetInst(local_i64_1));
@@ -954,11 +954,15 @@ void r3_record_instrument (WasmModule &module) {
   MemoryDecl *record_mem = module.add_memory(new_mem);
 
   /* Generate quick lookup of ignored exported function idxs */
-  std::map<FuncDecl*, std::string> func_export_map;
+  std::map<FuncDecl*, std::string> func_ignore_map;
   for (const char *func_name: ignored_export_funcnames) {
-    if (!set_func_export_map(module, func_name, func_export_map)) {
+    if (!set_func_export_map(module, func_name, func_ignore_map)) {
       ERR("Could not find function export: \'%s\'\n", func_name);
     }
+  }
+  for (const char *func_name: ignored_debug_funcnames) {
+    FuncDecl *func = module.find_func_from_debug_name(func_name);
+    func_ignore_map[func] = func_name;
   }
 
   /* Pre-compute sig indices since list indexing is expensive */
@@ -998,7 +1002,7 @@ void r3_record_instrument (WasmModule &module) {
   }
   /* These import calls that are excluded from lock-based instrumentation */
   std::map<FuncDecl*, std::string> lockless_calls;
-  for (int i = 0; i < sizeof(lockless_import_names) / sizeof(specialized_import_names[0]); i++) {
+  for (int i = 0; i < sizeof(lockless_import_names) / sizeof(lockless_import_names[0]); i++) {
     if (FuncDecl *f = module.find_import_func("wali", lockless_import_names[i]))
       lockless_calls[f] = lockless_import_names[i];
   }
@@ -1008,7 +1012,7 @@ void r3_record_instrument (WasmModule &module) {
   /* Instrument all functions */
   for (auto &func : module.Funcs()) {
     /* Do not instrument the instrument-hook functions */
-    if ((&func == lock_fn) || (&func == unlock_fn) || (func_export_map.count(&func))) {
+    if ((&func == lock_fn) || (&func == unlock_fn) || (func_ignore_map.count(&func))) {
       continue;
     }
     uint32_t local_indices[19] = {

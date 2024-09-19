@@ -304,11 +304,15 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     }
 
     /* Generate quick lookup of ignored exported function idxs */
-    std::map<FuncDecl*, std::string> func_export_map;
+    std::map<FuncDecl*, std::string> func_ignore_map;
     for (const char *func_name: ignored_export_funcnames) {
-        if (!set_func_export_map(module, func_name, func_export_map)) {
+        if (!set_func_export_map(module, func_name, func_ignore_map)) {
             ERR("Could not find function export: \'%s\'\n", func_name);
         }
+    }
+    for (const char *func_name: ignored_debug_funcnames) {
+        FuncDecl *func = module.find_func_from_debug_name(func_name);
+        func_ignore_map[func] = func_name;
     }
 
     // Initialize iterator indices
@@ -319,7 +323,7 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
 
     for (auto &func: module.Funcs()) {
         /* Ignore instrument hook and exported map functions */
-        if (func_export_map.count(&func)) {
+        if (func_ignore_map.count(&func)) {
             continue;
         }
         InstList &insts = func.instructions;

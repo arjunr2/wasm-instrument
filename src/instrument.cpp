@@ -155,6 +155,18 @@ ExportDecl* WasmModule::find_export (std::string export_name) {
   return NULL;
 }
 
+FuncDecl* WasmModule::find_func_from_debug_name (std::string debug_name) {
+  if (auto debug_names_ptr = this->getFnDebugNames()) {
+    auto &debug_names = *debug_names_ptr;
+    for (auto &dname : debug_names) {
+      if (dname.name == debug_name) {
+        return dname.func;
+      }
+    }
+  }
+  return NULL;
+}
+
 #define IMPORT_FIND(kd, field) { \
   for (auto &import: this->imports.list) { \
     if (import.mod_name == mod_name && import.member_name == member_name && kd == import.kind)  \

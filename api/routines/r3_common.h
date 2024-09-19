@@ -43,16 +43,20 @@ static const char* ignored_export_funcnames[] = {
   "wasm_memory_grow",
   "wasm_memory_size"
 };
+/* List of functions to ignore by debug name */
+static const char* ignored_debug_funcnames[] = {
+  "__wasm_init_memory" 
+};
 /* List of recording functions that require additional special operations 
   at replay */
-static const char *specialized_import_names[2] = {"SYS_mmap", "SYS_writev"};
+static const char *specialized_import_names[3] = {"SYS_mmap", "SYS_writev",
+  "__wasm_thread_spawn" };
     
 /* List of recording functions that cannot use lock-based instrumentation. 
   Each are handled in a specialized manner 
   NOTE: proc_exit and exit_group are identical in behavior
   */
-static const char *lockless_import_names[5] = {
-  "__wasm_thread_spawn", 
+static const char *lockless_import_names[4] = {
   // Futex doesn't need lock since it doesn't need to be ordered w.r.t. memory accesses
   "SYS_futex", 
   "SYS_exit", 
