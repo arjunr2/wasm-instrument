@@ -310,10 +310,6 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
             ERR("Could not find function export: \'%s\'\n", func_name);
         }
     }
-    for (const char *func_name: ignored_debug_funcnames) {
-        FuncDecl *func = module.find_func_from_debug_name(func_name);
-        func_ignore_map[func] = func_name;
-    }
 
     // Initialize iterator indices
     uint32_t access_tracker = 1;
