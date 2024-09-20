@@ -960,10 +960,6 @@ void r3_record_instrument (WasmModule &module) {
       ERR("Could not find function export: \'%s\'\n", func_name);
     }
   }
-  for (const char *func_name: ignored_debug_funcnames) {
-    FuncDecl *func = module.find_func_from_debug_name(func_name);
-    func_ignore_map[func] = func_name;
-  }
 
   /* Pre-compute sig indices since list indexing is expensive */
   uint32_t sig_indices[7];
@@ -1051,6 +1047,10 @@ void r3_record_instrument (WasmModule &module) {
       bool inc_access_tracker = true;
       RecordInstInfo record {};
       InstrumentType instrument_type = { .lockless = false, .force_trace = false };
+      // Do not lock start_function methods... usually used to initialize threads
+      if (&func == module.get_start_fn()) {
+        instrument_type.lockless = true;
+      }
       memset(&record, 0, sizeof(RecordInstInfo));
       InstList addinst;
 #define SETUP_INVOKE(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem, \
