@@ -26,6 +26,8 @@ struct CallInstInfo {
 
 struct InstrumentType {
   bool lockless;
+  bool lock_futex;
+  bool pre_insert_trace;
   bool force_trace;
 };
 
@@ -137,6 +139,34 @@ union RecordInstInfo {
   stackrets = ((stackrets == RET_PH) ? r : stackrets); \
 }
 
+/* Common instruction instrumentation patterns */
+#define PUSH_FUTEX_LOCK_IF(local_idx, val) { \
+  /* Lock for different futex ops */  \
+  PUSH_INST (BlockInst(-64)); \
+  PUSH_INST (LocalGetInst(local_idx));  \
+  PUSH_INST (I32ConstInst(0x7f)); \
+  PUSH_INST (I32AndInst()); \
+  PUSH_INST (I32ConstInst(val)); \
+  PUSH_INST (I32NeInst());  \
+  PUSH_INST (BrIfInst(0));  \
+  /* Lock wakes */  \
+  PUSH_INST (CallInst(lock_fn));  \
+  PUSH_INST (EndInst());  \
+}
+
+#define PUSH_FUTEX_UNLOCK_IF(local_idx, val) { \
+  /* Lock for different futex ops */  \
+  PUSH_INST (BlockInst(-64)); \
+  PUSH_INST (LocalGetInst(local_idx));  \
+  PUSH_INST (I32ConstInst(0x7f)); \
+  PUSH_INST (I32AndInst()); \
+  PUSH_INST (I32ConstInst(val)); \
+  PUSH_INST (I32NeInst());  \
+  PUSH_INST (BrIfInst(0));  \
+  /* Lock wakes */  \
+  PUSH_INST (CallInst(unlock_fn));  \
+  PUSH_INST (EndInst());  \
+}
 
 
 /* Mutex Lock/Unlock function creation 
@@ -575,6 +605,7 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
     std::map<FuncDecl*, std::string> &specialized_calls, 
     std::map<FuncDecl*, std::string> &lockless_calls,
     InstrumentType &instrument_type,
+    FuncDecl *lock_fn, FuncDecl *unlock_fn,
     CallInstInfo &recinfo, MemoryDecl *def_mem, MemoryDecl *record_mem, 
     WasmModule &module) {
 
@@ -618,6 +649,7 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
         /* Lockless calls */
         std::string call_name = ll_it->second;
         if (call_name == "SYS_futex") {
+          // Futex wait/wake still uses a custom lock unlike other functions
           call_id = RecordInterface::SC_FUTEX;
           PUSH_INST (I64ExtendI32UInst());
           PUSH_INST (LocalSetInst(local_i64_1));
@@ -632,16 +664,24 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
           PUSH_INST (LocalGetInst(local_i32_5));
           PUSH_INST (LocalGetInst(local_i64_1));
           PUSH_INST (I32WrapI64Inst());
+          /* Lock before import call only for wakes */
+          PUSH_FUTEX_LOCK_IF (local_i32_2, RecordInterface::FutexWake);
+          instrument_type.lock_futex = true;
         }
         else if (call_name == "SYS_exit") {
           call_id = RecordInterface::SC_THREAD_EXIT;
+          // Since thread exit ends execution, we need the trace output before the call
+          instrument_type.pre_insert_trace = true;
           PUSH_INST (LocalTeeInst(local_i32_1));
         }
         else if ((call_name == "SYS_exit_group") || (call_name == "__proc_exit")) {
           call_id = RecordInterface::SC_PROC_EXIT;
+          // Since proc exit ends execution, we need the trace output before the call
+          instrument_type.pre_insert_trace = true;
           PUSH_INST (LocalTeeInst(local_i32_1));
         }
-        instrument_type = { .lockless = true, .force_trace = true };
+        instrument_type.lockless = true;
+        instrument_type.force_trace = true;
       }
       else if (module.isImport(target) && (ll_it == lockless_calls.end())) {
         /* Generic import calls */
@@ -715,6 +755,7 @@ InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr,
 
 InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, CallInstInfo &recinfo,
     FuncDecl *tracedump_fn, uint32_t sig_indices[4], uint32_t local_idxs[19],
+    InstrumentType &instrument_type, FuncDecl *lock_fn, FuncDecl *unlock_fn,
     MemoryDecl *def_mem, MemoryDecl *record_mem, WasmModule &module)  {
 
   InstList addinst;
@@ -735,7 +776,8 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
   uint32_t i64_tmp_local_2 = local_idxs[18];
 
   RetVal ret = recinfo.ret;
-  bool has_ret = (ret.type != RET_VOID);
+  // When preinserting, we disable the return value handling
+  bool has_ret = ((ret.type != RET_VOID) && !instrument_type.pre_insert_trace);
 
   // Instrumentation for after the call (but before trace data)
   // Default (common) case involves getting the return value
@@ -757,7 +799,7 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
       );
     }
     default: {
-      // Default case: Save return value if it has one
+      // Default case: Save return value if it has to handle return
       if (has_ret) {
         PUSH_INST (LocalTeeInst(ret.local));
       }
@@ -808,6 +850,8 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
       LOCAL_I64_EXTEND(local_i32_1, RET_I32);
       LOCAL_I64_EXTEND(local_i32_2, RET_I32);
       LOCAL_I64_EXTEND(local_i32_3, RET_I32);
+      // Lock after import call only for waits
+      PUSH_FUTEX_LOCK_IF (local_i32_1, RecordInterface::FutexWait);
       break;
     }
     case RecordInterface::SC_THREAD_EXIT: {
@@ -830,6 +874,11 @@ InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_i
 
   /* Tracedump call */
   PUSH_INST (CallInst(tracedump_fn));
+
+  if (instrument_type.lock_futex) {
+    // Unlocks for both wait and wakes
+    PUSH_INST (CallInst(unlock_fn));
+  }
   
   return addinst;
 }
@@ -1046,7 +1095,8 @@ void r3_record_instrument (WasmModule &module) {
       InstBasePtr &instruction = *institr;
       bool inc_access_tracker = true;
       RecordInstInfo record {};
-      InstrumentType instrument_type = { .lockless = false, .force_trace = false };
+      InstrumentType instrument_type = { .lockless = false, 
+        .lock_futex = false, .pre_insert_trace = false, .force_trace = false };
       // Do not lock start_function methods... usually used to initialize threads
       if (&func == module.get_start_fn()) {
         instrument_type.lockless = true;
@@ -1074,7 +1124,8 @@ void r3_record_instrument (WasmModule &module) {
         /* Calls: Lock those to select import functions */
         case IMM_FUNC: 
           addinst = setup_call_record_instrument(institr, local_indices, sig_indices, 
-              specialized_calls, lockless_calls, instrument_type, record.Call, 
+              specialized_calls, lockless_calls, instrument_type, 
+              lock_fn, unlock_fn, record.Call, 
               def_mem, record_mem, module);
           break;
         ///* Indirect Calls: Lock none */
@@ -1106,6 +1157,7 @@ void r3_record_instrument (WasmModule &module) {
             traceinst = gen_call_trace_instructions(instruction,
               access_tracker, record.Call, call_tracedump_fn, 
               call_trace_sig_indices, local_indices, 
+              instrument_type, lock_fn, unlock_fn,
               def_mem, record_mem, module);
             break;
           }
@@ -1119,16 +1171,15 @@ void r3_record_instrument (WasmModule &module) {
         if (!instrument_type.lockless) {
           preinst.push_back(lock_inst);
         }
-        postinst.insert(postinst.begin(), traceinst.begin(), traceinst.end());
+        preinst.insert(preinst.end(), addinst.begin(), addinst.end());
+        if (!instrument_type.pre_insert_trace) {
+          postinst.insert(postinst.begin(), traceinst.begin(), traceinst.end());
+        } else {
+          preinst.insert(preinst.end(), traceinst.begin(), traceinst.end());
+        }
         if (!instrument_type.lockless) {
           postinst.push_back(unlock_inst);
         }
-        //if (post_insert) {
-        //  postinst.insert(postinst.begin(), addinst.begin(), addinst.end());
-        //} 
-        //else {
-          preinst.insert(preinst.end(), addinst.begin(), addinst.end());
-        //}
         insts.insert(institr, preinst.begin(), preinst.end());
         insts.insert(next_institr, postinst.begin(), postinst.end());
         /* Don't iterate over our inserted instructions */
