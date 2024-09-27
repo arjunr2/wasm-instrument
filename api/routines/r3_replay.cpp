@@ -18,11 +18,13 @@ typedef struct {
 } ReplayMemStore;
 
 typedef struct {
+    uint64_t tid;
     int64_t return_val;
     uint32_t call_id;
     int64_t call_args[3];
     ReplayMemStore* stores;
     uint32_t num_stores;
+    uint64_t sync_id;
 } ReplayOpProp;
 
 typedef struct {
@@ -68,11 +70,29 @@ static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
     }
 }
 
+// Instructions to enforce synchronization points
+#define PUSH_SYNC_TO_ID(id) {  \
+    PUSH_INST (LoopInst());  \
+    PUSH_INST (I32ConstInst(id));  \
+    PUSH_INST (GlobalGetInst(sync_tracker_global));  \
+    PUSH_INST (I32NeInst()); \
+    PUSH_INST (BrIfInst(0));  \
+    PUSH_INST (EndInst());  \
+}
+
+#define PUSH_INC_SYNC_TRACKER(id) { \
+    PUSH_INST (GlobalGetInst(sync_tracker_global));  \
+    PUSH_INST (I64ConstInst(1));  \
+    PUSH_INST (I64AddInst());  \
+    PUSH_INST (GlobalSetInst(sync_tracker_global));  \
+}
+
 static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop, 
         bool has_retval, wasm_type_t wasm_ret_type, MemoryDecl *def_mem,
         std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
         std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
-        int64_t flags) {
+        int64_t flags, FuncDecl *mutex_funcs[2], 
+        GlobalDecl *sync_tracker_global) {
     InstList addinst;
     bool gen_debug_calls = flags;
     // Return value for the arm
@@ -113,7 +133,8 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
                 PUSH_INST (CallInst(callid_func_it->second.func));
                 break;
             }
-            case RecordInterface::SC_PROC_EXIT: {
+            case RecordInterface::SC_PROC_EXIT: 
+            case RecordInterface::SC_THREAD_EXIT: {
                 int32_t status = prop.call_args[0];
                 PUSH_INST (I32ConstInst(status));
                 PUSH_INST (CallInst(callid_func_it->second.func));
@@ -131,26 +152,38 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
                 int32_t addr = prop.call_args[0];
                 RecordInterface::FutexOp futex_op = static_cast<RecordInterface::FutexOp>(prop.call_args[1]);
                 int32_t val = prop.call_args[2];
+                uint64_t sync_id = prop.sync_id;
                 switch (futex_op) {
                     case RecordInterface::FutexWait: {
+                        //PUSH_INST (I32ConstInst(addr));
+                        //PUSH_INST (I32ConstInst(val));
+                        //PUSH_INST (I64ConstInst(-1));
                         PUSH_INST (I32ConstInst(addr));
+                        PUSH_INST (I32ConstInst(futex_op));
                         PUSH_INST (I32ConstInst(val));
-                        PUSH_INST (I64ConstInst(-1));
-                        PUSH_INST (MemoryAtomicWait32Inst(2, 0, def_mem));
-                        PUSH_INST (DropInst());
+                        PUSH_INST (CallInst(callid_func_it->second.func));
+                        PUSH_INC_SYNC_TRACKER(sync_id);
+                        //PUSH_INST (MemoryAtomicWait32Inst(2, 0, def_mem));
+                        //PUSH_INST (DropInst());
                         break;
                     }
                     case RecordInterface::FutexWake: {
+                        //PUSH_INST (I32ConstInst(addr));
+                        //PUSH_INST (I32ConstInst(val));
                         PUSH_INST (I32ConstInst(addr));
+                        PUSH_INST (I32ConstInst(futex_op));
                         PUSH_INST (I32ConstInst(val));
-                        PUSH_INST (MemoryAtomicNotifyInst(2, 0, def_mem));
-                        PUSH_INST (DropInst());
+                        PUSH_INST (CallInst(callid_func_it->second.func));
+                        PUSH_INC_SYNC_TRACKER(sync_id);
+                        //PUSH_INST (MemoryAtomicNotifyInst(2, 0, def_mem));
+                        //PUSH_INST (DropInst());
                         break;
                     }
                     default: {
                         ERR("R3-Replay-Error: Unsupported futex op %d\n", futex_op);
                     }
                 }
+                break;
             }
             default: {
                 ERR("R3-Replay-Error: Side-effects unsupported for call_id %u\n", prop.call_id);
@@ -184,7 +217,9 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         std::set<FuncDecl*> &remove_importfuncs, 
         std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
         std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
-        int64_t flags) {
+        int64_t flags, FuncDecl *mutex_funcs[2], 
+        GlobalDecl *sync_tracker_global) {
+
     SigDecl* call_func_sig = call_func->sig;
     uint32_t call_func_sigidx = module.getSigIdx(call_func->sig);
     // Verify that import function and the indices are consistent with record
@@ -203,6 +238,8 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
     };
 
     InstList addinst;
+    // Lock the replay operation
+    PUSH_INST (CallInst(mutex_funcs[0]));
     // Start of replay unit
     PUSH_INST (BlockInst(call_func_sigidx));
     for (int i = 0; i < call_func_sig->params.size(); i++) {
@@ -224,7 +261,7 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         ret_sigidx = ret_sig_indices[4];
     }
 
-    // Insert global branch tracker
+    // Insert global trackers
     GlobalDecl* br_tracker = module.add_global(br_tracker_decl);
     for (int i = 0; i < op.num_props; i++) {
         PUSH_INST (BlockInst(ret_sigidx));
@@ -245,7 +282,8 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         // Assumes only single memory for now
         InstList propinsts = construct_single_replay_prop(
             op.num_props - i - 1, op.props[i], has_retval, wasm_ret_type,
-            module.getMemory(0), callid_handlers, unused_callid_handlers, flags);
+            module.getMemory(0), callid_handlers, unused_callid_handlers, flags, 
+            mutex_funcs, sync_tracker_global);
         addinst.insert(addinst.end(), propinsts.begin(), propinsts.end());
         PUSH_INST (EndInst());
     }
@@ -256,6 +294,8 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
     PUSH_INST (I32AddInst());
     PUSH_INST (GlobalSetInst(br_tracker));
     PUSH_INST (EndInst());
+    // Unlock the replay operation
+    PUSH_INST (CallInst(mutex_funcs[1]));
 
     // Insert instructions, remove import call, and reset iterator
     InstItr next_inst = std::next(institr);
@@ -275,7 +315,13 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     However, we need to add it purely to maintain address space consistency
     with the recorded module which added a page for instrumentation */
     MemoryDecl *def_mem = module.getMemory(0);
-    uint32_t old_init_pages = add_pages(def_mem, 1);
+    FuncDecl *mutex_funcs[2];
+    uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
+    /* Create custom mutex lock/unlock functions */
+    create_mutex_funcs(module, mutex_addr, mutex_funcs);
+
+    FuncDecl *lock_fn = mutex_funcs[0];
+    FuncDecl *unlock_fn = mutex_funcs[1];
 
     /* Engine callbacks for specialized replay handlers */
     std::map<uint32_t, ReplayImportFuncDecl> callid_handlers;
@@ -311,6 +357,13 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
         }
     }
 
+    // Global to enforce happens-before synchronization points
+    GlobalDecl sync_tracker_decl = {
+        .type = WASM_TYPE_I64, .is_mutable = true,
+        .init_expr_bytes = INIT_EXPR (I64_CONST, 0)
+    };
+    GlobalDecl* sync_tracker_global = module.add_global(sync_tracker_decl);
+
     // Initialize iterator indices
     uint32_t access_tracker = 1;
     uint32_t op_idx = 0;
@@ -341,9 +394,11 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
                             ops[op_idx++] :
                             (ReplayOp) { .access_idx = 0, .func_idx = 0, .props = nullptr, .num_props = 0 }
                         );
+                        // Mutex insertion around replay operation
                         insert_replay_op(module, call_func, institr, insts, curr_op, 
                             sig_indices, remove_importfuncs, callid_handlers, 
-                            unused_callid_handlers, flags);
+                            unused_callid_handlers, flags, mutex_funcs, 
+                            sync_tracker_global);
                         TRACE("[%s] Replaced Call Access %d\n", 
                             (tracked_import ? "TRACKED" : "UNTRACKED"), access_tracker);
                     }

@@ -169,71 +169,6 @@ union RecordInstInfo {
 }
 
 
-/* Mutex Lock/Unlock function creation 
-   Returns the function declarations in 'func' */
-void create_helper_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl *funcs[2]) {
-  MemoryDecl *memory = module.getMemory(0);
-  SigDecl sig = {.params= {}, .results = {}};
-  SigDecl *void_sig = module.add_sig(sig, false);
-  uint32_t void_sig_idx = module.getSigIdx(void_sig);
-
-#define INST(v) InstBasePtr(new v)
-  FuncDecl fn1 = {
-    .sig = void_sig,
-    .pure_locals = wasm_localcsv_t(),
-    .num_pure_locals = 0,
-    .instructions = {
-      INST (BlockInst(void_sig_idx)),
-      INST (LoopInst(void_sig_idx)),
-      // Try lock
-      INST (I32ConstInst(mutex_addr)),
-      INST (I32ConstInst(0)),
-      INST (I32ConstInst(1)),
-      INST (I32AtomicRmwCmpxchgInst(2, 0, memory)),
-      //
-      INST (I32EqzInst()),
-      INST (BrIfInst(1)),
-      // Wait for notify
-      INST (I32ConstInst(mutex_addr)),
-      INST (I32ConstInst(1)),
-      INST (I64ConstInst(-1)),
-      INST (MemoryAtomicWait32Inst(2, 0, memory)),
-      //
-      INST (DropInst()),
-      INST (BrInst(0)),
-
-      INST (EndInst()),
-      INST (EndInst()),
-      INST (EndInst())
-    }
-  };
-
-  FuncDecl fn2 = {
-    .sig = void_sig,
-    .pure_locals = wasm_localcsv_t(),
-    .num_pure_locals = 0,
-    .instructions = {
-      // Unlock
-      INST (I32ConstInst(mutex_addr)),
-      INST (I32ConstInst(0)),
-      INST (I32AtomicStoreInst(2, 0, memory)),
-      // Notify 1 thread max
-      INST (I32ConstInst(mutex_addr)),
-      INST (I32ConstInst(1)),
-      INST (MemoryAtomicNotifyInst(2, 0, memory)),
-      //
-      INST (DropInst()),
-      INST (EndInst())
-    }
-  };
-#undef INST
-
-  funcs[0] = module.add_func(fn1, NULL, "lock_instrument");
-  funcs[1] = module.add_func(fn2, NULL, "unlock_instrument");
-}
-
-
-
 InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterator &itr, 
     uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem,
     uint32_t access_idx, MemopInstInfo &recinfo) {
@@ -990,10 +925,10 @@ void r3_record_instrument (WasmModule &module) {
   FuncDecl* call_tracedump_fn = trace_fns[1];
 
   MemoryDecl *def_mem = module.getMemory(0);
-  /* Create custom mutex lock/unlock functions */
   FuncDecl *mutex_funcs[2];
   uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
-  create_helper_funcs(module, mutex_addr, mutex_funcs);
+  /* Create custom mutex lock/unlock functions */
+  create_mutex_funcs(module, mutex_addr, mutex_funcs);
 
   FuncDecl *lock_fn = mutex_funcs[0];
   FuncDecl *unlock_fn = mutex_funcs[1];

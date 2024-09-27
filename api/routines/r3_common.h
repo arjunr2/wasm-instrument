@@ -140,7 +140,7 @@ static ImportFuncData record_imports[NUM_RECORD_IMPORTS] = {
 /**  */
 
 /** Replay Instrumentation Functions */
-#define NUM_REPLAY_IMPORTS 4
+#define NUM_REPLAY_IMPORTS 5
 static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
   { // writev call replay
     .iminfo = {
@@ -178,6 +178,20 @@ static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
     },
     .key = RecordInterface::SC_PROC_EXIT
   },
+  { // thread exit call replay
+    .iminfo = {
+      .mod_name = "r3-replay",
+      .member_name = "SC_thread_exit"
+    },
+    .sig = {
+      .params = {
+        // Error Code
+        WASM_TYPE_I32, 
+      },
+      .results = { } 
+    },
+    .key = RecordInterface::SC_THREAD_EXIT
+  },
   { // thread_spawn call replay
     .iminfo = {
       .mod_name = "wali",
@@ -197,15 +211,24 @@ static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
     },
     .key = RecordInterface::SC_THREAD_SPAWN
   },
-  { // thread yield call for forced context switches
+  { // futex operation logging to view synchronization points
     .iminfo = {
       .mod_name = "r3-replay",
-      .member_name = "SC_yield"
+      .member_name = "SC_futex_log"
     },
     .sig = {
-      .params = {},
+      .params = {
+        // Futex Address
+        WASM_TYPE_I32,
+        // Futex Operation
+        WASM_TYPE_I32,
+        // Futex Value
+        WASM_TYPE_I32,
+      },
       .results = {} 
     },
+    .key = RecordInterface::SC_FUTEX,
+    .debug = true
   }
 };
 /** */
@@ -245,5 +268,69 @@ static uint32_t add_pages(MemoryDecl *mem, uint32_t num_pages) {
 static uint32_t transform_to_record_func_idx(uint32_t replay_idx) {
   return replay_idx + NUM_RECORD_IMPORTS - NUM_REPLAY_IMPORTS;
 }
+
+/* Mutex Lock/Unlock function creation using the address in Memory[0]
+   Returns the function declarations in 'func' */
+static void create_mutex_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl *funcs[2]) {
+  MemoryDecl *memory = module.getMemory(0);
+  SigDecl sig = {.params= {}, .results = {}};
+  SigDecl *void_sig = module.add_sig(sig, false);
+  uint32_t void_sig_idx = module.getSigIdx(void_sig);
+
+#define INST(v) InstBasePtr(new v)
+  FuncDecl fn1 = {
+    .sig = void_sig,
+    .pure_locals = wasm_localcsv_t(),
+    .num_pure_locals = 0,
+    .instructions = {
+      INST (BlockInst(void_sig_idx)),
+      INST (LoopInst(void_sig_idx)),
+      // Try lock
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(0)),
+      INST (I32ConstInst(1)),
+      INST (I32AtomicRmwCmpxchgInst(2, 0, memory)),
+      //
+      INST (I32EqzInst()),
+      INST (BrIfInst(1)),
+      // Wait for notify
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(1)),
+      INST (I64ConstInst(-1)),
+      INST (MemoryAtomicWait32Inst(2, 0, memory)),
+      //
+      INST (DropInst()),
+      INST (BrInst(0)),
+
+      INST (EndInst()),
+      INST (EndInst()),
+      INST (EndInst())
+    }
+  };
+
+  FuncDecl fn2 = {
+    .sig = void_sig,
+    .pure_locals = wasm_localcsv_t(),
+    .num_pure_locals = 0,
+    .instructions = {
+      // Unlock
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(0)),
+      INST (I32AtomicStoreInst(2, 0, memory)),
+      // Notify 1 thread max
+      INST (I32ConstInst(mutex_addr)),
+      INST (I32ConstInst(1)),
+      INST (MemoryAtomicNotifyInst(2, 0, memory)),
+      //
+      INST (DropInst()),
+      INST (EndInst())
+    }
+  };
+#undef INST
+
+  funcs[0] = module.add_func(fn1, NULL, "lock_instrument");
+  funcs[1] = module.add_func(fn2, NULL, "unlock_instrument");
+}
+
 
 #endif
