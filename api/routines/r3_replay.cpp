@@ -32,6 +32,7 @@ typedef struct {
   uint32_t func_idx;
   ReplayOpProp* props;
   uint32_t num_props;
+  uint64_t max_tid;
 } ReplayOp;
 
 typedef struct ReplayImportFuncDecl {
@@ -162,7 +163,6 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
                         PUSH_INST (I32ConstInst(futex_op));
                         PUSH_INST (I32ConstInst(val));
                         PUSH_INST (CallInst(callid_func_it->second.func));
-                        PUSH_INC_SYNC_TRACKER(sync_id);
                         //PUSH_INST (MemoryAtomicWait32Inst(2, 0, def_mem));
                         //PUSH_INST (DropInst());
                         break;
@@ -174,7 +174,6 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
                         PUSH_INST (I32ConstInst(futex_op));
                         PUSH_INST (I32ConstInst(val));
                         PUSH_INST (CallInst(callid_func_it->second.func));
-                        PUSH_INC_SYNC_TRACKER(sync_id);
                         //PUSH_INST (MemoryAtomicNotifyInst(2, 0, def_mem));
                         //PUSH_INST (DropInst());
                         break;
@@ -222,6 +221,7 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
 
     SigDecl* call_func_sig = call_func->sig;
     uint32_t call_func_sigidx = module.getSigIdx(call_func->sig);
+
     // Verify that import function and the indices are consistent with record
     // before proceeding
     {
@@ -232,23 +232,29 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         }
     }
 
+    char replay_func_debug_name[100];
+    ImportDecl *import_decl = module.get_import_name_from_func(call_func);
+    sprintf(replay_func_debug_name, "__replay_instrument_%s_%s", 
+        import_decl->mod_name.c_str(), 
+        import_decl->member_name.c_str());
+    FuncDecl replay_ops_func_decl = {
+        .sig = call_func_sig,
+        .pure_locals = wasm_localcsv_t(),
+        .num_pure_locals = 0,
+        .instructions = {
+            INST (EndInst())
+        }
+    };
+    FuncDecl* replay_ops_func = module.add_func(replay_ops_func_decl, NULL, replay_func_debug_name);
+    InstList &replay_insts = replay_ops_func->instructions;
+
     static GlobalDecl br_tracker_decl = {
         .type = WASM_TYPE_I32, .is_mutable = true, 
         .init_expr_bytes = INIT_EXPR (I32_CONST, 0)
     };
 
-    InstList addinst;
-    // Lock the replay operation
-    PUSH_INST (CallInst(mutex_funcs[0]));
-    // Start of replay unit
-    PUSH_INST (BlockInst(call_func_sigidx));
-    for (int i = 0; i < call_func_sig->params.size(); i++) {
-        PUSH_INST (DropInst());
-    }
-
     // Make sure the function only has max one return value
     assert (call_func_sig->results.size() <= 1);
-    
     // If non-void, ret_sigidx takes the value for the block
     int64_t ret_sigidx;
     wasm_type_t wasm_ret_type;
@@ -260,6 +266,13 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         has_retval = false;
         ret_sigidx = ret_sig_indices[4];
     }
+
+    InstList addinst;
+
+    // Lock the replay operation
+    PUSH_INST (CallInst(mutex_funcs[0]));
+    // Start of replay unit
+    PUSH_INST (BlockInst(ret_sigidx));
 
     // Insert global trackers
     GlobalDecl* br_tracker = module.add_global(br_tracker_decl);
@@ -300,7 +313,8 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
     // Insert instructions, remove import call, and reset iterator
     InstItr next_inst = std::next(institr);
     insts.erase(institr);
-    insts.insert(next_inst, addinst.begin(), addinst.end());
+    insts.insert(next_inst, INST(CallInst(replay_ops_func)));
+    replay_insts.insert(replay_insts.begin(), addinst.begin(), addinst.end());
     institr = std::prev(next_inst);
     remove_importfuncs.insert(call_func);
 }
@@ -317,6 +331,8 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     MemoryDecl *def_mem = module.getMemory(0);
     FuncDecl *mutex_funcs[2];
     uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
+    FuncDecl *last_preinstrumented_func = &module.Funcs().back();
+
     /* Create custom mutex lock/unlock functions */
     create_mutex_funcs(module, mutex_addr, mutex_funcs);
 
@@ -371,7 +387,10 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     std::set<FuncDecl*> remove_importfuncs;
 
     for (auto &func: module.Funcs()) {
-        /* Ignore instrument hook and exported map functions */
+        /* Ignore instrument hooks and exported map functions */
+        if (&func == last_preinstrumented_func) {
+            break;
+        }
         if (func_ignore_map.count(&func)) {
             continue;
         }
@@ -389,7 +408,7 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
                     if (module.isImport(call_func)) {
                         bool tracked_import = (op_idx < num_ops) && 
                             (access_tracker == ops[op_idx].access_idx);
-                        // Untracked imports with no replay data use the empty replay-op
+                        // Imports with no replay data use the empty replay-op
                         ReplayOp curr_op = (tracked_import ? 
                             ops[op_idx++] :
                             (ReplayOp) { .access_idx = 0, .func_idx = 0, .props = nullptr, .num_props = 0 }

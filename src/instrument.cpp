@@ -192,6 +192,28 @@ FuncDecl* WasmModule::find_import_func (std::string mod_name, std::string member
 }
 
 
+/* Getter methods */
+ImportDecl* WasmModule::get_import_name_from_func (FuncDecl *func) {
+  if (!this->isImport(func)) {
+    return NULL;
+  }
+  uint32_t func_ct = 0;
+  for (auto &imp: this->imports.list) {
+    if (func_ct >= this->imports.num_funcs) {
+      // All funcs have been seen already
+      return NULL;
+    }
+    if (imp.kind == KIND_FUNC) {
+      func_ct++;
+      if (imp.desc.func == func) {
+        return &imp;
+      }
+    }
+  }
+  return NULL;
+}
+
+
 /* Removal methods */
 bool WasmModule::remove_func_core (uint32_t idx, FuncDecl *func) {
   auto &funcs = this->Funcs();

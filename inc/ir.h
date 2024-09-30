@@ -366,6 +366,9 @@ class WasmModule {
     MemoryDecl* find_import_memory (std::string mod_name, std::string member_name);
     FuncDecl* find_import_func (std::string mod_name, std::string member_name);
 
+    /* Getters */
+    ImportDecl* get_import_name_from_func (FuncDecl *func);
+
     /* Removal */
     bool remove_func (uint32_t idx);
     bool remove_func (FuncDecl *func);
