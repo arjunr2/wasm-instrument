@@ -10,8 +10,8 @@ namespace RecordInterface {
     /* Specialized Calls */
     SC_MMAP = 1,
     SC_WRITEV = 2,
-    /* Lockless Calls */
     SC_THREAD_SPAWN = 3,
+    /* Lockless Calls */
     SC_FUTEX = 4,
     SC_THREAD_EXIT = 5,
     SC_PROC_EXIT = 6,
@@ -140,7 +140,7 @@ static ImportFuncData record_imports[NUM_RECORD_IMPORTS] = {
 /**  */
 
 /** Replay Instrumentation Functions */
-#define NUM_REPLAY_IMPORTS 5
+#define NUM_REPLAY_IMPORTS 6
 static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
   { // writev call replay
     .iminfo = {
@@ -229,6 +229,19 @@ static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
     },
     .key = RecordInterface::SC_FUTEX,
     .debug = true
+  },
+  { // thread ID tracking
+    .iminfo = {
+      .mod_name = "r3-replay",
+      .member_name = "SC_gettid"
+    },
+    .sig = {
+      .params = {},
+      .results = {
+        // Thread ID
+        WASM_TYPE_I32
+      } 
+    },
   }
 };
 /** */

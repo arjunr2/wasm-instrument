@@ -44,6 +44,15 @@ typedef struct ReplayImportFuncDecl {
     }
 } ReplayImportFuncDecl;
 
+typedef struct {
+    bool is_multithreaded;
+    uint64_t num_threads;
+    FuncDecl *gettid_func;
+    FuncDecl *lock_func;
+    FuncDecl *unlock_func;
+    std::vector<GlobalDecl*> tid_global_trackers;
+} ThreadReplayInfo;
+
 static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
     uint32_t val32;
     float valf32;
@@ -92,8 +101,7 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
         bool has_retval, wasm_type_t wasm_ret_type, MemoryDecl *def_mem,
         std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
         std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
-        int64_t flags, FuncDecl *mutex_funcs[2], 
-        GlobalDecl *sync_tracker_global) {
+        int64_t flags, ThreadReplayInfo &thread_replay_info) {
     InstList addinst;
     bool gen_debug_calls = flags;
     // Return value for the arm
@@ -207,7 +215,7 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
 }
 
 
-/* Inserts the return value and store replay operation 
+/* Inserts the return value and store replay operations (for all threads)
    Removes the call to the respective function
    */
 static void insert_replay_op(WasmModule &module, FuncDecl *call_func, 
@@ -216,8 +224,7 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         std::set<FuncDecl*> &remove_importfuncs, 
         std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
         std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
-        int64_t flags, FuncDecl *mutex_funcs[2], 
-        GlobalDecl *sync_tracker_global) {
+        int64_t flags, ThreadReplayInfo &thread_replay_info) {
 
     SigDecl* call_func_sig = call_func->sig;
     uint32_t call_func_sigidx = module.getSigIdx(call_func->sig);
@@ -269,8 +276,12 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
 
     InstList addinst;
 
+    PUSH_INST (CallInst(thread_replay_info.gettid_func));
+    PUSH_INST (DropInst());
     // Lock the replay operation
-    PUSH_INST (CallInst(mutex_funcs[0]));
+    if (thread_replay_info.is_multithreaded) {
+        PUSH_INST (CallInst(thread_replay_info.lock_func));
+    }
     // Start of replay unit
     PUSH_INST (BlockInst(ret_sigidx));
 
@@ -295,8 +306,8 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         // Assumes only single memory for now
         InstList propinsts = construct_single_replay_prop(
             op.num_props - i - 1, op.props[i], has_retval, wasm_ret_type,
-            module.getMemory(0), callid_handlers, unused_callid_handlers, flags, 
-            mutex_funcs, sync_tracker_global);
+            module.getMemory(0), callid_handlers, unused_callid_handlers, 
+            flags, thread_replay_info);
         addinst.insert(addinst.end(), propinsts.begin(), propinsts.end());
         PUSH_INST (EndInst());
     }
@@ -308,13 +319,24 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
     PUSH_INST (GlobalSetInst(br_tracker));
     PUSH_INST (EndInst());
     // Unlock the replay operation
-    PUSH_INST (CallInst(mutex_funcs[1]));
+    if (thread_replay_info.is_multithreaded) {
+        PUSH_INST (CallInst(thread_replay_info.unlock_func));
+    }
 
     // Insert instructions, remove import call, and reset iterator
     InstItr next_inst = std::next(institr);
     insts.erase(institr);
     insts.insert(next_inst, INST(CallInst(replay_ops_func)));
-    replay_insts.insert(replay_insts.begin(), addinst.begin(), addinst.end());
+    if (op.num_props == 0) {
+        // If no props, insert a nop instead of instructions
+        if (has_retval) {
+            replay_insts.push_front(
+                get_replay_retval_inst(wasm_ret_type, 0)
+            );
+        }
+    } else {
+        replay_insts.insert(replay_insts.begin(), addinst.begin(), addinst.end());
+    }
     institr = std::prev(next_inst);
     remove_importfuncs.insert(call_func);
 }
@@ -333,11 +355,26 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
     FuncDecl *last_preinstrumented_func = &module.Funcs().back();
 
-    /* Create custom mutex lock/unlock functions */
+    /* Create all thread-related management */
     create_mutex_funcs(module, mutex_addr, mutex_funcs);
-
-    FuncDecl *lock_fn = mutex_funcs[0];
-    FuncDecl *unlock_fn = mutex_funcs[1];
+    ThreadReplayInfo thread_replay_info = {
+        .lock_func = mutex_funcs[0],
+        .unlock_func = mutex_funcs[1],
+    };
+    // Global to enforce happens-before synchronization and thread values
+    for (int i = 0; i < num_ops; i++) {
+        while (thread_replay_info.num_threads < ops[i].max_tid) {
+            GlobalDecl gdecl = {
+                .type = WASM_TYPE_I64, .is_mutable = true,
+                .init_expr_bytes = INIT_EXPR (I64_CONST, 0)
+            };
+            thread_replay_info.tid_global_trackers.push_back(
+                module.add_global(gdecl)
+            );
+            thread_replay_info.num_threads++;
+        }
+    }
+    thread_replay_info.is_multithreaded = (thread_replay_info.num_threads > 1);
 
     /* Engine callbacks for specialized replay handlers */
     std::map<uint32_t, ReplayImportFuncDecl> callid_handlers;
@@ -347,8 +384,15 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
             .func = add_r3_import_function(module, replay_imports[i]), 
             .debug = replay_imports[i].debug 
         };
-        callid_handlers[replay_imports[i].key] = rep_imfunc; 
-        unused_callid_handlers.insert(rep_imfunc);
+        if (replay_imports[i].key != 0) {
+            callid_handlers[replay_imports[i].key] = rep_imfunc;
+            unused_callid_handlers.insert(rep_imfunc);
+        } else {
+            if (replay_imports[i].iminfo.member_name == "SC_gettid") {
+                // Set the tid import function
+                thread_replay_info.gettid_func = rep_imfunc.func;
+            }
+        }
     }
 
     /* Pre-compute sig indices for replay blocks */
@@ -372,13 +416,6 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
             ERR("Could not find function export: \'%s\'\n", func_name);
         }
     }
-
-    // Global to enforce happens-before synchronization points
-    GlobalDecl sync_tracker_decl = {
-        .type = WASM_TYPE_I64, .is_mutable = true,
-        .init_expr_bytes = INIT_EXPR (I64_CONST, 0)
-    };
-    GlobalDecl* sync_tracker_global = module.add_global(sync_tracker_decl);
 
     // Initialize iterator indices
     uint32_t access_tracker = 1;
@@ -416,8 +453,7 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
                         // Mutex insertion around replay operation
                         insert_replay_op(module, call_func, institr, insts, curr_op, 
                             sig_indices, remove_importfuncs, callid_handlers, 
-                            unused_callid_handlers, flags, mutex_funcs, 
-                            sync_tracker_global);
+                            unused_callid_handlers, flags, thread_replay_info);
                         TRACE("[%s] Replaced Call Access %d\n", 
                             (tracked_import ? "TRACKED" : "UNTRACKED"), access_tracker);
                     }
