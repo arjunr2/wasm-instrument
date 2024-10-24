@@ -4,11 +4,9 @@
 #include <cassert>
 #include <cstring>
 #include <numeric>
+#include <initializer_list>
 
 #define INST(inv) InstBasePtr(new inv)
-#define PUSH_INST(inv) addinst.push_back(InstBasePtr(new inv))
-#define PUSH_INSTBASE_PTR(inv) addinst.push_back(inv)
-
 
 /* Replay Op C Structure */
 typedef struct {
@@ -82,31 +80,35 @@ static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
 
 // Instructions to enforce synchronization points
 #define PUSH_SYNC_TO_ID(id) {  \
-    PUSH_INST (LoopInst());  \
-    PUSH_INST (I32ConstInst(id));  \
-    PUSH_INST (GlobalGetInst(sync_tracker_global));  \
-    PUSH_INST (I32NeInst()); \
-    PUSH_INST (BrIfInst(0));  \
-    PUSH_INST (EndInst());  \
+    builder.push ({             \
+        INST (LoopInst()),  \
+        INST (I32ConstInst(id)),  \
+        INST (GlobalGetInst(sync_tracker_global)),  \
+        INST (I32NeInst()), \
+        INST (BrIfInst(0)),  \
+        INST (EndInst())  \
+    }); \
 }
 
 #define PUSH_INC_SYNC_TRACKER(id) { \
-    PUSH_INST (GlobalGetInst(sync_tracker_global));  \
-    PUSH_INST (I64ConstInst(1));  \
-    PUSH_INST (I64AddInst());  \
-    PUSH_INST (GlobalSetInst(sync_tracker_global));  \
+    builder.push ({ \
+        INST (GlobalGetInst(sync_tracker_global)),  \
+        INST (I64ConstInst(1)),  \
+        INST (I64AddInst()),  \
+        INST (GlobalSetInst(sync_tracker_global))  \
+    }); \
 }
 
-static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop, 
+static InstBuilder construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop, 
         bool has_retval, wasm_type_t wasm_ret_type, MemoryDecl *def_mem,
         std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
         std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
         int64_t flags, ThreadReplayInfo &thread_replay_info) {
-    InstList addinst;
+    InstBuilder builder = {};
     bool gen_debug_calls = flags;
     // Return value for the arm
     if (has_retval) {
-        PUSH_INSTBASE_PTR(get_replay_retval_inst(wasm_ret_type, prop.return_val));
+        builder.push_inst (get_replay_retval_inst(wasm_ret_type, prop.return_val));
     }
     // Side-effects for the arm
     bool gen_side_effects = true;
@@ -126,9 +128,11 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
             case RecordInterface::SC_MMAP: {
                 uint32_t grow_value = prop.call_args[0];
                 if (grow_value > 0) {
-                    PUSH_INST (I32ConstInst(grow_value));
-                    PUSH_INST (MemoryGrowInst(def_mem));
-                    PUSH_INST (DropInst());
+                    builder.push ({
+                        INST (I32ConstInst(grow_value)),
+                        INST (MemoryGrowInst(def_mem)),
+                        INST (DropInst())
+                    });
                 }
                 break;
             }
@@ -136,25 +140,31 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
                 int32_t fd = prop.call_args[0];
                 int32_t iov = prop.call_args[1];
                 uint32_t iovcnt = prop.call_args[2];
-                PUSH_INST (I32ConstInst(fd));
-                PUSH_INST (I32ConstInst(iov));
-                PUSH_INST (I32ConstInst(iovcnt));
-                PUSH_INST (CallInst(callid_func_it->second.func));
+                builder.push ({
+                    INST (I32ConstInst(fd)),
+                    INST (I32ConstInst(iov)),
+                    INST (I32ConstInst(iovcnt)),
+                    INST (CallInst(callid_func_it->second.func))
+                });
                 break;
             }
             case RecordInterface::SC_PROC_EXIT: 
             case RecordInterface::SC_THREAD_EXIT: {
                 int32_t status = prop.call_args[0];
-                PUSH_INST (I32ConstInst(status));
-                PUSH_INST (CallInst(callid_func_it->second.func));
+                builder.push ({
+                    INST (I32ConstInst(status)),
+                    INST (CallInst(callid_func_it->second.func))
+                });
                 break;
             }
             case RecordInterface::SC_THREAD_SPAWN: {
                 int32_t setup_fn_ptr = prop.call_args[0];
                 int32_t thread_args_ptr = prop.call_args[1];
-                PUSH_INST (I32ConstInst(setup_fn_ptr));
-                PUSH_INST (I32ConstInst(thread_args_ptr));
-                PUSH_INST (CallInst(callid_func_it->second.func));
+                builder.push ({
+                    INST (I32ConstInst(setup_fn_ptr)),
+                    INST (I32ConstInst(thread_args_ptr)),
+                    INST (CallInst(callid_func_it->second.func))
+                });
                 break;
             }
             case RecordInterface::SC_FUTEX: {
@@ -164,26 +174,30 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
                 uint64_t sync_id = prop.sync_id;
                 switch (futex_op) {
                     case RecordInterface::FutexWait: {
-                        //PUSH_INST (I32ConstInst(addr));
-                        //PUSH_INST (I32ConstInst(val));
-                        //PUSH_INST (I64ConstInst(-1));
-                        PUSH_INST (I32ConstInst(addr));
-                        PUSH_INST (I32ConstInst(futex_op));
-                        PUSH_INST (I32ConstInst(val));
-                        PUSH_INST (CallInst(callid_func_it->second.func));
-                        //PUSH_INST (MemoryAtomicWait32Inst(2, 0, def_mem));
-                        //PUSH_INST (DropInst());
+                        builder.push ({
+                            //I32ConstInst(addr),
+                            //I32ConstInst(val),
+                            //I64ConstInst(-1),
+                            INST (I32ConstInst(addr)),
+                            INST (I32ConstInst(futex_op)),
+                            INST (I32ConstInst(val)),
+                            INST (CallInst(callid_func_it->second.func))
+                            //MemoryAtomicWait32Inst(2, 0, def_mem),
+                            //DropInst()
+                        });
                         break;
                     }
                     case RecordInterface::FutexWake: {
-                        //PUSH_INST (I32ConstInst(addr));
-                        //PUSH_INST (I32ConstInst(val));
-                        PUSH_INST (I32ConstInst(addr));
-                        PUSH_INST (I32ConstInst(futex_op));
-                        PUSH_INST (I32ConstInst(val));
-                        PUSH_INST (CallInst(callid_func_it->second.func));
-                        //PUSH_INST (MemoryAtomicNotifyInst(2, 0, def_mem));
-                        //PUSH_INST (DropInst());
+                        builder.push ({
+                            //I32ConstInst(addr),
+                            //I32ConstInst(val),
+                            INST (I32ConstInst(addr)),
+                            INST (I32ConstInst(futex_op)),
+                            INST (I32ConstInst(val)),
+                            INST (CallInst(callid_func_it->second.func))
+                            //MemoryAtomicNotifyInst(2, 0, def_mem),
+                            //DropInst()
+                        });
                         break;
                     }
                     default: {
@@ -200,18 +214,20 @@ static InstList construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop,
     // Stores for the arm
     for (int i = 0; i < prop.num_stores; i++) {
         ReplayMemStore &store = prop.stores[i];
-        PUSH_INST (I32ConstInst(store.addr));
-        PUSH_INST (I64ConstInst(store.value));
+        builder.push ({
+            INST (I32ConstInst(store.addr)),
+            INST (I64ConstInst(store.value))
+        });
         switch (store.size) {
-            case 1: PUSH_INST(I64Store8Inst(0, 0, def_mem)); break;
-            case 2: PUSH_INST(I64Store16Inst(0, 0, def_mem)); break;
-            case 4: PUSH_INST(I64Store32Inst(0, 0, def_mem)); break;
-            case 8: PUSH_INST(I64StoreInst(0, 0, def_mem)); break;
+            case 1: builder.push_inst (I64Store8Inst(0, 0, def_mem)); break;
+            case 2: builder.push_inst (I64Store16Inst(0, 0, def_mem)); break;
+            case 4: builder.push_inst (I64Store32Inst(0, 0, def_mem)); break;
+            case 8: builder.push_inst (I64StoreInst(0, 0, def_mem)); break;
             default: { ERR("R3-Replay-Error: Unsupported size %u", store.size); }
         }
     }
-    PUSH_INST (BrInst(br_arm_idx));
-    return addinst;
+    builder.push_inst (BrInst(br_arm_idx));
+    return builder;
 }
 
 
@@ -229,31 +245,16 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
     SigDecl* call_func_sig = call_func->sig;
     uint32_t call_func_sigidx = module.getSigIdx(call_func->sig);
 
+    bool empty_replay_op = (op.num_props == 0);
     // Verify that import function and the indices are consistent with record
     // before proceeding
     {
-        if (op.num_props != 0) {
+        if (!empty_replay_op) {
             uint32_t replay_func_idx = module.getFuncIdx(call_func);
             uint32_t record_func_idx = transform_to_record_func_idx(replay_func_idx);
             assert(op.func_idx == record_func_idx);
         }
     }
-
-    char replay_func_debug_name[100];
-    ImportDecl *import_decl = module.get_import_name_from_func(call_func);
-    sprintf(replay_func_debug_name, "__replay_instrument_%s_%s", 
-        import_decl->mod_name.c_str(), 
-        import_decl->member_name.c_str());
-    FuncDecl replay_ops_func_decl = {
-        .sig = call_func_sig,
-        .pure_locals = wasm_localcsv_t(),
-        .num_pure_locals = 0,
-        .instructions = {
-            INST (EndInst())
-        }
-    };
-    FuncDecl* replay_ops_func = module.add_func(replay_ops_func_decl, NULL, replay_func_debug_name);
-    InstList &replay_insts = replay_ops_func->instructions;
 
     static GlobalDecl br_tracker_decl = {
         .type = WASM_TYPE_I32, .is_mutable = true, 
@@ -274,69 +275,116 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         ret_sigidx = ret_sig_indices[4];
     }
 
-    InstList addinst;
 
-    PUSH_INST (CallInst(thread_replay_info.gettid_func));
-    PUSH_INST (DropInst());
-    // Lock the replay operation
-    if (thread_replay_info.is_multithreaded) {
-        PUSH_INST (CallInst(thread_replay_info.lock_func));
-    }
-    // Start of replay unit
-    PUSH_INST (BlockInst(ret_sigidx));
+    InstBuilder builder = {};
 
-    // Insert global trackers
-    GlobalDecl* br_tracker = module.add_global(br_tracker_decl);
-    for (int i = 0; i < op.num_props; i++) {
-        PUSH_INST (BlockInst(ret_sigidx));
+    if (empty_replay_op) {
+        // If no props, skip replay function construction and insert a nop
+        if (has_retval) {
+            builder.push_inst (get_replay_retval_inst(wasm_ret_type, 0));
+        } 
+        builder.push_inst (EndInst());
     }
-    std::list<uint32_t> labels(op.num_props);
-    std::iota(labels.begin(), labels.end(), 0);
-    // Insert switch table on the branch tracker
-    PUSH_INST (BlockInst(ret_sigidx));
-    // This is a value for the default case; this should never be used by valid replays
-    if (has_retval) {
-        PUSH_INSTBASE_PTR(get_replay_retval_inst(wasm_ret_type, (0xDEADBEEFULL)));
-    }
-    PUSH_INST (GlobalGetInst(br_tracker));
-    // Default skips global variable increment
-    PUSH_INST (BrTableInst(labels, op.num_props + 1));
-    PUSH_INST (EndInst());
-    for (int i = 0; i < op.num_props; i++) {
-        // Assumes only single memory for now
-        InstList propinsts = construct_single_replay_prop(
-            op.num_props - i - 1, op.props[i], has_retval, wasm_ret_type,
-            module.getMemory(0), callid_handlers, unused_callid_handlers, 
-            flags, thread_replay_info);
-        addinst.insert(addinst.end(), propinsts.begin(), propinsts.end());
-        PUSH_INST (EndInst());
+    else {
+        // Replay function instruction construction
+        builder.push({
+            INST (CallInst(thread_replay_info.gettid_func)),
+            INST (DropInst())
+        });
+
+        //std::list<uint32_t> thread_labels(op.max_tid);
+        //std::iota(thread_labels.begin(), thread_labels.end(), -1);
+        //thread_labels.front() = 0;
+
+        ///* New insertions */
+        //// Thread Replay Info: Starts from 0 since TID starts with 1
+        //for (int i = 0; i < op.max_tid; i++) {
+        //    PUSH_INST (BlockInst(ret_sigidx));
+        //}
+        //// This is a value for the default case; this should never be used by valid replays
+        //if (has_retval) {
+        //    PUSH_INSTBASE_PTR(get_replay_retval_inst(wasm_ret_type, (0xDEADBEEFULL)));
+        //}
+        //// Switch table on thread id
+        //PUSH_INST (CallInst(thread_replay_info.gettid_func));
+        //PUSH_INST (I32ConstInst(1));
+        //PUSH_INST (I32SubInst());
+        //PUSH_INST (BrTableInst(thread_labels, op.max_tid));
+        //PUSH_INST (EndInst());
+        /** */
+
+        // Lock the replay operation
+        if (thread_replay_info.is_multithreaded) {
+            builder.push_inst (CallInst(thread_replay_info.lock_func));
+        }
+        // Start of replay unit
+        builder.push_inst (BlockInst(ret_sigidx));
+
+        // Insert global trackers
+        GlobalDecl* br_tracker = module.add_global(br_tracker_decl);
+        for (int i = 0; i < op.num_props; i++) {
+            builder.push_inst (BlockInst(ret_sigidx));
+        }
+        std::list<uint32_t> seq_labels(op.num_props);
+        std::iota(seq_labels.begin(), seq_labels.end(), 0);
+        // Insert switch table on the branch tracker
+        builder.push_inst (BlockInst(ret_sigidx));
+        // This is a value for the default case; this should never be used by valid replays
+        if (has_retval) {
+            builder.push_inst (get_replay_retval_inst(wasm_ret_type, (0xDEADBEEFULL)));
+        }
+        builder.push_inst (GlobalGetInst(br_tracker));
+        // Default skips global variable increment
+        builder.push({
+            INST (BrTableInst(seq_labels, op.num_props + 1)),
+            INST (EndInst())
+        });
+        for (int i = 0; i < op.num_props; i++) {
+            // Assumes only single memory for now
+            InstBuilder prop_builder = construct_single_replay_prop(
+                op.num_props - i - 1, op.props[i], has_retval, wasm_ret_type,
+                module.getMemory(0), callid_handlers, unused_callid_handlers, 
+                flags, thread_replay_info);
+            builder.splice(prop_builder);
+            builder.push_inst (EndInst());
+        }
+
+        // End of replay unit
+        builder.push({
+            INST (GlobalGetInst(br_tracker)),
+            INST (I32ConstInst(1)),
+            INST (I32AddInst()),
+            INST (GlobalSetInst(br_tracker)),
+            INST (EndInst())
+        });
+        // Unlock the replay operation
+        if (thread_replay_info.is_multithreaded) {
+            builder.push_inst (CallInst(thread_replay_info.unlock_func));
+        }
+        // End of function
+        builder.push_inst (EndInst());
     }
 
-    // End of replay unit
-    PUSH_INST (GlobalGetInst(br_tracker));
-    PUSH_INST (I32ConstInst(1));
-    PUSH_INST (I32AddInst());
-    PUSH_INST (GlobalSetInst(br_tracker));
-    PUSH_INST (EndInst());
-    // Unlock the replay operation
-    if (thread_replay_info.is_multithreaded) {
-        PUSH_INST (CallInst(thread_replay_info.unlock_func));
-    }
+    /* Insert replay instructions into module, remove import call, and reset iterator */
+    // Setup the replay op function declaration
+    char replay_func_debug_name[100];
+    ImportDecl *import_decl = module.get_import_name_from_func(call_func);
+    sprintf(replay_func_debug_name, "__replay_instrument_%s_%s", 
+        import_decl->mod_name.c_str(), 
+        import_decl->member_name.c_str());
+    FuncDecl replay_ops_func_decl = {
+        .sig = call_func_sig,
+        .pure_locals = wasm_localcsv_t(),
+        .num_pure_locals = 0,
+        .instructions = builder.get_buf()
+    };
+    FuncDecl* replay_ops_func = module.add_func(replay_ops_func_decl, NULL, replay_func_debug_name);
+    InstList &replay_func_insts = replay_ops_func->instructions;
 
-    // Insert instructions, remove import call, and reset iterator
+    // Remove import call
     InstItr next_inst = std::next(institr);
     insts.erase(institr);
     insts.insert(next_inst, INST(CallInst(replay_ops_func)));
-    if (op.num_props == 0) {
-        // If no props, insert a nop instead of instructions
-        if (has_retval) {
-            replay_insts.push_front(
-                get_replay_retval_inst(wasm_ret_type, 0)
-            );
-        }
-    } else {
-        replay_insts.insert(replay_insts.begin(), addinst.begin(), addinst.end());
-    }
     institr = std::prev(next_inst);
     remove_importfuncs.insert(call_func);
 }
