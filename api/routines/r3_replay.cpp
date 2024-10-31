@@ -48,8 +48,10 @@ typedef struct {
     FuncDecl *gettid_func;
     FuncDecl *lock_func;
     FuncDecl *unlock_func;
-    std::vector<GlobalDecl*> tid_global_trackers;
+    // i64 pointing to sync_id
+    uint32_t sync_id_addr;
 } ThreadReplayInfo;
+
 
 static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
     uint32_t val32;
@@ -78,6 +80,25 @@ static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
     }
 }
 
+// Operations to push a replay function's return value; defaults to 0xDEADBEEFULL
+static inline InstBuilder& builder_push_return_value(InstBuilder &builder, 
+        bool has_retval, wasm_type_t wasm_ret_type, 
+        int64_t return_value = 0xDEADBEEFULL) {
+    if (has_retval) {
+        builder.push_inst(get_replay_retval_inst(wasm_ret_type, return_value));
+    }
+    return builder;
+}
+// Operations to push an invalid case in switch table
+static inline InstBuilder& builder_push_invalid_case(InstBuilder &builder) {
+    builder.push ({
+        INST (UnreachableInst()),
+        INST (EndInst())
+    });
+    return builder;
+}
+
+
 // Instructions to enforce synchronization points
 #define PUSH_SYNC_TO_ID(id) {  \
     builder.push ({             \
@@ -99,7 +120,7 @@ static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
     }); \
 }
 
-static InstBuilder construct_single_replay_prop(int br_arm_idx, ReplayOpProp &prop, 
+static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &prop, 
         bool has_retval, wasm_type_t wasm_ret_type, MemoryDecl *def_mem,
         std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
         std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
@@ -107,9 +128,7 @@ static InstBuilder construct_single_replay_prop(int br_arm_idx, ReplayOpProp &pr
     InstBuilder builder = {};
     bool gen_debug_calls = flags;
     // Return value for the arm
-    if (has_retval) {
-        builder.push_inst (get_replay_retval_inst(wasm_ret_type, prop.return_val));
-    }
+    builder_push_return_value(builder, has_retval, wasm_ret_type, prop.return_val);
     // Side-effects for the arm
     bool gen_side_effects = true;
     auto callid_func_it = callid_handlers.find(prop.call_id);
@@ -226,10 +245,100 @@ static InstBuilder construct_single_replay_prop(int br_arm_idx, ReplayOpProp &pr
             default: { ERR("R3-Replay-Error: Unsupported size %u", store.size); }
         }
     }
-    builder.push_inst (BrInst(br_arm_idx));
+
     return builder;
 }
 
+
+/* Construct the arm for a specific thread's replay operations */
+static InstBuilder construct_thread_replay_props(WasmModule &module, 
+    int tid_arm_idx, int begin_idx, int end_idx, ReplayOpProp *props, 
+    bool has_retval, int64_t ret_sigidx, wasm_type_t wasm_ret_type, 
+    MemoryDecl *def_mem,
+    std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
+    std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
+    int64_t flags, ThreadReplayInfo &thread_replay_info) {
+
+    InstBuilder builder = {};
+    int num_props = end_idx - begin_idx;
+
+    // Tracking the switch case for next prop
+    static GlobalDecl prop_br_tracker_decl = {
+        .type = WASM_TYPE_I32, .is_mutable = true, 
+        .init_expr_bytes = INIT_EXPR (I32_CONST, 0)
+    };
+    GlobalDecl* prop_br_tracker = module.add_global(prop_br_tracker_decl);
+    std::list<uint32_t> seq_labels(num_props);
+    std::iota(seq_labels.begin(), seq_labels.end(), 0);
+
+    // Start of prop replay unit
+    builder.push_inst (BlockInst(ret_sigidx));
+
+    for (int i = 0; i < num_props + 1; i++) {
+        builder.push_inst(BlockInst(ret_sigidx));
+    }
+    // Switch table on specific prop with default case, which should never be used
+    builder.push_inst (BlockInst(ret_sigidx));
+    builder_push_return_value(builder, has_retval, wasm_ret_type);
+    builder.push({
+        INST (GlobalGetInst(prop_br_tracker)),
+        INST (BrTableInst(seq_labels, num_props)),
+        INST (EndInst())
+    });
+    
+    // Construct each prop arm's replay operations
+    for (int i = 0; i < num_props; i++) {
+        InstBuilder prop_builder = construct_single_replay_prop(
+            num_props - i - 1, props[begin_idx + i], has_retval, wasm_ret_type,
+            def_mem, callid_handlers, unused_callid_handlers, 
+            flags, thread_replay_info);
+        builder.splice(prop_builder);
+        // Branch out of the switch case
+        builder.push_inst(BrInst(num_props - i));
+        builder.push_inst(EndInst());
+    }
+    // Error case for invalid prop
+    builder_push_invalid_case(builder);
+
+    // End of prop replay unit
+    builder.push({
+        INST (GlobalGetInst(prop_br_tracker)),
+        INST (I32ConstInst(1)),
+        INST (I32AddInst()),
+        INST (GlobalSetInst(prop_br_tracker)),
+        INST (EndInst())
+    });
+
+    return builder;
+}
+
+/* Insert builder instructions into module, remove import call, and reset iterator */
+static void replace_import_call(WasmModule &module, 
+        InstList::iterator &institr, InstList &insts, InstBuilder &builder,
+        FuncDecl *call_func, std::set<FuncDecl*> &remove_importfuncs) {
+
+    // Setup the replay op function declaration
+    char replay_func_debug_name[100];
+    ImportDecl *import_decl = module.get_import_name_from_func(call_func);
+    sprintf(replay_func_debug_name, "__replay_instrument_%s_%s", 
+        import_decl->mod_name.c_str(), 
+        import_decl->member_name.c_str());
+    FuncDecl replay_ops_func_decl = {
+        .sig = call_func->sig,
+        .pure_locals = wasm_localcsv_t(),
+        .num_pure_locals = 0,
+        .instructions = builder.get_buf()
+    };
+    FuncDecl* replay_ops_func = module.add_func(replay_ops_func_decl, NULL, replay_func_debug_name);
+    InstList &replay_func_insts = replay_ops_func->instructions;
+
+    // Remove import call
+    InstItr next_inst = std::next(institr);
+    insts.erase(institr);
+    insts.insert(next_inst, INST(CallInst(replay_ops_func)));
+    institr = std::prev(next_inst);
+    remove_importfuncs.insert(call_func);
+}
 
 /* Inserts the return value and store replay operations (for all threads)
    Removes the call to the respective function
@@ -256,11 +365,6 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         }
     }
 
-    static GlobalDecl br_tracker_decl = {
-        .type = WASM_TYPE_I32, .is_mutable = true, 
-        .init_expr_bytes = INIT_EXPR (I32_CONST, 0)
-    };
-
     // Make sure the function only has max one return value
     assert (call_func_sig->results.size() <= 1);
     // If non-void, ret_sigidx takes the value for the block
@@ -275,6 +379,10 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         ret_sigidx = ret_sig_indices[4];
     }
 
+    static GlobalDecl br_tracker_decl = {
+        .type = WASM_TYPE_I32, .is_mutable = true, 
+        .init_expr_bytes = INIT_EXPR (I32_CONST, 0)
+    };
 
     InstBuilder builder = {};
 
@@ -287,106 +395,70 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
     }
     else {
         // Replay function instruction construction
-        builder.push({
-            INST (CallInst(thread_replay_info.gettid_func)),
-            INST (DropInst())
-        });
+        // Block for sequencing thread-specific replay operations
+        if (thread_replay_info.is_multithreaded) {
+            std::list<uint32_t> thread_labels(op.max_tid);
+            std::iota(thread_labels.begin(), thread_labels.end(), 0);
 
-        //std::list<uint32_t> thread_labels(op.max_tid);
-        //std::iota(thread_labels.begin(), thread_labels.end(), -1);
-        //thread_labels.front() = 0;
+            // Thread Replay Info: Starts from 0 since TID starts with 1, including
+            //      an error case if tid is outside of cases
+            for (int i = 0; i < op.max_tid + 1; i++) {
+                builder.push_inst (BlockInst(ret_sigidx));
+            }
 
-        ///* New insertions */
-        //// Thread Replay Info: Starts from 0 since TID starts with 1
-        //for (int i = 0; i < op.max_tid; i++) {
-        //    PUSH_INST (BlockInst(ret_sigidx));
-        //}
-        //// This is a value for the default case; this should never be used by valid replays
-        //if (has_retval) {
-        //    PUSH_INSTBASE_PTR(get_replay_retval_inst(wasm_ret_type, (0xDEADBEEFULL)));
-        //}
-        //// Switch table on thread id
-        //PUSH_INST (CallInst(thread_replay_info.gettid_func));
-        //PUSH_INST (I32ConstInst(1));
-        //PUSH_INST (I32SubInst());
-        //PUSH_INST (BrTableInst(thread_labels, op.max_tid));
-        //PUSH_INST (EndInst());
+            // Switch table on thread id with default case, which should never be used
+            builder.push_inst (BlockInst(ret_sigidx));
+            // This is for type-safety of block; should never be returned from table
+            builder_push_return_value(builder, has_retval, wasm_ret_type);
+            builder.push({
+                INST (CallInst(thread_replay_info.gettid_func)),
+                INST (I32ConstInst(1)),
+                INST (I32SubInst()),
+                INST (BrTableInst(thread_labels, op.max_tid)),
+                INST (EndInst())
+            });
+
+            // Construct each thread arm's replay operations
+            for (int cur_tid = 1, i = 0; i < op.num_props; cur_tid++) {
+                // Obtain the range of ops [begin_idx, end_idx) for cur_tid
+                int begin_idx = i;
+                while ((i < op.num_props) && (op.props[i].tid == cur_tid)) { i++; }
+                int end_idx = i;
+                // Assumes only single memory for now
+                InstBuilder tid_props = construct_thread_replay_props(
+                    module, cur_tid - 1, begin_idx, end_idx, op.props, 
+                    has_retval, ret_sigidx, wasm_ret_type,
+                    module.getMemory(0), 
+                    callid_handlers, unused_callid_handlers, 
+                    flags, thread_replay_info);
+                builder.splice(tid_props);
+                // Branch out of the switch case
+                builder.push_inst(BrInst(op.max_tid - cur_tid + 1));
+                builder.push_inst (EndInst());
+            }
+            // Error case for invalid tid
+            builder_push_invalid_case(builder);
+        }
+        // Single-threaded replays can avoid gettid and tid switch table
+        else {
+            // Construct replay operations for single-threaded replay
+            InstBuilder single_thread_props = construct_thread_replay_props(
+                module, 0, 0, op.num_props, op.props, 
+                has_retval, ret_sigidx, wasm_ret_type,
+                module.getMemory(0), 
+                callid_handlers, unused_callid_handlers, 
+                flags, thread_replay_info);
+            builder.splice(single_thread_props);
+        }
         /** */
 
-        // Lock the replay operation
-        if (thread_replay_info.is_multithreaded) {
-            builder.push_inst (CallInst(thread_replay_info.lock_func));
-        }
-        // Start of replay unit
-        builder.push_inst (BlockInst(ret_sigidx));
-
-        // Insert global trackers
-        GlobalDecl* br_tracker = module.add_global(br_tracker_decl);
-        for (int i = 0; i < op.num_props; i++) {
-            builder.push_inst (BlockInst(ret_sigidx));
-        }
-        std::list<uint32_t> seq_labels(op.num_props);
-        std::iota(seq_labels.begin(), seq_labels.end(), 0);
-        // Insert switch table on the branch tracker
-        builder.push_inst (BlockInst(ret_sigidx));
-        // This is a value for the default case; this should never be used by valid replays
-        if (has_retval) {
-            builder.push_inst (get_replay_retval_inst(wasm_ret_type, (0xDEADBEEFULL)));
-        }
-        builder.push_inst (GlobalGetInst(br_tracker));
-        // Default skips global variable increment
-        builder.push({
-            INST (BrTableInst(seq_labels, op.num_props + 1)),
-            INST (EndInst())
-        });
-        for (int i = 0; i < op.num_props; i++) {
-            // Assumes only single memory for now
-            InstBuilder prop_builder = construct_single_replay_prop(
-                op.num_props - i - 1, op.props[i], has_retval, wasm_ret_type,
-                module.getMemory(0), callid_handlers, unused_callid_handlers, 
-                flags, thread_replay_info);
-            builder.splice(prop_builder);
-            builder.push_inst (EndInst());
-        }
-
-        // End of replay unit
-        builder.push({
-            INST (GlobalGetInst(br_tracker)),
-            INST (I32ConstInst(1)),
-            INST (I32AddInst()),
-            INST (GlobalSetInst(br_tracker)),
-            INST (EndInst())
-        });
-        // Unlock the replay operation
-        if (thread_replay_info.is_multithreaded) {
-            builder.push_inst (CallInst(thread_replay_info.unlock_func));
-        }
         // End of function
         builder.push_inst (EndInst());
     }
 
-    /* Insert replay instructions into module, remove import call, and reset iterator */
-    // Setup the replay op function declaration
-    char replay_func_debug_name[100];
-    ImportDecl *import_decl = module.get_import_name_from_func(call_func);
-    sprintf(replay_func_debug_name, "__replay_instrument_%s_%s", 
-        import_decl->mod_name.c_str(), 
-        import_decl->member_name.c_str());
-    FuncDecl replay_ops_func_decl = {
-        .sig = call_func_sig,
-        .pure_locals = wasm_localcsv_t(),
-        .num_pure_locals = 0,
-        .instructions = builder.get_buf()
-    };
-    FuncDecl* replay_ops_func = module.add_func(replay_ops_func_decl, NULL, replay_func_debug_name);
-    InstList &replay_func_insts = replay_ops_func->instructions;
-
-    // Remove import call
-    InstItr next_inst = std::next(institr);
-    insts.erase(institr);
-    insts.insert(next_inst, INST(CallInst(replay_ops_func)));
-    institr = std::prev(next_inst);
-    remove_importfuncs.insert(call_func);
+    /* Builder instructions finished; replace call */
+    replace_import_call(module, institr, insts, builder, 
+        call_func, remove_importfuncs);
 }
 
 
@@ -400,27 +472,20 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     with the recorded module which added a page for instrumentation */
     MemoryDecl *def_mem = module.getMemory(0);
     FuncDecl *mutex_funcs[2];
-    uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
+    uint32_t instrument_page_count = 1;
+    uint32_t instrument_page_start = (add_pages(def_mem, instrument_page_count) * WASM_PAGE_SIZE);
     FuncDecl *last_preinstrumented_func = &module.Funcs().back();
 
     /* Create all thread-related management */
-    create_mutex_funcs(module, mutex_addr, mutex_funcs);
+    create_mutex_funcs(module, instrument_page_start, mutex_funcs);
     ThreadReplayInfo thread_replay_info = {
         .lock_func = mutex_funcs[0],
         .unlock_func = mutex_funcs[1],
+        .sync_id_addr = instrument_page_start + 4,
     };
-    // Global to enforce happens-before synchronization and thread values
+    // Get total number of threads
     for (int i = 0; i < num_ops; i++) {
-        while (thread_replay_info.num_threads < ops[i].max_tid) {
-            GlobalDecl gdecl = {
-                .type = WASM_TYPE_I64, .is_mutable = true,
-                .init_expr_bytes = INIT_EXPR (I64_CONST, 0)
-            };
-            thread_replay_info.tid_global_trackers.push_back(
-                module.add_global(gdecl)
-            );
-            thread_replay_info.num_threads++;
-        }
+        thread_replay_info.num_threads = std::max(thread_replay_info.num_threads, ops[i].max_tid);
     }
     thread_replay_info.is_multithreaded = (thread_replay_info.num_threads > 1);
 
@@ -439,6 +504,10 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
             if (replay_imports[i].iminfo.member_name == "SC_gettid") {
                 // Set the tid import function
                 thread_replay_info.gettid_func = rep_imfunc.func;
+                // Single threaded programs don't need the gettid function
+                if (!thread_replay_info.is_multithreaded) {
+                    unused_callid_handlers.insert(rep_imfunc);
+                }
             }
         }
     }
