@@ -26,6 +26,15 @@ namespace RecordInterface {
   } FutexOp;
 }
 
+namespace ReplayInterface {
+  /* Replay-specific call instructions 
+  Enums must not collide with RecordInterface */
+  typedef enum {
+    SC_LOG_CALL = 0x70000000,
+    SC_GETTID = 0x70000001,
+  } CallID;
+}
+
 /* Types of Return Values for recorded instructions */
 typedef enum {
   RET_PH = 0,
@@ -140,7 +149,7 @@ static ImportFuncData record_imports[NUM_RECORD_IMPORTS] = {
 /**  */
 
 /** Replay Instrumentation Functions */
-#define NUM_REPLAY_IMPORTS 6
+#define NUM_REPLAY_IMPORTS 7
 static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
   { // writev call replay
     .iminfo = {
@@ -242,6 +251,36 @@ static ImportFuncData replay_imports[NUM_REPLAY_IMPORTS] = {
         WASM_TYPE_I32
       } 
     },
+    .key = ReplayInterface::SC_GETTID
+  },
+  { // debug: logging calls performed by replay
+    .iminfo = {
+      .mod_name = "r3-replay",
+      .member_name = "SC_log_call"
+    },
+    .sig = {
+      .params = {
+        // Access Idx
+        WASM_TYPE_I32,
+        // Func Idx of call target
+        WASM_TYPE_I32, 
+        // TID
+        WASM_TYPE_I32,
+        // Prop Arm Idx
+        WASM_TYPE_I32,
+        // Call ID
+        WASM_TYPE_I32,
+        // Return value (up to 1)
+        WASM_TYPE_I64,
+        // Arguments (up to 3)
+        WASM_TYPE_I64, WASM_TYPE_I64, WASM_TYPE_I64,
+        // Sync ID
+        WASM_TYPE_I64
+      },
+      .results = {} 
+    },
+    .key = ReplayInterface::SC_LOG_CALL,
+    .debug = true
   }
 };
 /** */

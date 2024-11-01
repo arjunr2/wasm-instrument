@@ -33,6 +33,20 @@ typedef struct {
   uint64_t max_tid;
 } ReplayOp;
 
+typedef struct {
+    // Op-level info
+    uint32_t access_idx;
+    uint32_t func_idx;
+    // Thread-level info
+    uint32_t tid;
+    // Prop-level info
+    uint32_t prop_idx;
+    uint32_t call_id;
+    int64_t return_val;
+    int64_t call_args[3];
+    uint64_t sync_id;
+} DebugLogCallInfo;
+
 typedef struct ReplayImportFuncDecl {
     FuncDecl *func;
     bool debug;
@@ -45,7 +59,7 @@ typedef struct ReplayImportFuncDecl {
 typedef struct {
     bool is_multithreaded;
     uint64_t num_threads;
-    FuncDecl *gettid_func;
+    FuncDecl *wait_sync_id_func;
     FuncDecl *lock_func;
     FuncDecl *unlock_func;
     // i64 pointing to sync_id
@@ -80,6 +94,24 @@ static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
     }
 }
 
+
+// Wrapped around replay import call; return nullptr if it doesn't generate call 
+// Uncreated calls are recorded as unused, which is pruned at the end
+static InstBasePtr create_call_to_replay_import(ReplayImportFuncDecl &replay_import,
+        std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
+        bool gen_debug_calls) {
+    // Create call for debug calls only if flags is set
+    bool create_call = !(replay_import.debug) ||
+        (replay_import.debug && gen_debug_calls);
+    if (create_call) {
+        unused_callid_handlers.erase(replay_import);
+        return INST(CallInst(replay_import.func));
+    } 
+    else {
+        return nullptr;
+    }
+}
+
 // Operations to push a replay function's return value; defaults to 0xDEADBEEFULL
 static inline InstBuilder& builder_push_return_value(InstBuilder &builder, 
         bool has_retval, wasm_type_t wasm_ret_type, 
@@ -97,48 +129,82 @@ static inline InstBuilder& builder_push_invalid_case(InstBuilder &builder) {
     });
     return builder;
 }
-
-
-// Instructions to enforce synchronization points
-#define PUSH_SYNC_TO_ID(id) {  \
-    builder.push ({             \
-        INST (LoopInst()),  \
-        INST (I32ConstInst(id)),  \
-        INST (GlobalGetInst(sync_tracker_global)),  \
-        INST (I32NeInst()), \
-        INST (BrIfInst(0)),  \
-        INST (EndInst())  \
-    }); \
+// Operations to push a debug `SC_log_call` call
+static InstBuilder builder_push_log_call(InstBuilder &builder, 
+        InstBasePtr log_call_handler_func,
+        DebugLogCallInfo log_info) {
+    builder.push ({
+        INST (I32ConstInst(log_info.access_idx)),
+        INST (I32ConstInst(log_info.func_idx)),
+        INST (I32ConstInst(log_info.tid)),
+        INST (I32ConstInst(log_info.prop_idx)),
+        INST (I32ConstInst(log_info.call_id)),
+        INST (I64ConstInst(log_info.return_val))
+    });
+    for (int i = 0; i < (sizeof(log_info.call_args) / sizeof(log_info.call_args[0])); i++) {
+        builder.push_inst(I64ConstInst(log_info.call_args[i]));
+    }
+    builder.push ({
+        INST (I64ConstInst(log_info.sync_id)),
+        log_call_handler_func
+    });
+    return builder;
 }
 
-#define PUSH_INC_SYNC_TRACKER(id) { \
-    builder.push ({ \
-        INST (GlobalGetInst(sync_tracker_global)),  \
-        INST (I64ConstInst(1)),  \
-        INST (I64AddInst()),  \
-        INST (GlobalSetInst(sync_tracker_global))  \
-    }); \
-}
+
 
 static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &prop, 
         bool has_retval, wasm_type_t wasm_ret_type, MemoryDecl *def_mem,
         std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
         std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
-        int64_t flags, ThreadReplayInfo &thread_replay_info) {
+        int64_t flags, ThreadReplayInfo &thread_replay_info,
+        DebugLogCallInfo debug_log_call_info) {
     InstBuilder builder = {};
     bool gen_debug_calls = flags;
+
+    debug_log_call_info.prop_idx = prop_arm_idx;
+    debug_log_call_info.call_id = prop.call_id;
+    debug_log_call_info.return_val = prop.return_val;
+    for (int i = 0; i < (sizeof(prop.call_args) / sizeof(prop.call_args[0])); i++) {
+        debug_log_call_info.call_args[i] = prop.call_args[i];
+    }
+    debug_log_call_info.sync_id = prop.sync_id;
+
+    // Generate function for debug logging
+    auto log_call_import = callid_handlers.find(ReplayInterface::SC_LOG_CALL)->second;
+    InstBasePtr log_call_handler_func = create_call_to_replay_import(log_call_import, 
+        unused_callid_handlers, gen_debug_calls);
+    if (log_call_handler_func) {
+        builder_push_log_call(builder, log_call_handler_func, debug_log_call_info);
+    }
+
+    // Sub by 1 right now since sync_id starts with 1; this can be changed in future
+    uint64_t cur_prop_sync_id = prop.sync_id - 1;
+    // Wait for sync_id to match
+    builder.push({
+        INST (I64ConstInst(cur_prop_sync_id)),
+        INST (CallInst(thread_replay_info.wait_sync_id_func))
+    });
     // Return value for the arm
     builder_push_return_value(builder, has_retval, wasm_ret_type, prop.return_val);
+    
     // Side-effects for the arm
+    // Prop import replays can fall into 3 categories:
+    // 1. No side-effects
+    // 2. Side-effects without host calls needed (e.g. mmap, futex)
+    // 3. Side-effects with host calls required (e.g. exit, thread_create)
     bool gen_side_effects = true;
+    InstBasePtr call_handler_func = INST(NopInst());
     auto callid_func_it = callid_handlers.find(prop.call_id);
-    // For imports that require host calls for side-effects
+    // For imports that require host calls for side-effects, get the appropriate function
     if (callid_func_it != callid_handlers.end()) {
-        // Generate side effects for debug calls only if flags is set
-        gen_side_effects = !(callid_func_it->second.debug) ||
-             (callid_func_it->second.debug && gen_debug_calls);
-        if (gen_side_effects) {
-            unused_callid_handlers.erase(callid_func_it->second);
+        call_handler_func = create_call_to_replay_import(callid_func_it->second, 
+            unused_callid_handlers, gen_debug_calls);
+        // Generate side-effects only if the function is found
+        if (call_handler_func) {
+            gen_side_effects = true;
+        } else {
+            call_handler_func = INST(NopInst());
         }
     }
     if (gen_side_effects) {
@@ -163,7 +229,7 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                     INST (I32ConstInst(fd)),
                     INST (I32ConstInst(iov)),
                     INST (I32ConstInst(iovcnt)),
-                    INST (CallInst(callid_func_it->second.func))
+                    call_handler_func
                 });
                 break;
             }
@@ -172,7 +238,7 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                 int32_t status = prop.call_args[0];
                 builder.push ({
                     INST (I32ConstInst(status)),
-                    INST (CallInst(callid_func_it->second.func))
+                    call_handler_func
                 });
                 break;
             }
@@ -182,7 +248,7 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                 builder.push ({
                     INST (I32ConstInst(setup_fn_ptr)),
                     INST (I32ConstInst(thread_args_ptr)),
-                    INST (CallInst(callid_func_it->second.func))
+                    call_handler_func
                 });
                 break;
             }
@@ -194,28 +260,19 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                 switch (futex_op) {
                     case RecordInterface::FutexWait: {
                         builder.push ({
-                            //I32ConstInst(addr),
-                            //I32ConstInst(val),
-                            //I64ConstInst(-1),
                             INST (I32ConstInst(addr)),
                             INST (I32ConstInst(futex_op)),
                             INST (I32ConstInst(val)),
-                            INST (CallInst(callid_func_it->second.func))
-                            //MemoryAtomicWait32Inst(2, 0, def_mem),
-                            //DropInst()
+                            call_handler_func
                         });
                         break;
                     }
                     case RecordInterface::FutexWake: {
                         builder.push ({
-                            //I32ConstInst(addr),
-                            //I32ConstInst(val),
                             INST (I32ConstInst(addr)),
                             INST (I32ConstInst(futex_op)),
                             INST (I32ConstInst(val)),
-                            INST (CallInst(callid_func_it->second.func))
-                            //MemoryAtomicNotifyInst(2, 0, def_mem),
-                            //DropInst()
+                            call_handler_func
                         });
                         break;
                     }
@@ -246,21 +303,32 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
         }
     }
 
+    // Increment the sync_id 
+    builder.push({
+        INST (I32ConstInst(thread_replay_info.sync_id_addr)),
+        INST (I64ConstInst(1)),
+        INST (I64AtomicRmwAddInst(3, 0, def_mem)),
+        INST (DropInst())
+    });
+
     return builder;
 }
 
 
 /* Construct the arm for a specific thread's replay operations */
 static InstBuilder construct_thread_replay_props(WasmModule &module, 
-    int tid_arm_idx, int begin_idx, int end_idx, ReplayOpProp *props, 
+    int cur_tid, int begin_idx, int end_idx, ReplayOpProp *props, 
     bool has_retval, int64_t ret_sigidx, wasm_type_t wasm_ret_type, 
     MemoryDecl *def_mem,
     std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
     std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
-    int64_t flags, ThreadReplayInfo &thread_replay_info) {
+    int64_t flags, ThreadReplayInfo &thread_replay_info, 
+    DebugLogCallInfo debug_log_call_info) {
 
     InstBuilder builder = {};
     int num_props = end_idx - begin_idx;
+
+    debug_log_call_info.tid = cur_tid;
 
     // Tracking the switch case for next prop
     static GlobalDecl prop_br_tracker_decl = {
@@ -291,7 +359,7 @@ static InstBuilder construct_thread_replay_props(WasmModule &module,
         InstBuilder prop_builder = construct_single_replay_prop(
             num_props - i - 1, props[begin_idx + i], has_retval, wasm_ret_type,
             def_mem, callid_handlers, unused_callid_handlers, 
-            flags, thread_replay_info);
+            flags, thread_replay_info, debug_log_call_info);
         builder.splice(prop_builder);
         // Branch out of the switch case
         builder.push_inst(BrInst(num_props - i));
@@ -315,14 +383,16 @@ static InstBuilder construct_thread_replay_props(WasmModule &module,
 /* Insert builder instructions into module, remove import call, and reset iterator */
 static void replace_import_call(WasmModule &module, 
         InstList::iterator &institr, InstList &insts, InstBuilder &builder,
-        FuncDecl *call_func, std::set<FuncDecl*> &remove_importfuncs) {
+        FuncDecl *call_func, uint32_t access_idx, 
+        std::set<FuncDecl*> &remove_importfuncs) {
 
     // Setup the replay op function declaration
     char replay_func_debug_name[100];
     ImportDecl *import_decl = module.get_import_name_from_func(call_func);
-    sprintf(replay_func_debug_name, "__replay_instrument_%s_%s", 
+    sprintf(replay_func_debug_name, "__replay_instrument_%s-%s-%u", 
         import_decl->mod_name.c_str(), 
-        import_decl->member_name.c_str());
+        import_decl->member_name.c_str(),
+        access_idx);
     FuncDecl replay_ops_func_decl = {
         .sig = call_func->sig,
         .pure_locals = wasm_localcsv_t(),
@@ -349,7 +419,8 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         std::set<FuncDecl*> &remove_importfuncs, 
         std::map<uint32_t, ReplayImportFuncDecl> &callid_handlers,
         std::set<ReplayImportFuncDecl> &unused_callid_handlers, 
-        int64_t flags, ThreadReplayInfo &thread_replay_info) {
+        int64_t flags, ThreadReplayInfo &thread_replay_info,
+        DebugLogCallInfo debug_log_call_info) {
 
     SigDecl* call_func_sig = call_func->sig;
     uint32_t call_func_sigidx = module.getSigIdx(call_func->sig);
@@ -386,6 +457,9 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
 
     InstBuilder builder = {};
 
+    debug_log_call_info.access_idx = op.access_idx;
+    debug_log_call_info.func_idx = op.func_idx;
+
     if (empty_replay_op) {
         // If no props, skip replay function construction and insert a nop
         if (has_retval) {
@@ -407,11 +481,13 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
             }
 
             // Switch table on thread id with default case, which should never be used
+            auto gettid_import = callid_handlers.find(ReplayInterface::SC_GETTID)->second;
             builder.push_inst (BlockInst(ret_sigidx));
             // This is for type-safety of block; should never be returned from table
             builder_push_return_value(builder, has_retval, wasm_ret_type);
             builder.push({
-                INST (CallInst(thread_replay_info.gettid_func)),
+                create_call_to_replay_import(gettid_import, 
+                    unused_callid_handlers, true),
                 INST (I32ConstInst(1)),
                 INST (I32SubInst()),
                 INST (BrTableInst(thread_labels, op.max_tid)),
@@ -426,11 +502,11 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
                 int end_idx = i;
                 // Assumes only single memory for now
                 InstBuilder tid_props = construct_thread_replay_props(
-                    module, cur_tid - 1, begin_idx, end_idx, op.props, 
+                    module, cur_tid, begin_idx, end_idx, op.props, 
                     has_retval, ret_sigidx, wasm_ret_type,
                     module.getMemory(0), 
                     callid_handlers, unused_callid_handlers, 
-                    flags, thread_replay_info);
+                    flags, thread_replay_info, debug_log_call_info);
                 builder.splice(tid_props);
                 // Branch out of the switch case
                 builder.push_inst(BrInst(op.max_tid - cur_tid + 1));
@@ -441,13 +517,15 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
         }
         // Single-threaded replays can avoid gettid and tid switch table
         else {
+            uint32_t first_tid = 1;
             // Construct replay operations for single-threaded replay
             InstBuilder single_thread_props = construct_thread_replay_props(
-                module, 0, 0, op.num_props, op.props, 
+                module, first_tid, 0, op.num_props, op.props, 
                 has_retval, ret_sigidx, wasm_ret_type,
                 module.getMemory(0), 
                 callid_handlers, unused_callid_handlers, 
-                flags, thread_replay_info);
+                flags, thread_replay_info,
+                debug_log_call_info);
             builder.splice(single_thread_props);
         }
         /** */
@@ -458,9 +536,34 @@ static void insert_replay_op(WasmModule &module, FuncDecl *call_func,
 
     /* Builder instructions finished; replace call */
     replace_import_call(module, institr, insts, builder, 
-        call_func, remove_importfuncs);
+        call_func, op.access_idx, remove_importfuncs);
 }
 
+/* Create function to implement synchronization of program to deterministic trace order */
+/* Function waits until sync_id_addr contains param0 in it */
+static FuncDecl* create_wait_sync_id_func(WasmModule &module, uint32_t sync_id_addr) {
+    MemoryDecl *memory = module.getMemory(0);
+    SigDecl i64p_sig_decl = { .params = {WASM_TYPE_I64}, .results = {} };
+    SigDecl *i64p_sig = module.add_sig(i64p_sig_decl, false);
+    uint32_t i64p_sig_idx = module.getSigIdx(i64p_sig);
+
+    FuncDecl fn = {
+        .sig = i64p_sig,
+        .pure_locals = wasm_localcsv_t(),
+        .num_pure_locals = 0,
+        .instructions = {
+            INST (LoopInst(-0x40)),
+            INST (I32ConstInst(sync_id_addr)),
+            INST (I64AtomicLoadInst(3, 0, memory)),
+            INST (LocalGetInst(0)) /* sync_id */,
+            INST (I64NeInst()),
+            INST (BrIfInst(0)), /* Retry until M[sync_id_addr] != sync_id */
+            INST (EndInst()),
+            INST (EndInst())
+        }
+    };
+    return module.add_func(fn, NULL, "__wait_replay_sync_id");
+}
 
 
 void r3_replay_instrument (WasmModule &module, void *replay_ops, 
@@ -477,11 +580,14 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     FuncDecl *last_preinstrumented_func = &module.Funcs().back();
 
     /* Create all thread-related management */
-    create_mutex_funcs(module, instrument_page_start, mutex_funcs);
+    uint32_t mutex_addr = instrument_page_start;
+    uint32_t sync_id_addr = instrument_page_start + 8;
+    create_mutex_funcs(module, mutex_addr, mutex_funcs);
     ThreadReplayInfo thread_replay_info = {
+        .wait_sync_id_func = create_wait_sync_id_func(module, sync_id_addr),
         .lock_func = mutex_funcs[0],
         .unlock_func = mutex_funcs[1],
-        .sync_id_addr = instrument_page_start + 4,
+        .sync_id_addr = sync_id_addr,
     };
     // Get total number of threads
     for (int i = 0; i < num_ops; i++) {
@@ -489,6 +595,7 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     }
     thread_replay_info.is_multithreaded = (thread_replay_info.num_threads > 1);
 
+    DebugLogCallInfo debug_log_call_info = { };
     /* Engine callbacks for specialized replay handlers */
     std::map<uint32_t, ReplayImportFuncDecl> callid_handlers;
     std::set<ReplayImportFuncDecl> unused_callid_handlers;
@@ -497,19 +604,12 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
             .func = add_r3_import_function(module, replay_imports[i]), 
             .debug = replay_imports[i].debug 
         };
-        if (replay_imports[i].key != 0) {
-            callid_handlers[replay_imports[i].key] = rep_imfunc;
-            unused_callid_handlers.insert(rep_imfunc);
-        } else {
-            if (replay_imports[i].iminfo.member_name == "SC_gettid") {
-                // Set the tid import function
-                thread_replay_info.gettid_func = rep_imfunc.func;
-                // Single threaded programs don't need the gettid function
-                if (!thread_replay_info.is_multithreaded) {
-                    unused_callid_handlers.insert(rep_imfunc);
-                }
-            }
+
+        if (callid_handlers.contains(replay_imports[i].key)) {
+            ERR("Duplicate Replay Handler Support for %s\n", replay_imports[i].iminfo.member_name.c_str());
         }
+        callid_handlers[replay_imports[i].key] = rep_imfunc;
+        unused_callid_handlers.insert(rep_imfunc);
     }
 
     /* Pre-compute sig indices for replay blocks */
@@ -565,12 +665,13 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
                         // Imports with no replay data use the empty replay-op
                         ReplayOp curr_op = (tracked_import ? 
                             ops[op_idx++] :
-                            (ReplayOp) { .access_idx = 0, .func_idx = 0, .props = nullptr, .num_props = 0 }
+                            (ReplayOp) { .access_idx = access_tracker, .func_idx = 0, .props = nullptr, .num_props = 0 }
                         );
                         // Mutex insertion around replay operation
                         insert_replay_op(module, call_func, institr, insts, curr_op, 
                             sig_indices, remove_importfuncs, callid_handlers, 
-                            unused_callid_handlers, flags, thread_replay_info);
+                            unused_callid_handlers, flags, thread_replay_info,
+                            debug_log_call_info);
                         TRACE("[%s] Replaced Call Access %d\n", 
                             (tracked_import ? "TRACKED" : "UNTRACKED"), access_tracker);
                     }
