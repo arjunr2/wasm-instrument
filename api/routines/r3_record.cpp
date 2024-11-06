@@ -1,6 +1,5 @@
 #include "routine_common.h"
 #include "r3_common.h"
-#include "r3_memops_table.h"
 #include <cstring>
 
 typedef struct {
@@ -15,6 +14,7 @@ typedef struct {
   uint32_t base_addr_local;
   uint32_t accwidth_local; // For prop.size = -1, the width is dynamically stored in this local
   uint16_t opcode; // Opcode is kept for size=0, which handles special cases
+  bool is_sync; // Accesses that enforce implicit synchronization
 } MemopInstInfo;
 
 struct CallInstInfo {
@@ -101,6 +101,7 @@ union RecordInstInfo {
   uint32_t local_addr = local_i32_3;                       \
   uint32_t local_accwidth = -1;                            \
   uint32_t mem_offset = 0;                                 \
+  bool is_sync = false;                                    \
   std::shared_ptr<_insttype> mem_inst = static_pointer_cast<_insttype>(instruction); 
 
 #define MEMOP_SETUP_END(_insttype, updater)                                                    \
@@ -114,7 +115,8 @@ union RecordInstInfo {
   }                                                                                            \
   recinfo = { .ret = ret, .prop = memop_inst_table[opcode],                                    \
     .offset = mem_offset, .base_addr_local = local_addr,                                       \
-    .accwidth_local = local_accwidth, .opcode = opcode };
+    .accwidth_local = local_accwidth, .opcode = opcode,                                        \
+    .is_sync = is_sync };
 
 
 #define CALL_SETUP_INIT(_insttype)       \
@@ -138,6 +140,8 @@ union RecordInstInfo {
 #define SET_RET(r) {                                   \
   stackrets = ((stackrets == RET_PH) ? r : stackrets); \
 }
+
+#define FLAG_SYNC() { is_sync = true; }
 
 /* Common instruction instrumentation patterns */
 #define PUSH_FUTEX_LOCK_IF(local_idx, val) { \
@@ -362,6 +366,11 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
                            }
 
     /* I32 | I32 */
+    case WASM_OP_I32_ATOMIC_RMW_XCHG:
+    case WASM_OP_I32_ATOMIC_RMW8_XCHG_U:
+    case WASM_OP_I32_ATOMIC_RMW16_XCHG_U: {
+                                            FLAG_SYNC ();
+                                          }
     case WASM_OP_I32_ATOMIC_RMW_ADD:
     case WASM_OP_I32_ATOMIC_RMW8_ADD_U:
     case WASM_OP_I32_ATOMIC_RMW16_ADD_U:
@@ -376,10 +385,7 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I32_ATOMIC_RMW16_OR_U:
     case WASM_OP_I32_ATOMIC_RMW_XOR:
     case WASM_OP_I32_ATOMIC_RMW8_XOR_U:
-    case WASM_OP_I32_ATOMIC_RMW16_XOR_U:
-    case WASM_OP_I32_ATOMIC_RMW_XCHG:
-    case WASM_OP_I32_ATOMIC_RMW8_XCHG_U:
-    case WASM_OP_I32_ATOMIC_RMW16_XCHG_U: {
+    case WASM_OP_I32_ATOMIC_RMW16_XOR_U:  {
                                             SET_RET (RET_I32);
                                           }
     case WASM_OP_I32_STORE:
@@ -402,6 +408,12 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
                                      }
 
     /* I32 | I64 */
+    case WASM_OP_I64_ATOMIC_RMW_XCHG:
+    case WASM_OP_I64_ATOMIC_RMW8_XCHG_U:
+    case WASM_OP_I64_ATOMIC_RMW16_XCHG_U:
+    case WASM_OP_I64_ATOMIC_RMW32_XCHG_U: {
+                                            FLAG_SYNC ();
+                                          } 
     case WASM_OP_I64_ATOMIC_RMW_ADD:
     case WASM_OP_I64_ATOMIC_RMW8_ADD_U:
     case WASM_OP_I64_ATOMIC_RMW16_ADD_U:
@@ -421,13 +433,9 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I64_ATOMIC_RMW_XOR:
     case WASM_OP_I64_ATOMIC_RMW8_XOR_U:
     case WASM_OP_I64_ATOMIC_RMW16_XOR_U:
-    case WASM_OP_I64_ATOMIC_RMW32_XOR_U:
-    case WASM_OP_I64_ATOMIC_RMW_XCHG:
-    case WASM_OP_I64_ATOMIC_RMW8_XCHG_U:
-    case WASM_OP_I64_ATOMIC_RMW16_XCHG_U:
-    case WASM_OP_I64_ATOMIC_RMW32_XCHG_U: {
-                                            SET_RET (RET_I64);
-                                          }
+    case WASM_OP_I64_ATOMIC_RMW32_XOR_U: {
+                                          SET_RET (RET_I64);
+                                         }
     case WASM_OP_I64_ATOMIC_STORE:
     case WASM_OP_I64_ATOMIC_STORE8:
     case WASM_OP_I64_ATOMIC_STORE16:
@@ -478,6 +486,7 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U:
     case WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U: {
                                                SET_RET (RET_I32);
+                                               FLAG_SYNC ();
                                              }
                                              {
                                                BLOCK_INST(sig_i32_3);
@@ -499,6 +508,7 @@ InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr,
     case WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U:
     case WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U: {
                                                SET_RET (RET_I64);
+                                               FLAG_SYNC ();
                                              }
                                              {
                                                BLOCK_INST(sig_i32_i64_2);
@@ -907,6 +917,9 @@ InstList gen_memop_trace_instructions(InstBasePtr &instruction, uint32_t access_
     PUSH_INST (I64ConstInst(0));
     PUSH_INST (I64ConstInst(0));
   }
+
+  /* Implicit Sync operation? */
+  PUSH_INST (I32ConstInst(recinfo.is_sync));
 
   /* Tracedump call */
   PUSH_INST (CallInst(tracedump_fn));

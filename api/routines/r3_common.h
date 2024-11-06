@@ -2,6 +2,7 @@
 #define R3_COMMON_H
 
 #include "routine_common.h"
+#include "r3_memops_table.h"
 
 namespace RecordInterface {
   /* Types of Call instructions */
@@ -117,7 +118,9 @@ static ImportFuncData record_imports[NUM_RECORD_IMPORTS] = {
         // Load value from Main Memory (only used if Differ == 1) 
         WASM_TYPE_I64, 
         // Expected value from Main Memory (only used if Differ == 1) 
-        WASM_TYPE_I64
+        WASM_TYPE_I64,
+        // Flag as implicit synchronization operator
+        WASM_TYPE_I32
       },
       .results = {} 
     }
@@ -384,5 +387,16 @@ static void create_mutex_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl
   funcs[1] = module.add_func(fn2, NULL, "unlock_instrument");
 }
 
+
+static SigDecl* get_sigdecl_from_cdef(WasmModule &module, CSigDecl csig) {
+  SigDecl sig;
+  for (int i = 0; csig.params[i] && (i < sizeof(csig.params) / sizeof(csig.params[0])); i++) {
+    sig.params.push_back(csig.params[i]);
+  }
+  for (int i = 0; csig.results[i] && (i < sizeof(csig.results) / sizeof(csig.results[0])); i++) {
+    sig.results.push_back(csig.results[i]);
+  }
+  return module.add_sig(sig, false);
+}
 
 #endif
