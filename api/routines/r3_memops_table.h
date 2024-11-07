@@ -24,6 +24,12 @@ typedef struct {
 } MemopProp;
 
 /* Signature declarations for all memory operations */
+// No param
+const CSigDecl sig_p_void_r_i32 = {
+	.params = { },
+	.results = { WASM_TYPE_I32 }
+};
+
 // One param
 const CSigDecl sig_p_i32_r_i32 = {
 	.params = { WASM_TYPE_I32 },
@@ -76,6 +82,10 @@ const CSigDecl sig_p_i32x3_r_i32 = {
 const CSigDecl sig_p_i32x3_r_void = {
 	.params = { WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32 },
 	.results = { }
+};
+const CSigDecl sig_p_i32i64x2_r_i32 = {
+	.params = { WASM_TYPE_I32, WASM_TYPE_I64, WASM_TYPE_I64 },
+	.results = { WASM_TYPE_I32 }
 };
 const CSigDecl sig_p_i32i64x2_r_i64 = {
 	.params = { WASM_TYPE_I32, WASM_TYPE_I64, WASM_TYPE_I64 },
