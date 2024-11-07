@@ -198,7 +198,18 @@ static InstBuilder builder_push_log_call(InstBuilder &builder,
     });
     return builder;
 }
-
+// Operations to push sync_id incrementation for ordering prop executions
+static InstBuilder builder_push_sync_id_inc(InstBuilder &builder, 
+        uint32_t sync_id_addr, MemoryDecl *def_mem) {
+    // Increment the sync_id 
+    builder.push({
+        INST (I32ConstInst(sync_id_addr)),
+        INST (I64ConstInst(1)),
+        INST (I64AtomicRmwAddInst(3, 0, def_mem)),
+        INST (DropInst())
+    });
+    return builder;
+}
 
 
 static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &prop, 
@@ -235,11 +246,15 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
         builder_push_log_call(builder, log_call_handler_func, debug_log_call_info);
     }
 
+    // Builder for side-effects
+    InstBuilder sf_builder = {};
+    // Some calls like `exit` end execution; we need to increment sync_id before calling it
+    bool pre_insert_sync_inc = false;
     // Implicit sync operations don't actually enforce any props since the actual
     //  instruction is being run
     if (!implicit_sync) {
         // Return value for the arm
-        builder_push_return_value(builder, sigmeta, prop.return_val);
+        builder_push_return_value(sf_builder, sigmeta, prop.return_val);
         
         // Side-effects for the arm
         // Prop import replays can fall into 3 categories:
@@ -266,7 +281,7 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                 case RecordInterface::SC_MMAP: {
                     uint32_t grow_value = prop.call_args[0];
                     if (grow_value > 0) {
-                        builder.push ({
+                        sf_builder.push ({
                             INST (I32ConstInst(grow_value)),
                             INST (MemoryGrowInst(def_mem)),
                             INST (DropInst())
@@ -278,7 +293,7 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                     int32_t fd = prop.call_args[0];
                     int32_t iov = prop.call_args[1];
                     uint32_t iovcnt = prop.call_args[2];
-                    builder.push ({
+                    sf_builder.push ({
                         INST (I32ConstInst(fd)),
                         INST (I32ConstInst(iov)),
                         INST (I32ConstInst(iovcnt)),
@@ -289,16 +304,17 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                 case RecordInterface::SC_PROC_EXIT: 
                 case RecordInterface::SC_THREAD_EXIT: {
                     int32_t status = prop.call_args[0];
-                    builder.push ({
+                    sf_builder.push ({
                         INST (I32ConstInst(status)),
                         call_handler_func
                     });
+                    pre_insert_sync_inc = true;
                     break;
                 }
                 case RecordInterface::SC_THREAD_SPAWN: {
                     int32_t setup_fn_ptr = prop.call_args[0];
                     int32_t thread_args_ptr = prop.call_args[1];
-                    builder.push ({
+                    sf_builder.push ({
                         INST (I32ConstInst(setup_fn_ptr)),
                         INST (I32ConstInst(thread_args_ptr)),
                         call_handler_func
@@ -312,7 +328,7 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                     uint64_t sync_id = prop.sync_id;
                     switch (futex_op) {
                         case RecordInterface::FutexWait: {
-                            builder.push ({
+                            sf_builder.push ({
                                 INST (I32ConstInst(addr)),
                                 INST (I32ConstInst(futex_op)),
                                 INST (I32ConstInst(val)),
@@ -321,7 +337,7 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
                             break;
                         }
                         case RecordInterface::FutexWake: {
-                            builder.push ({
+                            sf_builder.push ({
                                 INST (I32ConstInst(addr)),
                                 INST (I32ConstInst(futex_op)),
                                 INST (I32ConstInst(val)),
@@ -343,27 +359,27 @@ static InstBuilder construct_single_replay_prop(int prop_arm_idx, ReplayOpProp &
         // Stores for the arm
         for (int i = 0; i < prop.num_stores; i++) {
             ReplayMemStore &store = prop.stores[i];
-            builder.push ({
+            sf_builder.push ({
                 INST (I32ConstInst(store.addr)),
                 INST (I64ConstInst(store.value))
             });
             switch (store.size) {
-                case 1: builder.push_inst (I64Store8Inst(0, 0, def_mem)); break;
-                case 2: builder.push_inst (I64Store16Inst(0, 0, def_mem)); break;
-                case 4: builder.push_inst (I64Store32Inst(0, 0, def_mem)); break;
-                case 8: builder.push_inst (I64StoreInst(0, 0, def_mem)); break;
+                case 1: sf_builder.push_inst (I64Store8Inst(0, 0, def_mem)); break;
+                case 2: sf_builder.push_inst (I64Store16Inst(0, 0, def_mem)); break;
+                case 4: sf_builder.push_inst (I64Store32Inst(0, 0, def_mem)); break;
+                case 8: sf_builder.push_inst (I64StoreInst(0, 0, def_mem)); break;
                 default: { ERR("R3-Replay-Error: Unsupported size %u", store.size); }
             }
         }
     }
 
-    // Increment the sync_id 
-    builder.push({
-        INST (I32ConstInst(thread_replay_info.sync_id_addr)),
-        INST (I64ConstInst(1)),
-        INST (I64AtomicRmwAddInst(3, 0, def_mem)),
-        INST (DropInst())
-    });
+    if (!pre_insert_sync_inc) {
+        builder.splice(sf_builder);
+        builder_push_sync_id_inc(builder, thread_replay_info.sync_id_addr, def_mem);
+    } else {
+        builder_push_sync_id_inc(builder, thread_replay_info.sync_id_addr, def_mem);
+        builder.splice(sf_builder);
+    }
 
     return builder;
 }
@@ -540,15 +556,18 @@ static void insert_replay_op(WasmModule &module, InstMetaInfo &imeta_info,
         builder.push_inst (EndInst());
     }
     else {
+        // TID-arms range [0, max_tid] and a "max_tid + 1" for invalid tid
+        uint32_t first_tid = 0;
+        uint32_t num_tid_arms = op.max_tid + 2;
+        uint32_t num_valid_tid_arms = num_tid_arms - 1;
         // Replay function instruction construction
         // Block for sequencing thread-specific replay operations
         if (thread_replay_info.is_multithreaded) {
-            std::list<uint32_t> thread_labels(op.max_tid);
+            std::list<uint32_t> thread_labels(num_valid_tid_arms);
             std::iota(thread_labels.begin(), thread_labels.end(), 0);
 
-            // Thread Replay Info: Starts from 0 since TID starts with 1, including
-            //      an error case if tid is outside of cases
-            for (int i = 0; i < op.max_tid + 1; i++) {
+            // Thread Replay Info: Includes an error case if tid is outside of [0, max_tid]
+            for (int i = 0; i < num_tid_arms; i++) {
                 builder.push_inst(BlockInst(sigmeta.get_block_sigidx()));
             }
 
@@ -560,14 +579,12 @@ static void insert_replay_op(WasmModule &module, InstMetaInfo &imeta_info,
             builder.push({
                 create_call_to_replay_import(gettid_import, 
                     unused_callid_handlers, true),
-                INST (I32ConstInst(1)),
-                INST (I32SubInst()),
-                INST (BrTableInst(thread_labels, op.max_tid)),
+                INST (BrTableInst(thread_labels, num_valid_tid_arms)),
                 INST (EndInst())
             });
 
             // Construct each thread arm's replay operations
-            for (int cur_tid = 1, i = 0; i < op.num_props; cur_tid++) {
+            for (int cur_tid = first_tid, i = 0; i < op.num_props; cur_tid++) {
                 // Obtain the range of ops [begin_idx, end_idx) for cur_tid
                 int begin_idx = i;
                 while ((i < op.num_props) && (op.props[i].tid == cur_tid)) { i++; }
@@ -581,7 +598,7 @@ static void insert_replay_op(WasmModule &module, InstMetaInfo &imeta_info,
                     flags, thread_replay_info, debug_log_call_info);
                 builder.splice(tid_props);
                 // Branch out of the switch case
-                builder.push_inst(BrInst(op.max_tid - cur_tid + 1));
+                builder.push_inst(BrInst(num_valid_tid_arms - cur_tid));
                 builder.push_inst(EndInst());
             }
             // Error case for invalid tid
@@ -589,7 +606,6 @@ static void insert_replay_op(WasmModule &module, InstMetaInfo &imeta_info,
         }
         // Single-threaded replays can avoid gettid and tid switch table
         else {
-            uint32_t first_tid = 1;
             // Construct replay operations for single-threaded replay
             InstBuilder single_thread_props = construct_thread_replay_props(
                 module, imeta_info, first_tid, 0, op.num_props, op.props, 
@@ -662,6 +678,7 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
         .sync_id_addr = sync_id_addr,
     };
     // Get total number of threads
+    // Since main thread starts only at TID=1, get max.tid (not max.tid + 1)
     for (int i = 0; i < num_ops; i++) {
         thread_replay_info.num_threads = std::max(thread_replay_info.num_threads, ops[i].max_tid);
     }
@@ -705,6 +722,10 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
             ERR("Could not find function export: \'%s\'\n", func_name);
         }
     }
+    /* Do not instrument the instrument-hooks or start (usually just initialization) */
+    func_ignore_map[module.get_start_fn()] = "__#internal#_start_function";
+    func_ignore_map[thread_replay_info.lock_func] = "__#internal#_lock_instrument";
+    func_ignore_map[thread_replay_info.unlock_func] = "__#internal#_unlock_instrument";
 
     // Initialize iterator indices
     uint32_t access_tracker = 1;

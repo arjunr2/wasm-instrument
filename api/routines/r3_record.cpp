@@ -957,6 +957,10 @@ void r3_record_instrument (WasmModule &module) {
       ERR("Could not find function export: \'%s\'\n", func_name);
     }
   }
+  /* Do not instrument the instrument-hooks or start (usually just initialization) */
+  func_ignore_map[module.get_start_fn()] = "__#internal#_start_function";
+  func_ignore_map[lock_fn] = "__#internal#_lock_instrument";
+  func_ignore_map[unlock_fn] = "__#internal#_unlock_instrument";
 
   /* Pre-compute sig indices since list indexing is expensive */
   uint32_t sig_indices[7];
@@ -1004,8 +1008,8 @@ void r3_record_instrument (WasmModule &module) {
   uint32_t access_tracker = 1;
   /* Instrument all functions */
   for (auto &func : module.Funcs()) {
-    /* Do not instrument the instrument-hook functions */
-    if ((&func == lock_fn) || (&func == unlock_fn) || (func_ignore_map.count(&func))) {
+    /* Skip ignored functions */
+    if ((func_ignore_map.count(&func))) {
       continue;
     }
     uint32_t local_indices[19] = {
@@ -1045,10 +1049,6 @@ void r3_record_instrument (WasmModule &module) {
       RecordInstInfo record {};
       InstrumentType instrument_type = { .lockless = false, 
         .lock_futex = false, .pre_insert_trace = false, .force_trace = false };
-      // Do not lock start_function methods... usually used to initialize threads
-      if (&func == module.get_start_fn()) {
-        instrument_type.lockless = true;
-      }
       memset(&record, 0, sizeof(RecordInstInfo));
       InstList addinst;
 #define SETUP_INVOKE(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem, \
