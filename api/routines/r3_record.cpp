@@ -1,1142 +1,1012 @@
 #include "routine_common.h"
 #include "r3_common.h"
 #include <cstring>
+#include <cassert>
+#include <ranges>
 
-typedef struct {
-  WasmRet type;
-  uint32_t local;
-} RetVal;
+#define INST(inv) InstBasePtr(new inv)
 
-typedef struct {
-  RetVal ret;
-  MemopProp prop;
-  uint32_t offset;
-  uint32_t base_addr_local;
-  uint32_t accwidth_local; // For prop.size = -1, the width is dynamically stored in this local
-  uint16_t opcode; // Opcode is kept for size=0, which handles special cases
-  bool is_sync; // Accesses that enforce implicit synchronization
-} MemopInstInfo;
+// Wasm locals representation for instrumentation
+struct LocalVal {
+	wasm_type_t type;
+	uint32_t idx;
 
+    public:
+        LocalVal() : type((wasm_type_t)0), idx(-1) {}
+        LocalVal(wasm_type_t t, uint32_t i) : type(t), idx(i) {}
+};
+
+// Memory operation trace-relevant properties
+struct MemopInstInfo {
+    SigDecl *sig;
+	LocalVal ret_lc;
+	MemopProp prop;
+	uint32_t offset;
+	LocalVal baseaddr_lc;
+    // For prop.size = -1, the width is dynamically stored in this local
+	LocalVal accwidth_lc; 
+    // Opcode is kept for size=0, which handles special cases
+	uint16_t opcode; 
+    // Accesses that enforce implicit synchronization
+	bool is_sync; 
+
+    public:
+        bool has_retval() {
+            // Only support single return value so far
+            assert(sig->results.size() <= 1);
+            return sig->results.size() > 0;
+        }
+} ;
+
+// Call instruction trace-relevant properties
 struct CallInstInfo {
-  RetVal ret;
-  uint16_t opcode;
-  FuncDecl *target;
-  RecordInterface::CallID call_id;
+	LocalVal ret_lc;
+    std::vector<LocalVal> args;
+	uint16_t opcode;
+	FuncDecl *target;
+	RecordInterface::CallID call_id;
+
+    public:
+        bool has_retval() {
+            // Only support single return value so far
+            assert(target->sig->results.size() <= 1);
+            return target->sig->results.size() > 0;
+        }
+        void move_into(LocalVal &ret_lc, std::vector<LocalVal> &args, uint16_t opcode,
+                FuncDecl *target, RecordInterface::CallID call_id) {
+            this->ret_lc = ret_lc;
+            this->args = std::move(args);
+            this->opcode = opcode;
+            this->target = target;
+            this->call_id = call_id;
+        }
 };
 
+// Type of instrumentation required for the instruction
 struct InstrumentType {
-  bool lockless;
-  bool lock_futex;
-  bool pre_insert_trace;
-  bool force_trace;
+	bool lockless;
+	bool lock_futex;
+	bool pre_insert_trace;
+	bool force_trace;
 };
 
-union RecordInstInfo {
-  enum { MEMOP, CALL } type;
-  MemopInstInfo Memop;
-  CallInstInfo Call;
+// Generalized record operation properties
+enum RecordOpType { MEM_OP, CALL_OP };
+struct RecordInstInfo {
+    RecordOpType optype;
+	MemopInstInfo Memop;
+	CallInstInfo Call;
 };
 
+// Module-relevant context
+struct ModuleContext {
+    WasmModule &module;
+    MemoryDecl *def_mem;
+    MemoryDecl *record_mem;
+};
 
-/* Instruction-generation macros */
-#define PUSH_INST(inv)      addinst.push_back(InstBasePtr(new inv));
-#define PUSH_INST_PTR(inv)  addinst.push_back(InstBasePtr(inv)); 
+// Multi-threading relevant context
+struct ThreadRecordInfo {
+	FuncDecl *lock_fn;
+	FuncDecl *unlock_fn;
+};
 
-#define BLOCK_INST(v) {     \
-  insblock = true;          \
-  PUSH_INST (BlockInst(v)); \
-}
+// Access to functions with non-generic behavior and require "special" handling 
+struct CallMaps {
+    std::map<FuncDecl*, std::string> &specialized;
+    std::map<FuncDecl*, std::string> &lockless;
 
-#define SAVE_TOP(var) {          \
-  PUSH_INST (LocalSetInst(var)); \
-}
-#define RESTORE_TOP(var) {       \
-  PUSH_INST (LocalGetInst(var)); \
-} 
-#define TEE_TOP(var) {           \
-  PUSH_INST (LocalTeeInst(var)); \
-}
-
-#define SETUP_INIT_COMMON(_insttype)                                                 \
-  InstList addinst;                                                                  \
-  InstBasePtr instruction = (*itr);                                                  \
-  bool insblock = false;                                                             \
-  WasmRet stackrets = RET_PH;                                                        \
-  uint16_t opcode = instruction->getOpcode();                                        \
-  uint32_t local_f64 = local_idxs[0];                                                \
-  uint32_t local_f32 = local_idxs[1];                                                \
-  uint32_t local_i64_1 = local_idxs[2];                                              \
-  uint32_t local_i64_2 = local_idxs[3];                                              \
-  uint32_t local_i32_1 = local_idxs[4];                                              \
-  uint32_t local_i32_2 = local_idxs[5];                                              \
-  uint32_t local_i32_3 = local_idxs[6];                                              \
-                                                                                     \
-  uint32_t local_i32_ret = local_idxs[7];                                            \
-  uint32_t local_i64_ret = local_idxs[8];                                            \
-  uint32_t local_f32_ret = local_idxs[9];                                            \
-  uint32_t local_f64_ret = local_idxs[10];                                           \
-                                                                                     \
-  uint32_t sig_i32 = sig_idxs[0];                                                    \
-  uint32_t sig_i32_2 = sig_idxs[1];                                                  \
-  uint32_t sig_i32_i64 = sig_idxs[2];                                                \
-  uint32_t sig_i32_f32 = sig_idxs[3];                                                \
-  uint32_t sig_i32_f64 = sig_idxs[4];                                                \
-  uint32_t sig_i32_3 = sig_idxs[5];                                                  \
-  uint32_t sig_i32_i64_2 = sig_idxs[6];
-
-
-#define LOCAL_RET_SET_COMMON() \
-    switch (ret.type) {                                                                        \
-      case RET_I32: ret.local = local_idxs[7]; PUSH_INST (LocalSetInst(local_i32_ret)); break; \
-      case RET_I64: ret.local = local_idxs[8]; PUSH_INST (LocalSetInst(local_i64_ret)); break; \
-      case RET_F32: ret.local = local_idxs[9]; PUSH_INST (LocalSetInst(local_f32_ret)); break; \
-      case RET_F64: ret.local = local_idxs[10]; PUSH_INST (LocalSetInst(local_f64_ret)); break; \
-      default: {}                                                                              \
+    // Check (and return element) if function is specialized
+    std::pair<bool, std::string> is_specialized(FuncDecl *fn) {
+        auto x = specialized.find(fn);
+		bool found = (x != specialized.end());
+		return std::make_pair(found, found ? x->second : std::string());
     }
 
+    // Check (and return element) if function is lockless
+    std::pair<bool, std::string> is_lockless(FuncDecl *fn) {
+        auto x = lockless.find(fn);
+		bool found = (x != lockless.end());
+		return std::make_pair(found, found ? x->second : std::string());
+    }
+};
 
-#define MEMOP_SETUP_INIT(_insttype)                        \
-  SETUP_INIT_COMMON(_insttype)                             \
-  /* Only used for some operations that determine width */ \
-  uint32_t local_addr = local_i32_3;                       \
-  uint32_t local_accwidth = -1;                            \
-  uint32_t mem_offset = 0;                                 \
-  bool is_sync = false;                                    \
-  std::shared_ptr<_insttype> mem_inst = static_pointer_cast<_insttype>(instruction); 
+// Allocator interface for Wasm locals
+class LocalAllocator {
+    private:
+        std::map<wasm_type_t, std::vector<uint32_t>> idx_map;
+        std::map<wasm_type_t, uint32_t> allocator;
 
-#define MEMOP_SETUP_END(_insttype, updater)                                                    \
-  RetVal ret = { .type = stackrets, .local = (uint32_t)-1 };                                   \
-  if (insblock) {                                                                              \
-    _insttype *new_meminst = new _insttype(*mem_inst);                                         \
-    { updater; }                                                                               \
-    PUSH_INST_PTR (new_meminst);                                                               \
-    LOCAL_RET_SET_COMMON(); \
-    PUSH_INST (EndInst());                                                                     \
-  }                                                                                            \
-  recinfo = { .ret = ret, .prop = memop_inst_table[opcode],                                    \
-    .offset = mem_offset, .base_addr_local = local_addr,                                       \
-    .accwidth_local = local_accwidth, .opcode = opcode,                                        \
-    .is_sync = is_sync };
+    public:
+        // Initialize local index map from the locals count
+        LocalAllocator(FuncDecl *func, std::map<wasm_type_t, uint32_t> locals_count) {
+            idx_map.clear();
+            for (auto &x: locals_count) {
+                idx_map[x.first] = std::vector<uint32_t>(x.second);
+                for (int i = 0; i < x.second; i++) {
+                    idx_map[x.first][i] = func->add_local(x.first);
+                }
+            }
+        }
+
+        // Reset all allocations
+        void reset_allocator() {
+            for (auto &x: allocator) { x.second = 0; }
+        }
+
+        // Allocate a local of specific type
+        LocalVal allocate(wasm_type_t type) {
+            auto type_idx_vector = idx_map.at(type);
+            if (allocator[type] >= type_idx_vector.size()) {
+                ERR("Local allocation exceeded for type %d\n", type);
+                return LocalVal();
+            }
+            return LocalVal(type, type_idx_vector[allocator[type]++]);
+            //return (LocalVal) { .type = type, .idx = type_entry[allocator[type]++] };
+        }
+
+        // Get the total number of locals allocatable across all types
+        uint32_t get_local_pool_count() {
+            uint32_t max = 0;
+            for (auto &x: idx_map) { max += x.second.size(); }
+            return max;
+        }
+};
 
 
-#define CALL_SETUP_INIT(_insttype)       \
-  SETUP_INIT_COMMON(_insttype)           \
-  uint32_t local_i32_4 = local_idxs[11]; \
-  uint32_t local_i64_3 = local_idxs[12]; \
-  uint32_t local_i32_5 = local_idxs[15]; \
-  std::shared_ptr<_insttype> call_inst = static_pointer_cast<_insttype>(instruction);
+// Quick cached-access of sig indices (since list indexing is expensive)
+static std::pair<uint32_t, SigDecl*> get_sig_idx_cache(WasmModule &module, SigDecl sig) {
+    static std::unordered_map<SigDecl, 
+        std::pair<uint32_t, SigDecl*>, SigDeclHash> sig_idx_cache;
 
-// Local rets are ordered by RET_I32, RET_I64, RET_F32, RET_F64
-#define CALL_SETUP_END(_insttype, updater)  \
-  RetVal ret = { .type = stackrets, .local = local_idxs[7 + ret.type - RET_I32] };                                   \
-  recinfo = { .ret = ret, .opcode = opcode, .target = target, .call_id = call_id };
+    auto sig_entry = sig_idx_cache.find(sig);
+    if (sig_entry == sig_idx_cache.end()) {
+        SigDecl *sig_ptr = module.add_sig(sig, false);
+        uint32_t idx = module.getSigIdx(sig_ptr);
+        auto ret = std::make_pair(idx, sig_ptr);
+        sig_idx_cache[sig] = ret;
+        return ret;
+    } else {
+        return sig_entry->second;
+    }
+}
+
+/** Common instruction instrumentation patterns **/
+// Instructions to conditionally grab a lock if local_val == val
+static InstBuilder builder_push_ifeq_lock(
+        InstBuilder &builder, ThreadRecordInfo &thread_info, 
+        LocalVal &local_val, uint32_t val) {
+    builder.push ({
+        INST (BlockInst(-64)),
+        INST (LocalGetInst(local_val.idx)),
+        INST (I32ConstInst(0x7f)),
+        INST (I32AndInst()),
+        INST (I32ConstInst(val)),
+        INST (I32NeInst()),
+        INST (BrIfInst(0)),
+        /* Lock if val == local_val.idx */ 
+        INST (CallInst(thread_info.lock_fn)),
+        INST (EndInst())
+    });
+    return builder;
+}
+
+// Instructions to typecast any type to I64
+static InstBuilder builder_push_i64_extend(InstBuilder &builder, 
+        wasm_type_t type) {
+    switch (type) {
+        case WASM_TYPE_I32: builder.push_inst (I64ExtendI32UInst()); break;
+        case WASM_TYPE_I64: ; break;
+        case WASM_TYPE_F32: builder.push({
+            INST (I32ReinterpretF32Inst()),
+            INST (I64ExtendI32UInst())
+        }); break;
+        case WASM_TYPE_F64: builder.push_inst (I64ReinterpretF64Inst()); break;
+		default: { 
+            ERR("R3-Record-Error: Unsupported type %d for I64 Extend\n", type); 
+        }
+    }
+    return builder;
+}
+
+// Generate an <type>_NE instruction
+static InstBasePtr ne_type_inst(wasm_type_t type) {
+    switch (type) {
+        case WASM_TYPE_I32: return INST(I32NeInst());
+        case WASM_TYPE_I64: return INST(I64NeInst());
+        case WASM_TYPE_F32: return INST(F32NeInst());
+        case WASM_TYPE_F64: return INST(F64NeInst());
+        default: { ERR("R3-Record-Error: Unsupported type %d for NEQ\n", type); }
+    }
+    return NULL;
+}
+
+
+// Generate a instruction to store <type> sized data back to (recorded) memory
+static InstBasePtr writeback_inst(uint32_t size, MemoryDecl *mem) {
+    switch (size) {
+        case 1: return INST(I64Store8Inst(0, 0, mem));
+        case 2: return INST(I64Store16Inst(0, 0, mem));
+        case 4: return INST(I64Store32Inst(0, 0, mem));
+        case 8: return INST(I64StoreInst(0, 0, mem));
+        default: { ERR("R3-Record-Error: Unsupported size %d for writeback\n", size); }
+    }
+    return NULL;
+}
+/** */
+
+// Helper method to allocate a return value local
+static std::pair<bool, LocalVal> allocate_retval_local(LocalAllocator &lc_allocator, 
+        SigDecl *sig) {
+    LocalVal ret_lc;
+    bool has_ret = sig->results.size() > 0;
+    if (has_ret) {
+        // Single return value for now
+        assert (sig->results.size() == 1);
+        ret_lc = lc_allocator.allocate(sig->results.front());
+    }
+    return std::make_pair(has_ret, ret_lc);
+}
+
+// Helper method to non-destructively save list of typed stack arguments 
+// to new locals (non-destructive)
+// Updates the builder, and also returns the locals allocated
+// New locals are ordered in the same order as `values`
+static std::vector<LocalVal> 
+save_stack_args(InstBuilder &builder, LocalAllocator &lc_allocator, 
+        typelist &values) {
+    int num_params = values.size();
+    std::vector<LocalVal> local_vals_allocated(num_params);
+
+    int i = num_params - 1;
+    for (auto xt = values.rbegin(); 
+            xt != values.rend(); xt++, i--) {
+        LocalVal newlc = lc_allocator.allocate(*xt);
+        // Tee only the last value; set otherwise
+        if (i > 0) {
+            builder.push_inst(LocalSetInst(newlc.idx));
+        } else {
+            builder.push_inst(LocalTeeInst(newlc.idx));
+        }
+        local_vals_allocated[i] = newlc;
+    }
+    for (i = 1; i < local_vals_allocated.size(); i++) {
+        builder.push_inst(LocalGetInst(local_vals_allocated[i].idx));
+    }
+    return local_vals_allocated;
+}
+
+// Instructions to duplicate a memory operation to shadow memory
+// `default_updater` is used to perform updates on specific record fields 
+//  based on the memory operation type 
+template <typename ImmT>
+InstBuilder setup_memop_duplicate (InstBasePtr &instruction,
+    LocalAllocator &lc_allocator,
+    ModuleContext &modctx, MemopInstInfo &recinfo, 
+    void (*default_updater)(ImmT* new_inst, ModuleContext &modctx, 
+        std::vector<LocalVal> &local_vals_allocated, 
+        LocalVal &accwidth_lc, uint32_t &mem_offset),
+    bool is_sync_op = false) {
+
+    uint16_t opcode = instruction->getOpcode();
+    MemopProp memop_prop = memop_inst_table[opcode];
+
+    // Memory operation signature
+    SigDecl memop_sigdecl = get_sigdecl_from_cdef(memop_prop.sig);
+    auto memop_sigpair = get_sig_idx_cache(modctx.module, memop_sigdecl);
+    SigDecl* memop_sig = memop_sigpair.second;
+
+    // Block signature
+    SigDecl memop_block_sigdecl = { 
+        .params = memop_sig->params, .results = memop_sig->params 
+    };
+    auto memop_block_sigpair = get_sig_idx_cache(modctx.module, memop_block_sigdecl);
+    uint32_t memop_block_sigidx = memop_block_sigpair.first;
+
+    uint32_t num_params = memop_sig->params.size();
+
+    auto retlc_pair = allocate_retval_local(lc_allocator, memop_sig);
+    bool has_ret = retlc_pair.first;
+    LocalVal ret_lc = retlc_pair.second;
+
+    InstBuilder builder = {};
     
-//.mod_name = mod_name, .member_name = member_name, .args = args };
+    builder.push_inst(BlockInst(memop_block_sigidx));
+    // Save the stack arguments so we can duplicate them
+    std::vector<LocalVal> local_vals_allocated = 
+        save_stack_args(builder, lc_allocator, memop_sig->params);
+    // Duplicate the arguments for memop
+    for (auto xt = local_vals_allocated.begin(); xt != local_vals_allocated.end(); xt++) {
+        builder.push_inst(LocalGetInst(xt->idx));
+    }
 
-#define DEFAULT_ERR_CASE() {  \
-  ERR("R3-Record-Error: Cannot support opcode %04X (%s)\n", opcode, opcode_table[opcode].mnemonic); \
+    // Default values of record for memory operation (can be updated using `default_updater`)
+	uint32_t mem_offset = 0;
+    LocalVal accwidth_lc;
+    // Base address is always at the bottom of the stack operation (first param)
+    LocalVal baseaddr_lc = local_vals_allocated.front();
+
+	std::shared_ptr<ImmT> mem_inst = static_pointer_cast<ImmT>(instruction);     
+
+    ImmT *new_meminst = new ImmT(*mem_inst);
+    // Custom update for specific memory operations
+    default_updater(new_meminst, modctx, local_vals_allocated, accwidth_lc, mem_offset);
+
+    builder.push_inst(InstBasePtr(new_meminst));
+    if (has_ret) {
+        builder.push_inst(LocalSetInst(ret_lc.idx));
+    }
+    builder.push_inst(EndInst());
+
+    // Populate the relevant recording info to send to tracing function
+    recinfo = { .sig = memop_sig, .ret_lc = ret_lc, .prop = memop_prop, 
+        .offset = mem_offset, 
+        .baseaddr_lc = baseaddr_lc, .accwidth_lc = accwidth_lc, 
+        .opcode = opcode, .is_sync = is_sync_op };
+
+    return builder;
 }
 
-#define SET_RET(r) {                                   \
-  stackrets = ((stackrets == RET_PH) ? r : stackrets); \
-}
+// Setup for ImmMemargLaneidxInst instructions
+InstBuilder setup_memarg_laneidx_instgen (InstBasePtr &instruction, 
+        LocalAllocator &lc_allocator,
+        ModuleContext &modctx, MemopInstInfo &recinfo) {
 
-#define FLAG_SYNC() { is_sync = true; }
+    uint16_t opcode = instruction->getOpcode();
+	ERR("R3-Record-Error: Cannot support opcode %04X (%s) yet\n", 
+        opcode, opcode_table[opcode].mnemonic);
 
-/* Common instruction instrumentation patterns */
-#define PUSH_FUTEX_LOCK_IF(local_idx, val) { \
-  /* Lock for different futex ops */  \
-  PUSH_INST (BlockInst(-64)); \
-  PUSH_INST (LocalGetInst(local_idx));  \
-  PUSH_INST (I32ConstInst(0x7f)); \
-  PUSH_INST (I32AndInst()); \
-  PUSH_INST (I32ConstInst(val)); \
-  PUSH_INST (I32NeInst());  \
-  PUSH_INST (BrIfInst(0));  \
-  /* Lock wakes */  \
-  PUSH_INST (CallInst(lock_fn));  \
-  PUSH_INST (EndInst());  \
-}
-
-#define PUSH_FUTEX_UNLOCK_IF(local_idx, val) { \
-  /* Lock for different futex ops */  \
-  PUSH_INST (BlockInst(-64)); \
-  PUSH_INST (LocalGetInst(local_idx));  \
-  PUSH_INST (I32ConstInst(0x7f)); \
-  PUSH_INST (I32AndInst()); \
-  PUSH_INST (I32ConstInst(val)); \
-  PUSH_INST (I32NeInst());  \
-  PUSH_INST (BrIfInst(0));  \
-  /* Lock wakes */  \
-  PUSH_INST (CallInst(unlock_fn));  \
-  PUSH_INST (EndInst());  \
-}
-
-
-InstList setup_memarg_laneidx_record_instrument (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem,
-    uint32_t access_idx, MemopInstInfo &recinfo) {
-
-  MEMOP_SETUP_INIT(ImmMemargLaneidxInst);
-
-  switch (opcode) {
-    /*** ImmMemargLaneidx type ***/
-    default: DEFAULT_ERR_CASE()
-  }
-
-  MEMOP_SETUP_END(ImmMemargLaneidxInst,
-    new_meminst->setMemory(record_mem)
-  );
-
-  return addinst;
+    auto updater = [](ImmMemargLaneidxInst* new_inst, ModuleContext &modctx, 
+            auto &local_vec, LocalVal &accwidth_lc, auto &_c) {
+        new_inst->setMemory(modctx.record_mem);
+    };
+    // Do not duplicate for now..
+    return {};
 }
 
 
-InstList setup_memory_record_instrument (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, MemopInstInfo &recinfo) {
+// Setup for ImmMemoryInst instructions
+InstBuilder setup_memory_instgen (InstBasePtr &instruction, 
+        LocalAllocator &lc_allocator,
+        ModuleContext &modctx, MemopInstInfo &recinfo) {
 
-  MEMOP_SETUP_INIT(ImmMemoryInst);
+    auto updater = [](ImmMemoryInst* new_inst, ModuleContext &modctx, 
+            auto &local_vec, LocalVal &accwidth_lc, auto &_c) {
+        new_inst->setMemory(modctx.record_mem);
+        switch (new_inst->getOpcode()) {
+            // Top of stack for MEMORY_FILL contains length of copy
+            case WASM_OP_MEMORY_FILL: accwidth_lc = local_vec.back(); break;
+            default: ;
+        }
+    };
 
-  switch (opcode) {
-    /*** ImmMemory type ***/
-    /* I32 | I32 | I32 */
-    case WASM_OP_MEMORY_FILL: {
-                                 local_accwidth = local_i32_1;
-                              }
-                              {
-                                 BLOCK_INST(sig_i32_3);
-                                 SAVE_TOP (local_i32_1);
-                                 SAVE_TOP (local_i32_2);
-                                 TEE_TOP (local_addr);
-                                 RESTORE_TOP (local_i32_2);
-                                 RESTORE_TOP (local_i32_1);
-
-                                 RESTORE_TOP (local_addr);
-                                 RESTORE_TOP (local_i32_2);
-                                 RESTORE_TOP (local_i32_1);
-                                 break;
-                              }
-    /* */
-    case WASM_OP_MEMORY_SIZE: {
-                                 SET_RET (RET_I32);
-                              }
-                              {
-                                 BLOCK_INST (-0x40);
-                                 break;
-                              }
-    /* I32 */
-    case WASM_OP_MEMORY_GROW: {
-                                SET_RET (RET_I32);
-                              }
-                              {
-                                BLOCK_INST(sig_i32);
-                                TEE_TOP(local_addr);
-
-                                RESTORE_TOP(local_addr);
-                                break;
-                              }
-    default: DEFAULT_ERR_CASE()
-  }
-
-  MEMOP_SETUP_END(ImmMemoryInst,
-    new_meminst->setMemory(record_mem)
-  );
-
-  return addinst;
+    return setup_memop_duplicate<ImmMemoryInst>(instruction, lc_allocator, 
+        modctx, recinfo, updater, false);
 }
 
 
-InstList setup_data_memory_record_instrument (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, MemopInstInfo &recinfo) {
+// Setup for ImmDataMemoryInst instructions
+InstBuilder setup_data_memory_instgen (InstBasePtr &instruction, 
+        LocalAllocator &lc_allocator,
+        ModuleContext &modctx, MemopInstInfo &recinfo) {
 
-  MEMOP_SETUP_INIT(ImmDataMemoryInst);
+    auto updater = [](ImmDataMemoryInst* new_inst, ModuleContext &modctx, 
+            auto &local_vec, LocalVal &accwidth_lc, auto &_c) {
+        new_inst->setMemory(modctx.record_mem);
+        // Top of stack for MEMORY_INIT contains length of copy
+        accwidth_lc = local_vec.back();
+    };
 
-  switch (opcode) {
-    /*** ImmDataMemory type ***/
-    /* I32 | I32 | I32 */
-    case WASM_OP_MEMORY_INIT: {
-                                 BLOCK_INST(sig_i32_3);
-                                 SAVE_TOP (local_i32_1);
-                                 SAVE_TOP (local_i32_2);
-                                 TEE_TOP (local_addr);
-                                 RESTORE_TOP (local_i32_2);
-                                 RESTORE_TOP (local_i32_1);
-
-                                 RESTORE_TOP (local_addr);
-                                 RESTORE_TOP (local_i32_2);
-                                 RESTORE_TOP (local_i32_1);
-                                 break;
-                              }
-    default: DEFAULT_ERR_CASE()
-  }
-
-  local_accwidth = local_i32_1;
-
-  MEMOP_SETUP_END(ImmDataMemoryInst,
-    new_meminst->setMemory(record_mem)
-  );
-
-  return addinst;
+    return setup_memop_duplicate<ImmDataMemoryInst>(instruction, lc_allocator, 
+        modctx, recinfo, updater, false);
 }
 
 
-InstList setup_memorycp_record_instrument (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, MemopInstInfo &recinfo) {
+// Setup for ImmMemorycpInst instructions
+InstBuilder setup_memorycp_instgen (InstBasePtr &instruction, 
+        LocalAllocator &lc_allocator,
+        ModuleContext &modctx, MemopInstInfo &recinfo) {
 
-  MEMOP_SETUP_INIT(ImmMemorycpInst);
+    auto updater = [](ImmMemorycpInst* new_inst, ModuleContext &modctx, 
+            auto &local_vec, LocalVal &accwidth_lc, auto &_c) {
+        new_inst->setDstMemory(modctx.record_mem);
+        // Top of stack for MEMORY_COPY contains length of copy
+        accwidth_lc = local_vec.back();
+    };
 
-  switch (opcode) {
-    /*** ImmMemorycp type ***/
-    /* I32 | I32 | I32 */
-    case WASM_OP_MEMORY_COPY: {
-                                 BLOCK_INST(sig_i32_3);
-                                 SAVE_TOP (local_i32_1);
-                                 SAVE_TOP (local_i32_2);
-                                 TEE_TOP (local_addr);
-                                 RESTORE_TOP (local_i32_2);
-                                 RESTORE_TOP (local_i32_1);
-
-                                 RESTORE_TOP (local_addr);
-                                 RESTORE_TOP (local_i32_2);
-                                 RESTORE_TOP (local_i32_1);
-                                 break;
-                              }
-    default: DEFAULT_ERR_CASE()
-  }
-
-  local_accwidth = local_i32_1;
-
-  MEMOP_SETUP_END(ImmMemorycpInst,
-    new_meminst->setDstMemory(record_mem)
-  );
-
-  return addinst;
+    return setup_memop_duplicate<ImmMemorycpInst>(instruction, lc_allocator, 
+        modctx, recinfo, updater, false);
 }
 
 
-InstList setup_memarg_record_instrument (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[11], uint32_t sig_idxs[7], MemoryDecl *record_mem, 
-    uint32_t access_idx, MemopInstInfo &recinfo) {
+// Setup for ImmMemargInst instructions
+InstBuilder setup_memarg_instgen (InstBasePtr &instruction, 
+        LocalAllocator &lc_allocator,
+        ModuleContext &modctx, MemopInstInfo &recinfo) {
 
-  MEMOP_SETUP_INIT(ImmMemargInst);
+    uint16_t opcode = instruction->getOpcode();
+    bool is_sync_op = false;
+    bool ignore_op = false;
+    // Special cases for certain opcodes -- synchronization and ignore
+    switch (opcode) {
+		case WASM_OP_I32_ATOMIC_RMW_XCHG:
+		case WASM_OP_I32_ATOMIC_RMW8_XCHG_U:
+		case WASM_OP_I32_ATOMIC_RMW16_XCHG_U:
+		case WASM_OP_I64_ATOMIC_RMW_XCHG:
+		case WASM_OP_I64_ATOMIC_RMW8_XCHG_U:
+		case WASM_OP_I64_ATOMIC_RMW16_XCHG_U:
+		case WASM_OP_I64_ATOMIC_RMW32_XCHG_U:
+		case WASM_OP_I32_ATOMIC_RMW_CMPXCHG:
+		case WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U:
+		case WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U:
+		case WASM_OP_I64_ATOMIC_RMW_CMPXCHG:
+		case WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U:
+		case WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U:
+		case WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U: 
+            is_sync_op = true; break;
+		case WASM_OP_MEMORY_ATOMIC_NOTIFY:
+		case WASM_OP_MEMORY_ATOMIC_WAIT32:
+		case WASM_OP_MEMORY_ATOMIC_WAIT64:
+            ignore_op = true; break;
+        default: 
+            is_sync_op = false;
+            ignore_op = false;
+    }
 
-  switch (opcode) {
-    /*** ImmMemarg type ***/
-    /* I32 */
-    case WASM_OP_I32_LOAD:
-    case WASM_OP_I32_ATOMIC_LOAD:
-    case WASM_OP_I32_LOAD8_S:
-    case WASM_OP_I32_LOAD8_U: 
-    case WASM_OP_I32_ATOMIC_LOAD8_U:
-    case WASM_OP_I32_LOAD16_S:
-    case WASM_OP_I32_LOAD16_U:
-    case WASM_OP_I32_ATOMIC_LOAD16_U: {
-                                        SET_RET (RET_I32);
-                                      }
+    // Ignore the operation if it is not supported
+    if (ignore_op) {
+        WARN("R3-Record-Warning: Ignoring Op %d (%s)\n", opcode, 
+            opcode_table[opcode].mnemonic);
+        return {};
+    }
 
-    case WASM_OP_I64_LOAD:
-    case WASM_OP_I64_LOAD8_S:
-    case WASM_OP_I64_LOAD8_U:
-    case WASM_OP_I64_LOAD16_S:
-    case WASM_OP_I64_LOAD16_U:
-    case WASM_OP_I64_LOAD32_S:
-    case WASM_OP_I64_LOAD32_U:
-    case WASM_OP_I64_ATOMIC_LOAD:
-    case WASM_OP_I64_ATOMIC_LOAD8_U:
-    case WASM_OP_I64_ATOMIC_LOAD16_U:
-    case WASM_OP_I64_ATOMIC_LOAD32_U: {
-                                        SET_RET (RET_I64);
-                                      }
+    auto updater = [](ImmMemargInst* new_inst, ModuleContext &modctx, 
+            auto _a, auto &_b, uint32_t &mem_offset) {
+        new_inst->setMemory(modctx.record_mem);
+        // Updates memory offset
+        mem_offset = new_inst->getOffset();
+    };
 
-    case WASM_OP_F32_LOAD: {
-                             SET_RET (RET_F32);
-                           }
-    case WASM_OP_F64_LOAD: {
-                             SET_RET (RET_F64);
-                           }
-                           {
-                              BLOCK_INST(sig_i32);
-                              TEE_TOP(local_addr);
-
-                              RESTORE_TOP(local_addr);
-                              break;
-                           }
-
-    /* I32 | I32 */
-    case WASM_OP_I32_ATOMIC_RMW_XCHG:
-    case WASM_OP_I32_ATOMIC_RMW8_XCHG_U:
-    case WASM_OP_I32_ATOMIC_RMW16_XCHG_U: {
-                                            FLAG_SYNC ();
-                                          }
-    case WASM_OP_I32_ATOMIC_RMW_ADD:
-    case WASM_OP_I32_ATOMIC_RMW8_ADD_U:
-    case WASM_OP_I32_ATOMIC_RMW16_ADD_U:
-    case WASM_OP_I32_ATOMIC_RMW_SUB:
-    case WASM_OP_I32_ATOMIC_RMW8_SUB_U:
-    case WASM_OP_I32_ATOMIC_RMW16_SUB_U:
-    case WASM_OP_I32_ATOMIC_RMW_AND:
-    case WASM_OP_I32_ATOMIC_RMW8_AND_U:
-    case WASM_OP_I32_ATOMIC_RMW16_AND_U:
-    case WASM_OP_I32_ATOMIC_RMW_OR:
-    case WASM_OP_I32_ATOMIC_RMW8_OR_U:
-    case WASM_OP_I32_ATOMIC_RMW16_OR_U:
-    case WASM_OP_I32_ATOMIC_RMW_XOR:
-    case WASM_OP_I32_ATOMIC_RMW8_XOR_U:
-    case WASM_OP_I32_ATOMIC_RMW16_XOR_U:  {
-                                            SET_RET (RET_I32);
-                                          }
-    case WASM_OP_I32_STORE:
-    case WASM_OP_I32_STORE8:
-    case WASM_OP_I32_STORE16:
-    case WASM_OP_I32_ATOMIC_STORE:
-    case WASM_OP_I32_ATOMIC_STORE8:
-    case WASM_OP_I32_ATOMIC_STORE16: {
-                                       SET_RET (RET_VOID);
-                                     }
-                                     {
-                                        BLOCK_INST(sig_i32_2);
-                                        SAVE_TOP (local_i32_1);
-                                        TEE_TOP (local_addr);
-                                        RESTORE_TOP (local_i32_1);
-
-                                        RESTORE_TOP (local_addr);
-                                        RESTORE_TOP (local_i32_1);
-                                        break;
-                                     }
-
-    /* I32 | I64 */
-    case WASM_OP_I64_ATOMIC_RMW_XCHG:
-    case WASM_OP_I64_ATOMIC_RMW8_XCHG_U:
-    case WASM_OP_I64_ATOMIC_RMW16_XCHG_U:
-    case WASM_OP_I64_ATOMIC_RMW32_XCHG_U: {
-                                            FLAG_SYNC ();
-                                          } 
-    case WASM_OP_I64_ATOMIC_RMW_ADD:
-    case WASM_OP_I64_ATOMIC_RMW8_ADD_U:
-    case WASM_OP_I64_ATOMIC_RMW16_ADD_U:
-    case WASM_OP_I64_ATOMIC_RMW32_ADD_U:
-    case WASM_OP_I64_ATOMIC_RMW_SUB:
-    case WASM_OP_I64_ATOMIC_RMW8_SUB_U:
-    case WASM_OP_I64_ATOMIC_RMW16_SUB_U:
-    case WASM_OP_I64_ATOMIC_RMW32_SUB_U:
-    case WASM_OP_I64_ATOMIC_RMW_AND:
-    case WASM_OP_I64_ATOMIC_RMW8_AND_U:
-    case WASM_OP_I64_ATOMIC_RMW16_AND_U:
-    case WASM_OP_I64_ATOMIC_RMW32_AND_U:
-    case WASM_OP_I64_ATOMIC_RMW_OR:
-    case WASM_OP_I64_ATOMIC_RMW8_OR_U:
-    case WASM_OP_I64_ATOMIC_RMW16_OR_U:
-    case WASM_OP_I64_ATOMIC_RMW32_OR_U:
-    case WASM_OP_I64_ATOMIC_RMW_XOR:
-    case WASM_OP_I64_ATOMIC_RMW8_XOR_U:
-    case WASM_OP_I64_ATOMIC_RMW16_XOR_U:
-    case WASM_OP_I64_ATOMIC_RMW32_XOR_U: {
-                                          SET_RET (RET_I64);
-                                         }
-    case WASM_OP_I64_ATOMIC_STORE:
-    case WASM_OP_I64_ATOMIC_STORE8:
-    case WASM_OP_I64_ATOMIC_STORE16:
-    case WASM_OP_I64_ATOMIC_STORE32:
-    case WASM_OP_I64_STORE:
-    case WASM_OP_I64_STORE8:
-    case WASM_OP_I64_STORE16:
-    case WASM_OP_I64_STORE32: {
-                                SET_RET (RET_VOID);
-                              }
-                              {
-                                BLOCK_INST(sig_i32_i64);
-                                SAVE_TOP (local_i64_1);
-                                TEE_TOP (local_addr);
-                                RESTORE_TOP (local_i64_1);
-
-                                RESTORE_TOP (local_addr);
-                                RESTORE_TOP (local_i64_1);
-                                break;
-                              }
-
-    /* I32 | F32 */
-    case WASM_OP_F32_STORE: {
-                              BLOCK_INST(sig_i32_f32);
-                              SAVE_TOP (local_f32);
-                              TEE_TOP (local_addr);
-                              RESTORE_TOP (local_f32);
-
-                              RESTORE_TOP (local_addr);
-                              RESTORE_TOP (local_f32);
-                              break;
-                            }
-
-    /* I32 | F64 */
-    case WASM_OP_F64_STORE: {
-                              BLOCK_INST(sig_i32_f64);
-                              SAVE_TOP (local_f64);
-                              TEE_TOP (local_addr);
-                              RESTORE_TOP (local_f64);
-
-                              RESTORE_TOP (local_addr);
-                              RESTORE_TOP (local_f64);
-                              break;
-                            }
-
-    /* I32 | I32 | I32 */
-    case WASM_OP_I32_ATOMIC_RMW_CMPXCHG:
-    case WASM_OP_I32_ATOMIC_RMW8_CMPXCHG_U:
-    case WASM_OP_I32_ATOMIC_RMW16_CMPXCHG_U: {
-                                               SET_RET (RET_I32);
-                                               FLAG_SYNC ();
-                                             }
-                                             {
-                                               BLOCK_INST(sig_i32_3);
-                                               SAVE_TOP (local_i32_1);
-                                               SAVE_TOP (local_i32_2);
-                                               TEE_TOP (local_addr);
-                                               RESTORE_TOP (local_i32_2);
-                                               RESTORE_TOP (local_i32_1);
-
-                                               RESTORE_TOP (local_addr);
-                                               RESTORE_TOP (local_i32_2);
-                                               RESTORE_TOP (local_i32_1);
-                                               break;
-                                             }
-
-    /* I32 | I64 | I64 */
-    case WASM_OP_I64_ATOMIC_RMW_CMPXCHG:
-    case WASM_OP_I64_ATOMIC_RMW8_CMPXCHG_U:
-    case WASM_OP_I64_ATOMIC_RMW16_CMPXCHG_U:
-    case WASM_OP_I64_ATOMIC_RMW32_CMPXCHG_U: {
-                                               SET_RET (RET_I64);
-                                               FLAG_SYNC ();
-                                             }
-                                             {
-                                               BLOCK_INST(sig_i32_i64_2);
-                                               SAVE_TOP (local_i64_1);
-                                               SAVE_TOP (local_i64_2);
-                                               TEE_TOP (local_addr);
-                                               RESTORE_TOP (local_i64_2);
-                                               RESTORE_TOP (local_i64_1);
-
-                                               RESTORE_TOP (local_addr);
-                                               RESTORE_TOP (local_i64_2);
-                                               RESTORE_TOP (local_i64_1);
-                                               break;
-                                             }
-
-    /* Synchronization Ops: Currently do not duplicate
-     * However, we need to record it in the trace.. */
-    case WASM_OP_MEMORY_ATOMIC_NOTIFY:
-    case WASM_OP_MEMORY_ATOMIC_WAIT32:
-    case WASM_OP_MEMORY_ATOMIC_WAIT64: {
-                                         break;
-                                       }
-    default: DEFAULT_ERR_CASE()
-  }
-
-  mem_offset = mem_inst->getOffset();
-
-  MEMOP_SETUP_END(ImmMemargInst,
-    new_meminst->setMemory(record_mem)
-  );
-
-  return addinst;
-
+    return setup_memop_duplicate<ImmMemargInst>(instruction, lc_allocator, 
+        modctx, recinfo, updater, is_sync_op);
 }
 
 
-InstList setup_call_record_instrument (std::list<InstBasePtr>::iterator &itr, 
-    uint32_t local_idxs[16], uint32_t sig_idxs[7], 
-    std::map<FuncDecl*, std::string> &specialized_calls, 
-    std::map<FuncDecl*, std::string> &lockless_calls,
-    InstrumentType &instrument_type,
-    FuncDecl *lock_fn, FuncDecl *unlock_fn,
-    CallInstInfo &recinfo, MemoryDecl *def_mem, MemoryDecl *record_mem, 
-    WasmModule &module) {
+// Setup for ImmFuncInst (call) instructions
+InstBuilder setup_call_instgen (InstBasePtr &instruction, 
+        LocalAllocator &lc_allocator, CallMaps &call_maps,
+		InstrumentType &instrument_type, ThreadRecordInfo &thread_info,
+        ModuleContext &modctx, CallInstInfo &recinfo) {
 
-  CALL_SETUP_INIT(ImmFuncInst);
+    std::shared_ptr<ImmFuncInst> call_inst = 
+        static_pointer_cast<ImmFuncInst>(instruction);
+    
+    // Get the target of function call
+	FuncDecl *target = call_inst->getFunc();
+    SigDecl *target_sig = target->sig;
+	
+    RecordInterface::CallID call_id = RecordInterface::SC_UNKNOWN;
+    std::vector<LocalVal> args;
 
-  FuncDecl *target = call_inst->getFunc();
-  RecordInterface::CallID call_id = RecordInterface::SC_UNKNOWN;
-  std::string mod_name;
-  std::string member_name;
-  std::vector<int64_t> args;
+    // Currently only supports wali specialized calls
+	std::string mod_name = "wali";
+    bool internal_call = false;
 
-  switch (opcode) {
-    /*** ImmFunc type ***/
-    case WASM_OP_CALL:  {
-      bool internal_call = false;
-      auto spec_it = specialized_calls.find(target);
-      auto ll_it = lockless_calls.find(target);
-      if (spec_it != specialized_calls.end()) {
-        /* Specialized calls */
-        std::string call_name = spec_it->second;
+    auto spec_elem = call_maps.is_specialized(target);
+    auto lockless_elem = call_maps.is_lockless(target);
+
+    auto retlc_pair = allocate_retval_local(lc_allocator, target_sig);
+    bool has_ret = retlc_pair.first;
+    LocalVal ret_lc = retlc_pair.second;
+
+    InstBuilder builder = {};
+    std::vector<LocalVal> local_vals_allocated;
+
+    // Helper method to allocate args into locals
+    auto allocate_arg_locals_instgen = [&lc_allocator, &local_vals_allocated, &builder, &target_sig] {
+        local_vals_allocated = save_stack_args(builder, lc_allocator, target_sig->params);
+    };
+
+    if (spec_elem.first) {
+        // Specialized calls
+        std::string call_name = spec_elem.second;
         if (call_name == "SYS_mmap") {
-          call_id = RecordInterface::SC_MMAP;
-          instrument_type = { .force_trace = true };
+            call_id = RecordInterface::SC_MMAP;
+            instrument_type.force_trace = true;
         }
         else if (call_name == "SYS_writev") {
-          call_id = RecordInterface::SC_WRITEV;
-          PUSH_INST (LocalSetInst(local_i32_3));
-          PUSH_INST (LocalSetInst(local_i32_2));
-          PUSH_INST (LocalTeeInst(local_i32_1));
-          PUSH_INST (LocalGetInst(local_i32_2));
-          PUSH_INST (LocalGetInst(local_i32_3));
+            call_id = RecordInterface::SC_WRITEV;
+            allocate_arg_locals_instgen();
         }
-        else if (call_name == "__wasm_thread_spawn") {
-          call_id = RecordInterface::SC_THREAD_SPAWN;
-          PUSH_INST (LocalSetInst(local_i32_2));
-          PUSH_INST (LocalTeeInst(local_i32_1));
-          PUSH_INST (LocalGetInst(local_i32_2));
+		else if (call_name == "__wasm_thread_spawn") {
+            call_id = RecordInterface::SC_THREAD_SPAWN;
+            allocate_arg_locals_instgen();
         }
-      }
-      else if (ll_it != lockless_calls.end()) {
-        /* Lockless calls */
-        std::string call_name = ll_it->second;
-        if (call_name == "SYS_futex") {
-          // Futex wait/wake still uses a custom lock unlike other functions
-          call_id = RecordInterface::SC_FUTEX;
-          PUSH_INST (I64ExtendI32UInst());
-          PUSH_INST (LocalSetInst(local_i64_1));
-          PUSH_INST (LocalSetInst(local_i32_5));
-          PUSH_INST (LocalSetInst(local_i32_4));
-          PUSH_INST (LocalSetInst(local_i32_3));
-          PUSH_INST (LocalSetInst(local_i32_2));
-          PUSH_INST (LocalTeeInst(local_i32_1));
-          PUSH_INST (LocalGetInst(local_i32_2));
-          PUSH_INST (LocalGetInst(local_i32_3));
-          PUSH_INST (LocalGetInst(local_i32_4));
-          PUSH_INST (LocalGetInst(local_i32_5));
-          PUSH_INST (LocalGetInst(local_i64_1));
-          PUSH_INST (I32WrapI64Inst());
-          /* Lock before import call only for wakes */
-          PUSH_FUTEX_LOCK_IF (local_i32_2, RecordInterface::FutexWake);
-          instrument_type.lock_futex = true;
-        }
+    }
+	else if (lockless_elem.first) {
+        // Lockless calls
+        std::string call_name = lockless_elem.second;
+		if (call_name == "SYS_futex") {
+            // Futex wait/wake still uses a custom lock unlike other functions
+            call_id = RecordInterface::SC_FUTEX;
+            instrument_type.lock_futex = true;
+            allocate_arg_locals_instgen();
+            /* Lock before import call only for wakes */
+            builder_push_ifeq_lock(builder, thread_info,
+                local_vals_allocated[1], 
+                RecordInterface::FutexWake);
+		}
         else if (call_name == "SYS_exit") {
-          call_id = RecordInterface::SC_THREAD_EXIT;
-          // Since thread exit ends execution, we need the trace output before the call
-          instrument_type.pre_insert_trace = true;
-          PUSH_INST (LocalTeeInst(local_i32_1));
+            call_id = RecordInterface::SC_THREAD_EXIT;
+            // Since thread exit ends execution, we need the trace output before the call
+            instrument_type.pre_insert_trace = true;
+            allocate_arg_locals_instgen();
         }
         else if ((call_name == "SYS_exit_group") || (call_name == "__proc_exit")) {
-          call_id = RecordInterface::SC_PROC_EXIT;
-          // Since proc exit ends execution, we need the trace output before the call
-          instrument_type.pre_insert_trace = true;
-          PUSH_INST (LocalTeeInst(local_i32_1));
+            call_id = RecordInterface::SC_PROC_EXIT;
+            // Since proc exit ends execution, we need the trace output before the call
+            instrument_type.pre_insert_trace = true;
+            allocate_arg_locals_instgen();
         }
         instrument_type.lockless = true;
         instrument_type.force_trace = true;
-      }
-      else if (module.isImport(target) && (ll_it == lockless_calls.end())) {
-        /* Generic import calls */
+    }
+    else if (modctx.module.isImport(target) && !lockless_elem.first) {
+        // Generic import calls
         call_id = RecordInterface::SC_GENERIC;
-        instrument_type = { .force_trace = true };
-      }
-      else {
-        /* Handle return for internal calls */
+        instrument_type.force_trace = true;
+    }
+    else {
+        // Handle return for internal calls
         internal_call = true;
-      }
-      /* Handle return local for all non-internal calls */
-      if (!internal_call) {
-        typelist result_types = target->sig->results;
-        if (result_types.size() > 1) {
-          ERR("R3-Record-Error: Unsupported return types larger than 1 "
-            "Got %lu for Func[%d]\n", result_types.size(), module.getFuncIdx(target));
-        }
-        else if (result_types.size() == 0) {
-          SET_RET (RET_VOID);
-        }
-        else {
-          switch (result_types.front()) {
-            case WASM_TYPE_I32: SET_RET (RET_I32); break;
-            case WASM_TYPE_I64: SET_RET (RET_I64); break;
-            case WASM_TYPE_F32: SET_RET (RET_F32); break;
-            case WASM_TYPE_F64: SET_RET (RET_F64); break;
-            default: { ERR("R3-Record-Error: Unsupported return type %d (opc: %04X)\n", 
-                        result_types.front(), opcode); }
-          }
-        }
-      }
-      break;
     }
 
-    default: DEFAULT_ERR_CASE();
-  }
+    // Populate the relevant recording info to send to tracing function
+	recinfo.move_into(ret_lc, local_vals_allocated,
+        instruction->getOpcode(), target, call_id);
 
-  CALL_SETUP_END(ImmFuncInst, {});
-  return addinst;
+    return builder;
 }
 
 
-/* Typecast any value to I64 */
-#define PUSH_I64_EXTEND(type) {                                      \
-  switch (type) {                                                    \
-    case RET_I32: PUSH_INST (I64ExtendI32UInst()); break;            \
-    case RET_I64: break;                                             \
-    case RET_F32: PUSH_INST (I32ReinterpretF32Inst());               \
-                  PUSH_INST (I64ExtendI32UInst()); break;            \
-    case RET_F64: PUSH_INST (I64ReinterpretF64Inst()); break;        \
-    default: { ERR("R3-Record-Error: Unsupported type %d for I64 Extend (opc: %04X)\n", \
-      type, opcode); } \
-  }                                                                  \
-}
+// Tracedump instruction generation for CALL_OP
+InstBuilder callop_trace_instgen(InstBasePtr &instruction, 
+        LocalAllocator &lc_allocator, uint32_t access_idx, 
+        CallInstInfo &recinfo, FuncDecl *tracedump_fn, 
+        InstrumentType &instrument_type,
+		ThreadRecordInfo &thread_info, ModuleContext modctx)  {
 
-#define LOCAL_I64_EXTEND(local, type) { \
-  PUSH_INST (LocalGetInst(local)); \
-  PUSH_I64_EXTEND(type); \
-}
+	uint16_t opcode = instruction->getOpcode();
+	RecordInterface::CallID call_id = recinfo.call_id;
 
-#define I64_SUCCESS_CHECK(code) { \
-  PUSH_INST (BlockInst(sig_indices[1])); \
-  PUSH_INST (LocalTeeInst(i64_tmp_local_1)); \
-  PUSH_INST (LocalGetInst(i64_tmp_local_1)); \
-  PUSH_INST (I64ConstInst(0)); \
-  PUSH_INST (I64LtSInst()); \
-  PUSH_INST (BrIfInst(0)); \
-  { code } \
-  PUSH_INST (EndInst()); \
-}
+    InstBuilder builder = {};
 
-InstList gen_call_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, CallInstInfo &recinfo,
-    FuncDecl *tracedump_fn, uint32_t sig_indices[4], uint32_t local_idxs[19],
-    InstrumentType &instrument_type, FuncDecl *lock_fn, FuncDecl *unlock_fn,
-    MemoryDecl *def_mem, MemoryDecl *record_mem, WasmModule &module)  {
+    LocalVal ret_lc = recinfo.ret_lc;
+    // Pre-allocated locals used
+    LocalVal i64_tmp_lc = lc_allocator.allocate(WASM_TYPE_I64);
+    // Allocate-on-demand locals (only in specific casseswhen return value is present)
+    LocalVal i32_lc_cond_1;
 
-  InstList addinst;
-  uint16_t opcode = instruction->getOpcode();
-  RecordInterface::CallID call_id = recinfo.call_id;
+	// When preinserting, we disable the return value handling
+	bool has_ret = (recinfo.has_retval() && !instrument_type.pre_insert_trace);
 
-  uint32_t local_f64 = local_idxs[0];
-  uint32_t local_f32 = local_idxs[1];
-  uint32_t local_i64_1 = local_idxs[2];
-  uint32_t local_i64_2 = local_idxs[3];
-  uint32_t local_i32_1 = local_idxs[4];
-  uint32_t local_i32_2 = local_idxs[5];
-  uint32_t local_i32_3 = local_idxs[6];
-  uint32_t local_i32_4 = local_idxs[11];
-  uint32_t local_i64_3 = local_idxs[12];
-  uint32_t local_i32_5 = local_idxs[15];
-  uint32_t i64_tmp_local_1 = local_idxs[17];
-  uint32_t i64_tmp_local_2 = local_idxs[18];
-
-  RetVal ret = recinfo.ret;
-  // When preinserting, we disable the return value handling
-  bool has_ret = ((ret.type != RET_VOID) && !instrument_type.pre_insert_trace);
-
-  // Instrumentation for after the call (but before trace data)
-  // Default (common) case involves getting the return value
-  switch (call_id) {
-    case RecordInterface::SC_UNKNOWN: {
-      ERR("R3-Record-Error: Call ID %d not expected\n", call_id);
-      break;
-    }
-    // mmap requires extra operation in addition to default for generic calls
-    // local_i32_1 records memory grow length
-    case RecordInterface::SC_MMAP: {
-      I64_SUCCESS_CHECK(
-        PUSH_INST (MemorySizeInst(def_mem));
-        PUSH_INST (MemorySizeInst(record_mem));
-        PUSH_INST (I32SubInst());
-        PUSH_INST (LocalTeeInst(local_i32_1));
-        PUSH_INST (MemoryGrowInst(record_mem));
-        PUSH_INST (DropInst());
-      );
-    }
-    default: {
-      // Default case: Save return value if it has to handle return
-      if (has_ret) {
-        PUSH_INST (LocalTeeInst(ret.local));
-      }
-      break; 
-    }
-  }
-
-  /* Acc Idx */
-  PUSH_INST (I32ConstInst(access_idx));
-  /* Opcode */
-  PUSH_INST (I32ConstInst(opcode));
-  /* Function Index */
-  uint32_t func_idx = module.getFuncIdx(recinfo.target);
-  PUSH_INST (I32ConstInst(func_idx));
-  /* Call ID */
-  PUSH_INST (I32ConstInst(call_id));
-  /* Return Value: For values without ret, it can be resolved at replay gen */
-  if (has_ret) {
-    PUSH_INST (LocalGetInst(ret.local));
-    PUSH_I64_EXTEND(ret.type);
-  } else {
-    PUSH_INST (I64ConstInst(0));
-  }
-
-  /* Args for specific call */
-  int num_args = 0;
-  switch (call_id) {
-    case RecordInterface::SC_MMAP: {
-      num_args = 1;
-      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
-      break;
-    }
-    case RecordInterface::SC_WRITEV: {
-      num_args = 3;
-      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
-      LOCAL_I64_EXTEND(local_i32_2, RET_I32);
-      LOCAL_I64_EXTEND(local_i32_3, RET_I32);
-      break;
-    }
-    case RecordInterface::SC_THREAD_SPAWN: {
-      num_args = 2;
-      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
-      LOCAL_I64_EXTEND(local_i32_2, RET_I32);
-      break;
-    }
-    case RecordInterface::SC_FUTEX: {
-      num_args = 3;
-      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
-      LOCAL_I64_EXTEND(local_i32_2, RET_I32);
-      LOCAL_I64_EXTEND(local_i32_3, RET_I32);
-      // Lock after import call only for waits
-      PUSH_FUTEX_LOCK_IF (local_i32_1, RecordInterface::FutexWait);
-      break;
-    }
-    case RecordInterface::SC_THREAD_EXIT: {
-      num_args = 1;
-      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
-      break;
-    }
-    case RecordInterface::SC_PROC_EXIT: {
-      num_args = 1;
-      LOCAL_I64_EXTEND(local_i32_1, RET_I32);
-      break;
-    }
-    case RecordInterface::SC_GENERIC: { break; }
-    default: { ERR("R3-Record-Error: Unsupported call ID %d\n", call_id); }
-  }
-  // Push remaining placeholder args
-  for (int i = num_args; i < 3; i++) {
-    PUSH_INST (I64ConstInst(0));
-  }
-
-  /* Tracedump call */
-  PUSH_INST (CallInst(tracedump_fn));
-
-  if (instrument_type.lock_futex) {
-    // Unlocks for both wait and wakes
-    PUSH_INST (CallInst(unlock_fn));
-  }
-  
-  return addinst;
-}
-
-InstList gen_memop_trace_instructions(InstBasePtr &instruction, uint32_t access_idx, MemopInstInfo &recinfo,
-    FuncDecl *tracedump_fn, uint32_t local_ret_idxs[8], MemoryDecl *record_mem) {
-  InstList addinst;
-  RetVal ret = recinfo.ret;
-  /* Perform comparison operator */
-  InstBasePtr neq, load_inst;
-  uint32_t main_value_local = local_ret_idxs[ret.type - RET_I32];
-  uint32_t i64_local = local_ret_idxs[RET_I64 - RET_I32];
-  uint32_t full_addr_local = local_ret_idxs[4];
-  uint32_t differ_local = local_ret_idxs[5];
-  uint32_t i64_tmp_local_1 = local_ret_idxs[6];
-  uint32_t i64_tmp_local_2 = local_ret_idxs[7];
-  uint16_t opcode = instruction->getOpcode();
-  bool no_ret = false;
-
-  switch (ret.type) {
-    case RET_I32: { neq.reset(new I32NeInst()); break; }
-    case RET_I64: { neq.reset(new I64NeInst()); break; }
-    case RET_F32: { neq.reset(new F32NeInst()); break; }
-    case RET_F64: { neq.reset(new F64NeInst()); break; }
-    default: { no_ret = true; }
-  }
-
-  /* Differ */
-  // Only values that return trigger a difference writeback
-  if (no_ret) {
-    PUSH_INST (I32ConstInst(0));
-  } else {
-    PUSH_INST (LocalTeeInst(main_value_local));
-    PUSH_INST (LocalGetInst(main_value_local));
-    PUSH_INST (LocalGetInst(ret.local));
-    PUSH_INST_PTR (neq);
-  }
-  PUSH_INST (LocalTeeInst(differ_local));
-
-  /* Acc Idx */
-  PUSH_INST (I32ConstInst(access_idx));
-  /* Opcode */
-  PUSH_INST (I32ConstInst(opcode));
-
-  /* Addr for memops: Save in local too */
-  PUSH_INST (I32ConstInst(recinfo.offset));
-  PUSH_INST (LocalGetInst(recinfo.base_addr_local));
-  PUSH_INST (I32AddInst());
-  PUSH_INST (LocalTeeInst(full_addr_local));
-
-  /* Size */
-  if (recinfo.prop.size != -1) {
-    PUSH_INST (I32ConstInst(recinfo.prop.size));
-  } else {
-    PUSH_INST (LocalGetInst(recinfo.accwidth_local));
-  }
-
-  if (!no_ret) {
-    /* Main-Memory Load Value with storeback to shadow */
-    PUSH_INST (BlockInst(-64));
-    PUSH_INST (LocalGetInst(differ_local));
-    PUSH_INST (I32EqzInst());
-    PUSH_INST (BrIfInst(0));
-
-    PUSH_INST (LocalGetInst(full_addr_local));
-    PUSH_INST (LocalGetInst(main_value_local));
-    // Typecast any value to I64
-    PUSH_I64_EXTEND(ret.type);
-    // Store back main value to shadow memory
-    PUSH_INST (LocalTeeInst(i64_local));
-    switch (memop_inst_table[opcode].size) {
-      case 1: PUSH_INST (I64Store8Inst(0, 0, record_mem)); break;
-      case 2: PUSH_INST (I64Store16Inst(0, 0, record_mem)); break;
-      case 4: PUSH_INST (I64Store32Inst(0, 0, record_mem)); break;
-      case 8: PUSH_INST (I64StoreInst(0, 0, record_mem)); break;
-      default: { ERR("R3-Record-Error: Unsupported size %ld for %04X\n", 
-        memop_inst_table[opcode].size, opcode); }
-    }
-    PUSH_INST (LocalGetInst(i64_local));
-
-    /* Expected Main-Memory Load Value */
-    PUSH_INST (LocalGetInst(ret.local));
-    PUSH_I64_EXTEND(ret.type);
-
-    PUSH_INST (LocalSetInst(i64_tmp_local_1));
-    PUSH_INST (LocalSetInst(i64_tmp_local_2));
-    PUSH_INST (EndInst());
-    PUSH_INST (LocalGetInst(i64_tmp_local_2));
-    PUSH_INST (LocalGetInst(i64_tmp_local_1));
-  } else {
-    PUSH_INST (I64ConstInst(0));
-    PUSH_INST (I64ConstInst(0));
-  }
-
-  /* Implicit Sync operation? */
-  PUSH_INST (I32ConstInst(recinfo.is_sync));
-
-  /* Tracedump call */
-  PUSH_INST (CallInst(tracedump_fn));
-
-  return addinst;
-}
-
-/* Main R3 Record function */
-void r3_record_instrument (WasmModule &module) {
-  /* Engine callback for tracing */
-  FuncDecl* trace_fns[NUM_RECORD_IMPORTS];
-  for (int i = 0; i < NUM_RECORD_IMPORTS; i++) {
-    trace_fns[i] = add_r3_import_function(module, record_imports[i]);
-  }
-  FuncDecl* memop_tracedump_fn = trace_fns[0];
-  FuncDecl* call_tracedump_fn = trace_fns[1];
-
-  MemoryDecl *def_mem = module.getMemory(0);
-  FuncDecl *mutex_funcs[2];
-  uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
-  /* Create custom mutex lock/unlock functions */
-  create_mutex_funcs(module, mutex_addr, mutex_funcs);
-
-  FuncDecl *lock_fn = mutex_funcs[0];
-  FuncDecl *unlock_fn = mutex_funcs[1];
-
-  /* Create new memory: Must happen after adding all instrumentation pages */
-  MemoryDecl new_mem = *def_mem;
-  MemoryDecl *record_mem = module.add_memory(new_mem);
-
-  /* Generate quick lookup of ignored exported function idxs */
-  std::map<FuncDecl*, std::string> func_ignore_map;
-  for (const char *func_name: ignored_export_funcnames) {
-    if (!set_func_export_map(module, func_name, func_ignore_map)) {
-      ERR("Could not find function export: \'%s\'\n", func_name);
-    }
-  }
-  /* Do not instrument the instrument-hooks or start (usually just initialization) */
-  func_ignore_map[module.get_start_fn()] = "__#internal#_start_function";
-  func_ignore_map[lock_fn] = "__#internal#_lock_instrument";
-  func_ignore_map[unlock_fn] = "__#internal#_unlock_instrument";
-
-  /* Pre-compute sig indices since list indexing is expensive */
-  uint32_t sig_indices[7];
-  typelist blocktypes[7] = {
-    {WASM_TYPE_I32}, // Addr
-    {WASM_TYPE_I32, WASM_TYPE_I32}, // Addr | I32
-    {WASM_TYPE_I32, WASM_TYPE_I64}, // Addr | I64
-    {WASM_TYPE_I32, WASM_TYPE_F32}, // Addr | F32
-    {WASM_TYPE_I32, WASM_TYPE_F64}, // Addr | F64
-    {WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32}, // Addr | I32 | I32
-    {WASM_TYPE_I32, WASM_TYPE_I64, WASM_TYPE_I64}, // Addr | I64 | I64
-  };
-  for (int i = 0; i < 7; i++) {
-    SigDecl s = { .params = blocktypes[i], .results = blocktypes[i] };
-    sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
-  }
-
-  uint32_t call_trace_sig_indices[4];
-  typelist call_trace_blocktypes[4] = {
-    {WASM_TYPE_I32},
-    {WASM_TYPE_I64},
-    {WASM_TYPE_F32},
-    {WASM_TYPE_F64}
-  };
-  for (int i = 0; i < 4; i++) {
-    SigDecl s = { .params = call_trace_blocktypes[i], .results = call_trace_blocktypes[i] };
-    call_trace_sig_indices[i] = module.getSigIdx(module.add_sig(s, false));
-  }
-
-  /* These import calls require extra non-generic instrumentation
-    This still uses lock-based instrumentation */
-  std::map<FuncDecl*, std::string> specialized_calls;
-  for (int i = 0; i < sizeof(specialized_import_names) / sizeof(specialized_import_names[0]); i++) {
-    if (FuncDecl *f = module.find_import_func("wali", specialized_import_names[i]))
-      specialized_calls[f] = specialized_import_names[i];
-  }
-  /* These import calls that are excluded from lock-based instrumentation */
-  std::map<FuncDecl*, std::string> lockless_calls;
-  for (int i = 0; i < sizeof(lockless_import_names) / sizeof(lockless_import_names[0]); i++) {
-    if (FuncDecl *f = module.find_import_func("wali", lockless_import_names[i]))
-      lockless_calls[f] = lockless_import_names[i];
-  }
-
-
-  uint32_t access_tracker = 1;
-  /* Instrument all functions */
-  for (auto &func : module.Funcs()) {
-    /* Skip ignored functions */
-    if ((func_ignore_map.count(&func))) {
-      continue;
-    }
-    uint32_t local_indices[19] = {
-      /* For Call, all these locals are for call arg shepherding
-         For Memop, they are defined below */
-      func.add_local(WASM_TYPE_F64),
-      func.add_local(WASM_TYPE_F32),
-      func.add_local(WASM_TYPE_I64),
-      func.add_local(WASM_TYPE_I64),
-      func.add_local(WASM_TYPE_I32),
-      func.add_local(WASM_TYPE_I32),
-      func.add_local(WASM_TYPE_I32),
-      /* Save values for shadow loads */
-      func.add_local(WASM_TYPE_I32),
-      func.add_local(WASM_TYPE_I64),
-      func.add_local(WASM_TYPE_F32),
-      func.add_local(WASM_TYPE_F64),
-      /* Save values for original loads */
-      func.add_local(WASM_TYPE_I32),
-      func.add_local(WASM_TYPE_I64),
-      func.add_local(WASM_TYPE_F32),
-      func.add_local(WASM_TYPE_F64),
-      /* Trace Temp value for address */
-      func.add_local(WASM_TYPE_I32),
-      /* Trace Temp value for differ */
-      func.add_local(WASM_TYPE_I32),
-      /* Trace Temp for load values / call args */
-      func.add_local(WASM_TYPE_I64),
-      func.add_local(WASM_TYPE_I64),
+    // Signature for logic for specialized calls
+    SigDecl i64_pr_sigdecl = { 
+        .params = {WASM_TYPE_I64}, .results = {WASM_TYPE_I64} 
     };
-    InstList &insts = func.instructions;
+    auto i64_pr_sigpair = get_sig_idx_cache(modctx.module, i64_pr_sigdecl);
 
-    /** Instrumenting memory-related instructions **/
-    for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
-      InstBasePtr &instruction = *institr;
-      bool inc_access_tracker = true;
-      RecordInstInfo record {};
-      InstrumentType instrument_type = { .lockless = false, 
-        .lock_futex = false, .pre_insert_trace = false, .force_trace = false };
-      memset(&record, 0, sizeof(RecordInstInfo));
-      InstList addinst;
-#define SETUP_INVOKE(ty) setup_##ty##_record_instrument(institr, local_indices, sig_indices, record_mem, \
-    access_tracker, record.Memop)
-      switch(instruction->getImmType()) {
-        case IMM_MEMARG: 
-          addinst = SETUP_INVOKE(memarg);
-          break;
-        case IMM_MEMARG_LANEIDX: 
-          addinst = SETUP_INVOKE(memarg_laneidx);
-          break;
-        case IMM_MEMORY:
-          addinst = SETUP_INVOKE(memory);
-          break;
-        case IMM_DATA_MEMORY:
-          addinst = SETUP_INVOKE(data_memory);
-          break;
-        case IMM_MEMORYCP:
-          addinst = SETUP_INVOKE(memorycp);
-          break;
-        /* Calls: Lock those to select import functions */
-        case IMM_FUNC: 
-          addinst = setup_call_record_instrument(institr, local_indices, sig_indices, 
-              specialized_calls, lockless_calls, instrument_type, 
-              lock_fn, unlock_fn, record.Call, 
-              def_mem, record_mem, module);
-          break;
-        ///* Indirect Calls: Lock none */
-        //case IMM_SIG_TABLE: {
-        //                      PUSH_INST(NopInst()); break;
-        //                    }
-        default: { inc_access_tracker = false; }; 
-      }
+	// Instrumentation for after the call (but before trace data)
+	// Default (common) case involves getting the return value
+	switch (call_id) {
+		case RecordInterface::SC_UNKNOWN: {
+			ERR("R3-Record-Error: Call ID %d not expected\n", call_id);
+			break;
+		}
+		// mmap requires extra operation in addition to default for generic calls
+		// local_i32_1 records memory grow length
+		case RecordInterface::SC_MMAP: {
+            i32_lc_cond_1 = lc_allocator.allocate(WASM_TYPE_I32);
+            builder.push ({
+                // Check if memory grew
+                INST (BlockInst(i64_pr_sigpair.first)),
+                INST (LocalTeeInst(i64_tmp_lc.idx)),
+                INST (LocalGetInst(i64_tmp_lc.idx)),
+                INST (I64ConstInst(0)),
+                INST (I64LtSInst()),
+                INST (BrIfInst(0)),
+                // Execute grow in shadow memory
+				INST (MemorySizeInst(modctx.def_mem)),
+				INST (MemorySizeInst(modctx.record_mem)),
+				INST (I32SubInst()),
+				INST (LocalTeeInst(i32_lc_cond_1.idx)),
+				INST (MemoryGrowInst(modctx.record_mem)),
+				INST (DropInst()),
+                // End block
+                INST (EndInst())
+            });
+		}
+		default: {
+			// Default case: Save return value if it has to handle return
+			if (has_ret) {
+				builder.push_inst(LocalTeeInst(ret_lc.idx));
+			}
+			break; 
+		}
+	}
+
+	uint32_t func_idx = modctx.module.getFuncIdx(recinfo.target);
+    builder.push ({
+        // Acc Idx
+        INST (I32ConstInst(access_idx)),
+        // Opcode
+        INST (I32ConstInst(opcode)),
+        // Function Index
+        INST (I32ConstInst(func_idx)),
+        // Call ID
+        INST (I32ConstInst(call_id))
+    });
+	// Return Value: For values without ret, it is resolved at replay gen
+	if (has_ret) {
+		builder.push_inst(LocalGetInst(ret_lc.idx));
+		builder_push_i64_extend(builder, ret_lc.type);
+	} else {
+        builder.push_inst(I64ConstInst(0));
+	}
+
+	// Args for specific call
+	int num_args = 0;
+    // Helper method to push args for tracedump
+    auto push_arglocals_i64_extend = [&lc_allocator, &builder, &recinfo, &num_args]() {
+        for (int i = 0; i < num_args; i++) {
+            builder.push_inst(LocalGetInst(recinfo.args[i].idx));
+            builder_push_i64_extend(builder, recinfo.args[i].type);
+        }
+    };
+
+	switch (call_id) {
+		case RecordInterface::SC_MMAP: {
+			num_args = 1;
+            builder.push_inst(LocalGetInst(i32_lc_cond_1.idx));
+            builder_push_i64_extend(builder, i32_lc_cond_1.type);
+			break;
+		}
+		case RecordInterface::SC_WRITEV: {
+			num_args = 3;
+            push_arglocals_i64_extend();
+			break;
+		}
+		case RecordInterface::SC_THREAD_SPAWN: {
+			num_args = 2;
+            push_arglocals_i64_extend();
+			break;
+		}
+		case RecordInterface::SC_FUTEX: {
+			num_args = 3;
+            push_arglocals_i64_extend();
+			// Lock after import call only for waits
+            builder_push_ifeq_lock(builder, thread_info,
+                recinfo.args[1], RecordInterface::FutexWait);
+			break;
+		}
+		case RecordInterface::SC_THREAD_EXIT: {
+			num_args = 1;
+            push_arglocals_i64_extend();
+			break;
+		}
+		case RecordInterface::SC_PROC_EXIT: {
+			num_args = 1;
+            push_arglocals_i64_extend();
+			break;
+		}
+		case RecordInterface::SC_GENERIC: { break; }
+		default: { ERR("R3-Record-Error: Unsupported call ID %d\n", call_id); }
+	}
+	// Push remaining placeholder args
+	for (int i = num_args; i < 3; i++) {
+		builder.push_inst (I64ConstInst(0));
+	}
+
+	// Tracedump call
+	builder.push_inst (CallInst(tracedump_fn));
+
+	if (instrument_type.lock_futex) {
+		// Unlocks for both wait and wakes
+		builder.push_inst (CallInst(thread_info.unlock_fn));
+	}
+	
+	return builder;
+}
+
+
+
+InstBuilder memop_trace_instgen(InstBasePtr &instruction, LocalAllocator &lc_allocator,
+        uint32_t access_idx, MemopInstInfo &recinfo, FuncDecl *tracedump_fn, 
+        ModuleContext &modctx) {
+
+	InstBasePtr neq;
+	InstBuilder builder = {};
+
+	uint16_t opcode = instruction->getOpcode();
+
+    // Return value local from shadow memory operation
+	LocalVal shadow_retval_lc = recinfo.ret_lc;
+    // Pre-allocated locals used
+    LocalVal differ_lc = lc_allocator.allocate(WASM_TYPE_I32);
+    LocalVal full_addr_lc = lc_allocator.allocate(WASM_TYPE_I32);
+    // Allocate-on-demand locals (only when return value is present)
+    LocalVal main_retval_lc;
+    LocalVal i64_main_retval_lc;
+    LocalVal i64_shadow_retval_lc;
+
+	// Differ
+	// Only values that return trigger a difference writeback
+	if (recinfo.has_retval()) {
+	    // Allocate all loads for monitoring memops with return values
+        main_retval_lc = lc_allocator.allocate(shadow_retval_lc.type);
+        i64_main_retval_lc = lc_allocator.allocate(WASM_TYPE_I64);
+        i64_shadow_retval_lc = lc_allocator.allocate(WASM_TYPE_I64);
+        // Local to store main return value
+        builder.push({
+            INST (LocalTeeInst(main_retval_lc.idx)),
+            INST (LocalGetInst(main_retval_lc.idx)),
+            INST (LocalGetInst(shadow_retval_lc.idx)),
+            ne_type_inst(shadow_retval_lc.type)
+        });
+    } else {
+		builder.push_inst(I32ConstInst(0));
+	}
+	builder.push_inst(LocalTeeInst(differ_lc.idx));
+
+    builder.push({
+        // Acc Idx
+        INST (I32ConstInst(access_idx)),
+        // Opcode
+        INST (I32ConstInst(opcode)),
+        // Addr for memops: Save in local too
+        INST (I32ConstInst(recinfo.offset)),
+        INST (LocalGetInst(recinfo.baseaddr_lc.idx)),
+        INST (I32AddInst()),
+        INST (LocalTeeInst(full_addr_lc.idx))
+    });
+
+	// Size
+	if (recinfo.prop.size != -1) {
+        // Instructions for which it can be statically determined
+		builder.push_inst(I32ConstInst(recinfo.prop.size));
+	} else {
+        // Instructions for which it can only be dynamically determined
+		builder.push_inst(LocalGetInst(recinfo.accwidth_lc.idx));
+	}
+
+	if (recinfo.has_retval()) {
+        builder.push({
+            // Main-Memory Load Value with storeback to shadow
+            INST (BlockInst(-64)),
+            INST (LocalGetInst(differ_lc.idx)),
+            INST (I32EqzInst()),
+            INST (BrIfInst(0)),
+            // Logic if differ != 0; i.e, writeback to loaded value from 
+            // main memory to shadow memory
+            INST (LocalGetInst(full_addr_lc.idx)),
+            INST (LocalGetInst(main_retval_lc.idx)),
+        });
+        builder_push_i64_extend(builder, main_retval_lc.type);
+        builder.push_inst (LocalTeeInst(i64_main_retval_lc.idx));
+
+        builder.push ({
+            // Store back main memory retval value to shadow memory
+            writeback_inst(memop_inst_table[opcode].size, modctx.record_mem),
+		    // Expected shadow memory load value 
+            INST (LocalGetInst(shadow_retval_lc.idx))
+        });
+        builder_push_i64_extend(builder, shadow_retval_lc.type);
+        builder.push ({
+            INST (LocalSetInst(i64_shadow_retval_lc.idx)),
+            INST (EndInst())
+        });
+        builder.push ({
+            // Main memory load value
+            INST (LocalGetInst(i64_main_retval_lc.idx)),
+            // Shadow memory load value
+            INST (LocalGetInst(i64_shadow_retval_lc.idx))
+        });
+	} else {
+        builder.push ({
+            INST (I64ConstInst(0)),
+            INST (I64ConstInst(0))
+        });
+	}
+
+    builder.push ({
+        // Implicit Sync operation? 
+        INST (I32ConstInst(recinfo.is_sync)),
+        // Tracedump call
+        INST (CallInst(tracedump_fn))
+    });
+
+	return builder;
+}
+
+
+// Main R3 Record function
+void r3_record_instrument (WasmModule &module) {
+	// Engine callback for tracing
+	FuncDecl* trace_fns[NUM_RECORD_IMPORTS];
+	for (int i = 0; i < NUM_RECORD_IMPORTS; i++) {
+		trace_fns[i] = add_r3_import_function(module, record_imports[i]);
+	}
+	FuncDecl* memop_tracedump_fn = trace_fns[0];
+	FuncDecl* call_tracedump_fn = trace_fns[1];
+
+	MemoryDecl *def_mem = module.getMemory(0);
+	FuncDecl *mutex_funcs[2];
+	uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
+	// Create custom mutex lock/unlock functions
+	create_mutex_funcs(module, mutex_addr, mutex_funcs);
+
+    ThreadRecordInfo thread_record_info = { 
+        .lock_fn = mutex_funcs[0], 
+        .unlock_fn = mutex_funcs[1] 
+    };
+
+	// Create new memory: Must happen after adding all instrumentation pages
+	MemoryDecl new_mem = *def_mem;
+	MemoryDecl *record_mem = module.add_memory(new_mem);
+
+	// Generate quick lookup of ignored exported function idxs
+	std::map<FuncDecl*, std::string> func_ignore_map;
+	for (const char *func_name: ignored_export_funcnames) {
+		if (!set_func_export_map(module, func_name, func_ignore_map)) {
+			ERR("Could not find function export: \'%s\'\n", func_name);
+		}
+	}
+	// Do not instrument the instrument-hooks or start (usually just initialization)
+	func_ignore_map[module.get_start_fn()] = "__#internal#_start_function";
+	func_ignore_map[thread_record_info.lock_fn] = "__#internal#_lock_instrument";
+	func_ignore_map[thread_record_info.unlock_fn] = "__#internal#_unlock_instrument";
+
+	// These import calls require extra non-generic instrumentation
+	//	This still uses lock-based instrumentation 
+	std::map<FuncDecl*, std::string> specialized_calls;
+	for (int i = 0; i < sizeof(specialized_import_names) / sizeof(specialized_import_names[0]); i++) {
+		if (FuncDecl *f = module.find_import_func("wali", specialized_import_names[i]))
+			specialized_calls[f] = specialized_import_names[i];
+	}
+	// These import calls that are excluded from lock-based instrumentation
+	std::map<FuncDecl*, std::string> lockless_calls;
+	for (int i = 0; i < sizeof(lockless_import_names) / sizeof(lockless_import_names[0]); i++) {
+		if (FuncDecl *f = module.find_import_func("wali", lockless_import_names[i]))
+			lockless_calls[f] = lockless_import_names[i];
+	}
+
+    CallMaps call_maps = {
+        .specialized = specialized_calls,
+        .lockless = lockless_calls,
+    };
+
+	uint32_t access_tracker = 1;
+
+	// Iterate through all functions in the module
+	for (auto &func : module.Funcs()) {
+		// Skip ignored functions
+		if ((func_ignore_map.count(&func))) {
+			continue;
+		}
+        // For Call, all these locals are for call arg shepherding
+        // For Memop, used for shadow/original loads and temporaries
+        std::map<wasm_type_t, uint32_t> locals_count = {
+            {WASM_TYPE_I32, 7}, {WASM_TYPE_I64, 6},
+            {WASM_TYPE_F32, 3}, {WASM_TYPE_F64, 3}
+        };
+
+        LocalAllocator lc_allocator(&func, locals_count);
+        // Verify the size of locals count
+        assert (lc_allocator.get_local_pool_count() == 19);
+		InstList &insts = func.instructions;
+
+		// Instrumenting memory-related instructions
+		for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
+			InstBasePtr &instruction = *institr;
+			RecordInstInfo record;
+			InstrumentType instrument_type = { 
+                .lockless = false, 
+				.lock_futex = false, 
+                .pre_insert_trace = false, 
+                .force_trace = false 
+            };
+
+            ModuleContext modctx = {
+                .module = module,
+                .def_mem = def_mem,
+                .record_mem = record_mem,
+            };
+
+            InstBuilder setup_builder = {};
+            InstBuilder trace_builder = {};
+
+            // Reset local allocators for every instruction instrumentation
+            lc_allocator.reset_allocator();
+
+			bool inc_access_tracker = true;
+#define SETUP_INVOKE(ty) \
+    setup_##ty##_instgen(instruction, lc_allocator, modctx, record.Memop);\
+    record.optype = MEM_OP;
+			switch(instruction->getImmType()) {
+                case IMM_MEMARG: setup_builder = SETUP_INVOKE(memarg); break;
+				case IMM_MEMARG_LANEIDX: setup_builder = SETUP_INVOKE(memarg_laneidx); break;
+				case IMM_MEMORY: setup_builder = SETUP_INVOKE(memory); break;
+				case IMM_DATA_MEMORY: setup_builder = SETUP_INVOKE(data_memory); break;
+				case IMM_MEMORYCP: setup_builder = SETUP_INVOKE(memorycp); break;
+				// Calls: Lock those to select import functions
+				case IMM_FUNC: 
+					setup_builder = setup_call_instgen(instruction, lc_allocator, 
+                                call_maps, instrument_type, thread_record_info, 
+                                modctx, record.Call); 
+                    record.optype = CALL_OP;
+					break;
+				///* Indirect Calls: Lock none */
+				//case IMM_SIG_TABLE: {
+				//                      PUSH_INST(NopInst()); break;
+				//                    }
+				default: { inc_access_tracker = false; }; 
+			}
 #undef SETUP_INVOKE
-      if (!addinst.empty() || instrument_type.force_trace) {
-        auto next_institr = std::next(institr);
-        /* Insert instructions guarded by mutex (pre/post) */
-        InstList preinst, postinst;
+			if (!setup_builder.empty() || instrument_type.force_trace) {
+				auto next_institr = std::next(institr);
+				// Insert instructions guarded by mutex (pre/post)
+                InstBuilder trace_builder = {};
 
-        InstList traceinst;
-        switch (instruction->getImmType()) {
-          case IMM_MEMARG_LANEIDX:
-          case IMM_MEMORY:
-          case IMM_MEMORYCP:
-          case IMM_DATA_MEMORY:
-          case IMM_MEMARG: {
-            traceinst = gen_memop_trace_instructions(instruction, 
-              access_tracker, record.Memop, memop_tracedump_fn, &local_indices[11], 
-              record_mem);
-            break;
-          }
+				switch (instruction->getImmType()) {
+					case IMM_MEMARG_LANEIDX:
+					case IMM_MEMORY:
+					case IMM_MEMORYCP:
+					case IMM_DATA_MEMORY:
+					case IMM_MEMARG: {
+                        trace_builder = memop_trace_instgen(instruction, lc_allocator,
+                            access_tracker, record.Memop, memop_tracedump_fn, modctx);
+						break;
+					}
+					case IMM_FUNC: {
+                        trace_builder = callop_trace_instgen(instruction,
+                            lc_allocator, access_tracker, record.Call, 
+                            call_tracedump_fn, instrument_type, 
+                            thread_record_info, modctx);
+						break;
+					}
+					default: {
+						ERR("R3-Record-Error: Missupported Imm Type %d\n", instruction->getImmType()); \
+					}; 
+				}
 
-          case IMM_FUNC: {
-            traceinst = gen_call_trace_instructions(instruction,
-              access_tracker, record.Call, call_tracedump_fn, 
-              call_trace_sig_indices, local_indices, 
-              instrument_type, lock_fn, unlock_fn,
-              def_mem, record_mem, module);
-            break;
-          }
-          default: {
-                    ERR("R3-Record-Error: Missupported Imm Type %d\n", instruction->getImmType()); \
-                  }; 
-        }
-        InstBasePtr lock_inst = InstBasePtr(new CallInst(lock_fn));
-        InstBasePtr unlock_inst = InstBasePtr(new CallInst(unlock_fn));
+                // Insert all setup + trace instrumentation with appropriate 
+                // lock/unlock guards into the module
+                InstBuilder pre_builder = {};
+                InstBuilder post_builder = {};
 
-        if (!instrument_type.lockless) {
-          preinst.push_back(lock_inst);
-        }
-        preinst.insert(preinst.end(), addinst.begin(), addinst.end());
-        if (!instrument_type.pre_insert_trace) {
-          postinst.insert(postinst.begin(), traceinst.begin(), traceinst.end());
-        } else {
-          preinst.insert(preinst.end(), traceinst.begin(), traceinst.end());
-        }
-        if (!instrument_type.lockless) {
-          postinst.push_back(unlock_inst);
-        }
-        insts.insert(institr, preinst.begin(), preinst.end());
-        insts.insert(next_institr, postinst.begin(), postinst.end());
-        /* Don't iterate over our inserted instructions */
-        institr = std::prev(next_institr);
-      }
-      if (inc_access_tracker) {
-        access_tracker++;
-      }
-    }
-  }
+				if (!instrument_type.lockless) {
+					pre_builder.push_inst (CallInst(thread_record_info.lock_fn));
+				}
+                pre_builder.splice(setup_builder);
+				if (!instrument_type.pre_insert_trace) {
+					post_builder.splice(trace_builder);
+				} else {
+					pre_builder.splice(trace_builder);
+				}
+				if (!instrument_type.lockless) {
+                    post_builder.push_inst (CallInst(thread_record_info.unlock_fn));
+				}
+
+                pre_builder.splice_into(insts, institr);
+                post_builder.splice_into(insts, next_institr);
+
+				// Don't iterate over our inserted instructions
+				institr = std::prev(next_institr);
+			}
+			if (inc_access_tracker) {
+				access_tracker++;
+			}
+		}
+	}
 
 }

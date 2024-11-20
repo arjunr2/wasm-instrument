@@ -523,10 +523,8 @@ static void insert_replay_op(WasmModule &module, InstMetaInfo &imeta_info,
     if (implicit_sync) {
         if (!empty_replay_op) { assert (call_func == NULL); }
         // Implicit operations require signature of instruction
-        sigmeta.set_inst_sig(
-            get_sigdecl_from_cdef(module, memop_inst_table[imeta_info.opcode].sig)
-        );
-
+        SigDecl s = get_sigdecl_from_cdef(memop_inst_table[imeta_info.opcode].sig);
+        sigmeta.set_inst_sig(module.add_sig(s, false));
     }
     else {
         // Verify that import function and the indices are consistent with record

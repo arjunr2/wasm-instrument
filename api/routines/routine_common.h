@@ -55,6 +55,11 @@ class InstBuilder {
         inline void splice_into(InstList &other, InstList::iterator pos) {
           other.splice(pos, buf);
         }
+
+        /* Size */
+        inline bool empty() {
+          return buf.empty();
+        }
 };
 
 

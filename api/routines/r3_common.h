@@ -388,7 +388,7 @@ static void create_mutex_funcs(WasmModule &module, uint32_t mutex_addr, FuncDecl
 }
 
 
-static SigDecl* get_sigdecl_from_cdef(WasmModule &module, CSigDecl csig) {
+static SigDecl get_sigdecl_from_cdef(CSigDecl csig) {
   SigDecl sig;
   for (int i = 0; csig.params[i] && (i < sizeof(csig.params) / sizeof(csig.params[0])); i++) {
     sig.params.push_back(csig.params[i]);
@@ -396,7 +396,7 @@ static SigDecl* get_sigdecl_from_cdef(WasmModule &module, CSigDecl csig) {
   for (int i = 0; csig.results[i] && (i < sizeof(csig.results) / sizeof(csig.results[0])); i++) {
     sig.results.push_back(csig.results[i]);
   }
-  return module.add_sig(sig, false);
+  return sig;
 }
 
 #endif

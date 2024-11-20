@@ -76,20 +76,30 @@ struct SigDecl {
   typelist params;
   typelist results;
 
-  bool operator==(const SigDecl &sig) {
+  bool operator==(const SigDecl &sig) const {
     bool parameq = std::equal(this->params.begin(), this->params.end(),
             sig.params.begin(), sig.params.end());
     bool resulteq = std::equal(this->results.begin(), this->results.end(),
             sig.results.begin(), sig.results.end());
     return parameq && resulteq;
   }
-  bool operator!=(const SigDecl &sig) {
+  bool operator!=(const SigDecl &sig) const {
     bool parameq = std::equal(this->params.begin(), this->params.end(),
             sig.params.begin(), sig.params.end());
     bool resulteq = std::equal(this->results.begin(), this->results.end(),
             sig.results.begin(), sig.results.end());
     return !(parameq && resulteq);
   }
+};
+// Hash function class for SigDecl
+class SigDeclHash {
+  public:
+    size_t operator()(const SigDecl &s) const {
+      size_t hs = 0;
+      for (auto &x: s.params) { hs += (size_t)x; }
+      for (auto &x: s.params) { hs += (size_t)x; }
+      return hs;
+    }
 };
 
 
