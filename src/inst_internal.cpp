@@ -7,6 +7,55 @@ void InstBase::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   throw std::runtime_error("Encode unimplemented for this opcode\n");
 }
 
+/* Reads next instructions from buf (advancing it) and 
+      constructs the specified instruction type */
+//InstBasePtr InstBase::next_inst_from_buf(WasmModule &module, buffer_t &buf) {
+//  InstBasePtr instptr;
+//  uint32_t pc = buf.ptr - buf.start;
+//  Opcode_t opcode = RD_OPCODE();
+//  opcode_imm_type imm_type = opcode_table[opcode].imm_type;
+//  #define ICS(cs, clsname) \
+//    case cs: instptr.reset(new clsname(module, opcode, buf)); break;
+//  switch (imm_type) {
+//    ICS (IMM_NONE, ImmNoneInst);
+//    ICS (IMM_BLOCKT, ImmBlocktInst);
+//    ICS (IMM_LABEL, ImmLabelInst);
+//    ICS (IMM_LABELS, ImmLabelsInst);
+//    ICS (IMM_FUNC, ImmFuncInst);
+//    ICS (IMM_SIG_TABLE, ImmSigTableInst);
+//    ICS (IMM_LOCAL, ImmLocalInst);
+//    ICS (IMM_GLOBAL, ImmGlobalInst);
+//    ICS (IMM_TABLE, ImmTableInst);
+//    ICS (IMM_MEMARG, ImmMemargInst);
+//    ICS (IMM_I32, ImmI32Inst);
+//    ICS (IMM_F64, ImmF64Inst);
+//    ICS (IMM_MEMORY, ImmMemoryInst);
+//    ICS (IMM_TAG, ImmTagInst);
+//    ICS (IMM_I64, ImmI64Inst);
+//    ICS (IMM_F32, ImmF32Inst);
+//    ICS (IMM_REFNULLT, ImmRefnulltInst);
+//    ICS (IMM_VALTS, ImmValtsInst);
+//    // Extension Immediates
+//    ICS (IMM_DATA_MEMORY, ImmDataMemoryInst);
+//    ICS (IMM_DATA, ImmDataInst);
+//    ICS (IMM_MEMORYCP, ImmMemorycpInst);
+//    ICS (IMM_DATA_TABLE, ImmDataTableInst);
+//    ICS (IMM_TABLECP, ImmTablecpInst);
+//    ICS (IMM_V128, ImmV128Inst);
+//    ICS (IMM_LANEIDX, ImmLaneidxInst);
+//    ICS (IMM_LANEIDX16, ImmLaneidx16Inst);
+//    ICS (IMM_MEMARG_LANEIDX, ImmMemargLaneidxInst);
+//  #undef ICS
+//    default:
+//      ERR("Unknown imm type: %d\n", imm_type);
+//      throw std::runtime_error("Unknown imm");
+//  }
+//  TRACE("O: %s\n", opcode_table[instptr->getOpcode()].mnemonic);
+//  return instptr;
+//}
+
+
+
 /* ImmNoneInst  */
 ImmNoneInst::ImmNoneInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
                           : InstBase(opcode) { }
@@ -188,7 +237,9 @@ ImmTagInst::ImmTagInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
   throw std::runtime_error ("Unimplemeted TAG opcode"); 
 }
 
-//void ImmTagInst::encode_imm (WasmModule &module, bytedeque &bdeq) const { } 
+void ImmTagInst::encode_imm (WasmModule &module, bytedeque &bdeq) const { 
+  throw std::runtime_error ("Unimplemeted TAG opcode");
+} 
 
 
 /* ImmI64Inst  */

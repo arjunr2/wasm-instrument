@@ -12,12 +12,11 @@
 #include "common.h"
 #include "wasmdefs.h"
 
-
 /* For instruction parsing */
 class InstBase;
 typedef std::shared_ptr<InstBase> InstBasePtr;
-typedef std::list<InstBasePtr> InstList;
 typedef std::list<InstBasePtr>::iterator InstItr;
+typedef std::list<InstBasePtr> InstList;
 
 typedef std::list<wasm_type_t> typelist;
 

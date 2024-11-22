@@ -30,14 +30,14 @@ extern int g_threads;
   char internal_buf[400]; \
   char outerr[500]; \
   sprintf(internal_buf, __VA_ARGS__); \
-  sprintf(outerr, "\033[0;31m%s", internal_buf);  \
+  sprintf(outerr, "\033[1;31m%s\033[0m", internal_buf);  \
   fprintf(stderr, "%s", outerr);  \
 }
 #define WARN(...) {  \
   char internal_buf[400]; \
   char outerr[500]; \
   sprintf(internal_buf, __VA_ARGS__); \
-  sprintf(outerr, "\033[0;31m%s", internal_buf);  \
+  sprintf(outerr, "\033[1;33m%s\033[0m", internal_buf);  \
   fprintf(stderr, "%s", outerr);  \
 }
 extern int g_trace;

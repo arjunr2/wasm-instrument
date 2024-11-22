@@ -344,54 +344,11 @@ static wasm_localcsv_t decode_locals(buffer_t &buf, uint32_t &num_locals) {
 InstList WasmModule::decode_expr_to_insts (buffer_t &buf, bool gen_cfg) {
   InstList ilist = { };
   while (buf.ptr < buf.end) {
-    Opcode_t opcode = RD_OPCODE();
-
-    opcode_imm_type imm_type = opcode_table[opcode].imm_type;
-    TRACE("O: %s\n", opcode_table[opcode].mnemonic);
-
-    InstBasePtr instptr;
-    #define ICS(cs, clsname) \
-      case cs:  \
-        instptr.reset(new clsname((*this), opcode, buf)); break;
-    switch (imm_type) {
-      ICS (IMM_NONE, ImmNoneInst);
-      ICS (IMM_BLOCKT, ImmBlocktInst);
-      ICS (IMM_LABEL, ImmLabelInst);
-      ICS (IMM_LABELS, ImmLabelsInst);
-      ICS (IMM_FUNC, ImmFuncInst);
-      ICS (IMM_SIG_TABLE, ImmSigTableInst);
-      ICS (IMM_LOCAL, ImmLocalInst);
-      ICS (IMM_GLOBAL, ImmGlobalInst);
-      ICS (IMM_TABLE, ImmTableInst);
-      ICS (IMM_MEMARG, ImmMemargInst);
-      ICS (IMM_I32, ImmI32Inst);
-      ICS (IMM_F64, ImmF64Inst);
-      ICS (IMM_MEMORY, ImmMemoryInst);
-      ICS (IMM_TAG, ImmTagInst);
-      ICS (IMM_I64, ImmI64Inst);
-      ICS (IMM_F32, ImmF32Inst);
-      ICS (IMM_REFNULLT, ImmRefnulltInst);
-      ICS (IMM_VALTS, ImmValtsInst);
-      // Extension Immediates
-      ICS (IMM_DATA_MEMORY, ImmDataMemoryInst);
-      ICS (IMM_DATA, ImmDataInst);
-      ICS (IMM_MEMORYCP, ImmMemorycpInst);
-      ICS (IMM_DATA_TABLE, ImmDataTableInst);
-      ICS (IMM_TABLECP, ImmTablecpInst);
-      ICS (IMM_V128, ImmV128Inst);
-      ICS (IMM_LANEIDX, ImmLaneidxInst);
-      ICS (IMM_LANEIDX16, ImmLaneidx16Inst);
-      ICS (IMM_MEMARG_LANEIDX, ImmMemargLaneidxInst);
-      default:
-        ERR("Unknown imm type: %d\n", imm_type);
-        throw std::runtime_error("Unknown imm");
-    }
-    ilist.push_back(instptr);
+    ilist.push_back(InstParser::next_inst_from_buf(*this, buf));
   }
   if (buf.ptr != buf.end) {
     throw std::runtime_error("Unaligned end for instruction parsing\n");
   }
-  TRACE("=== Function Parsed Successfully ===\n");
   return ilist;
 }
 
@@ -402,8 +359,10 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len, bool gen_cfg)
   
   uint32_t num_imports = this->imports.num_funcs;
   auto &funcs = this->funcs;
+  uint32_t func_count = num_imports;
   for (auto func_itr = std::next(funcs.begin(), num_imports);
-          func_itr != funcs.end(); ++func_itr) {
+          func_itr != funcs.end(); ++func_itr, ++func_count) {
+    TRACE("=== Parsing Function %d ===\n", func_count);
     FuncDecl &func = *func_itr;
     /* Fn size (locals + body) */
     uint32_t size = RD_U32();
@@ -417,6 +376,7 @@ void WasmModule::decode_code_section (buffer_t &buf, uint32_t len, bool gen_cfg)
     func.code_bytes = RD_BYTESTR(end_insts - start_insts);
     buffer_t cbuf = { start_insts, start_insts, end_insts };
     func.instructions = this->decode_expr_to_insts(cbuf, gen_cfg);
+    TRACE("=== Function %d Parsed Successfully ===\n", func_count);
   }
 }
 
