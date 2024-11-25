@@ -42,7 +42,7 @@ static void scope_opcode_instrument (WasmModule &module, ScopeBlock* scope, Func
     // For scope instructions, recursive invocation if found
     if ( (next_outer_subscope != scope->outer_subscopes.end()) && 
           (institr == outer_subscope->start) ) {
-      if (outer_subscope->get_scope_type() == INVALID) {
+      if (outer_subscope->get_scope_type() == UNKNOWN) {
         ERR("Invalid scope type\n"); 
       }
       scope_opcode_instrument (module, outer_subscope, func);

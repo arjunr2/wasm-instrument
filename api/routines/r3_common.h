@@ -303,19 +303,6 @@ static bool set_func_export_map(WasmModule &module, std::string name, std::map<F
   return false;
 }
 
-/* Add pages to memory statically. Return the old number of pages */
-static uint32_t add_pages(MemoryDecl *mem, uint32_t num_pages) {
-  wasm_limits_t &memlimit = mem->limits;
-  uint32_t memdata_end = memlimit.initial * WASM_PAGE_SIZE;
-
-  uint32_t retval = memlimit.initial;
-  memlimit.initial += num_pages;
-  if (memlimit.has_max && (memlimit.initial > memlimit.max)) {
-    throw std::runtime_error("Not enough memory to instrument");
-  }
-  return retval;
-}
-
 /* Record currently inserts the import functions (call_tracedump & memop_tracedump),
   making the function indices we get at replay time offset by the inserted amount.
   This method performs a transformation from the index for a specific function

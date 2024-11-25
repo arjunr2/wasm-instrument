@@ -66,5 +66,7 @@ class InstBuilder {
 /* Method to look for either main or _start */
 ExportDecl* get_main_export(WasmModule &module);
 
+/* Add pages to memory statically. Return the old number of pages */
+uint32_t add_pages(MemoryDecl *mem, uint32_t num_pages);
 
 #endif

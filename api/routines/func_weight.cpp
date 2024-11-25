@@ -70,7 +70,7 @@ static uint64_t scope_weight_instrument (WasmModule &module, ScopeBlock* scope, 
           weight += MAX (ifweight, elseweight);
           break;
         }
-        case INVALID: { 
+        case UNKNOWN: { 
           ERR("Invalid scope type\n"); 
           break;
         }

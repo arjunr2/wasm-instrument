@@ -336,6 +336,8 @@ class WasmModule {
 
     /* Scope view of function code */
     ScopeList gen_scopes_from_instructions(FuncDecl *func);
+    // Same as above method, but only return the main scope block
+    ScopeBlock gen_func_static_scope_hierarchy(FuncDecl *func);
 
     /* Decode wasm file from buffer */
     void decode_buffer (buffer_t &buf, bool gen_cfg);
