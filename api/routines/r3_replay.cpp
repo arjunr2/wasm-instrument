@@ -758,6 +758,7 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
                     import_call = module.isImport(imeta_info.call_func);
                     break;
                 }
+                case IMM_SIG_TABLE:
                 case IMM_MEMARG:
                 case IMM_MEMARG_LANEIDX:
                 case IMM_MEMORY:

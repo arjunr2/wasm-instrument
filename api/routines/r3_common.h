@@ -307,8 +307,8 @@ static bool set_func_export_map(WasmModule &module, std::string name, std::map<F
   making the function indices we get at replay time offset by the inserted amount.
   This method performs a transformation from the index for a specific function
   at replay time to that at record time */
-static uint32_t transform_to_record_func_idx(uint32_t replay_idx) {
-  return replay_idx + NUM_RECORD_IMPORTS - NUM_REPLAY_IMPORTS;
+static uint32_t transform_to_record_func_idx(uint32_t replay_func_idx) {
+  return replay_func_idx + NUM_RECORD_IMPORTS - NUM_REPLAY_IMPORTS;
 }
 
 /* Mutex Lock/Unlock function creation using the address in Memory[0]

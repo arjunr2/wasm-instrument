@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cassert>
 #include <ranges>
+#include <sstream>
 
 #define INST(inv) InstBasePtr(new inv)
 
@@ -83,6 +84,33 @@ struct ModuleContext {
     WasmModule &module;
     MemoryDecl *def_mem;
     MemoryDecl *record_mem;
+    std::set<FuncDecl*> &funcref_wrappers;
+};
+
+// A union type to represent configurable static/dynamic instrumentation vars 
+// uniformly
+union InstrumentVarMode {
+    // Statically determined (default case)
+    uint32_t constant;
+    // Dynamically determined (e.g. call_indirect)
+    LocalVal lc;
+};
+
+// Instruction-relevant context
+struct InstructionContext {
+    InstBasePtr &instruction;
+    FuncDecl* func;
+    bool is_dynamic_callsite;
+    InstrumentVarMode access_idx;
+
+public:
+    InstBasePtr construct_access_idx_inst() {
+        if (is_dynamic_callsite) {
+            return INST(LocalGetInst(access_idx.lc.idx));
+        } else {
+            return INST(I32ConstInst(access_idx.constant));
+        }
+    }
 };
 
 // Multi-threading relevant context
@@ -348,11 +376,11 @@ InstBuilder setup_memop_duplicate (InstBasePtr &instruction,
 }
 
 // Setup for ImmMemargLaneidxInst instructions
-InstBuilder setup_memarg_laneidx_instgen (InstBasePtr &instruction, 
+InstBuilder setup_memarg_laneidx_instgen (InstructionContext &instctx, 
         LocalAllocator &lc_allocator,
         ModuleContext &modctx, MemopInstInfo &recinfo) {
 
-    uint16_t opcode = instruction->getOpcode();
+    uint16_t opcode = instctx.instruction->getOpcode();
 	ERR("R3-Record-Error: Cannot support opcode %04X (%s) yet\n", 
         opcode, opcode_table[opcode].mnemonic);
 
@@ -366,7 +394,7 @@ InstBuilder setup_memarg_laneidx_instgen (InstBasePtr &instruction,
 
 
 // Setup for ImmMemoryInst instructions
-InstBuilder setup_memory_instgen (InstBasePtr &instruction, 
+InstBuilder setup_memory_instgen (InstructionContext &instctx, 
         LocalAllocator &lc_allocator,
         ModuleContext &modctx, MemopInstInfo &recinfo) {
 
@@ -380,13 +408,13 @@ InstBuilder setup_memory_instgen (InstBasePtr &instruction,
         }
     };
 
-    return setup_memop_duplicate<ImmMemoryInst>(instruction, lc_allocator, 
-        modctx, recinfo, updater, false);
+    return setup_memop_duplicate<ImmMemoryInst>(instctx.instruction, 
+        lc_allocator, modctx, recinfo, updater, false);
 }
 
 
 // Setup for ImmDataMemoryInst instructions
-InstBuilder setup_data_memory_instgen (InstBasePtr &instruction, 
+InstBuilder setup_data_memory_instgen (InstructionContext &instctx, 
         LocalAllocator &lc_allocator,
         ModuleContext &modctx, MemopInstInfo &recinfo) {
 
@@ -397,13 +425,13 @@ InstBuilder setup_data_memory_instgen (InstBasePtr &instruction,
         accwidth_lc = local_vec.back();
     };
 
-    return setup_memop_duplicate<ImmDataMemoryInst>(instruction, lc_allocator, 
-        modctx, recinfo, updater, false);
+    return setup_memop_duplicate<ImmDataMemoryInst>(instctx.instruction, 
+        lc_allocator, modctx, recinfo, updater, false);
 }
 
 
 // Setup for ImmMemorycpInst instructions
-InstBuilder setup_memorycp_instgen (InstBasePtr &instruction, 
+InstBuilder setup_memorycp_instgen (InstructionContext &instctx, 
         LocalAllocator &lc_allocator,
         ModuleContext &modctx, MemopInstInfo &recinfo) {
 
@@ -414,17 +442,17 @@ InstBuilder setup_memorycp_instgen (InstBasePtr &instruction,
         accwidth_lc = local_vec.back();
     };
 
-    return setup_memop_duplicate<ImmMemorycpInst>(instruction, lc_allocator, 
-        modctx, recinfo, updater, false);
+    return setup_memop_duplicate<ImmMemorycpInst>(instctx.instruction, 
+        lc_allocator, modctx, recinfo, updater, false);
 }
 
 
 // Setup for ImmMemargInst instructions
-InstBuilder setup_memarg_instgen (InstBasePtr &instruction, 
+InstBuilder setup_memarg_instgen (InstructionContext &instctx, 
         LocalAllocator &lc_allocator,
         ModuleContext &modctx, MemopInstInfo &recinfo) {
 
-    uint16_t opcode = instruction->getOpcode();
+    uint16_t opcode = instctx.instruction->getOpcode();
     bool is_sync_op = false;
     bool ignore_op = false;
     // Special cases for certain opcodes -- synchronization and ignore
@@ -467,20 +495,21 @@ InstBuilder setup_memarg_instgen (InstBasePtr &instruction,
         mem_offset = new_inst->getOffset();
     };
 
-    return setup_memop_duplicate<ImmMemargInst>(instruction, lc_allocator, 
-        modctx, recinfo, updater, is_sync_op);
+    return setup_memop_duplicate<ImmMemargInst>(instctx.instruction, 
+        lc_allocator, modctx, recinfo, updater, is_sync_op);
 }
 
 
 // Setup for ImmFuncInst (call) instructions
-InstBuilder setup_call_instgen (InstBasePtr &instruction, 
+InstBuilder setup_call_instgen (InstructionContext &instctx, 
         LocalAllocator &lc_allocator, CallMaps &call_maps,
 		InstrumentType &instrument_type, ThreadRecordInfo &thread_info,
         ModuleContext &modctx, CallInstInfo &recinfo) {
 
     std::shared_ptr<ImmFuncInst> call_inst = 
-        static_pointer_cast<ImmFuncInst>(instruction);
+        static_pointer_cast<ImmFuncInst>(instctx.instruction);
     
+    uint16_t opcode = call_inst->getOpcode();
     // Get the target of function call
 	FuncDecl *target = call_inst->getFunc();
     SigDecl *target_sig = target->sig;
@@ -562,21 +591,61 @@ InstBuilder setup_call_instgen (InstBasePtr &instruction,
     }
 
     // Populate the relevant recording info to send to tracing function
-	recinfo.move_into(ret_lc, local_vals_allocated,
-        instruction->getOpcode(), target, call_id);
+	recinfo.move_into(ret_lc, local_vals_allocated, opcode, target, call_id);
+
+    // Calls within instrumented funcref call_indirect targets must use the 
+    // access idx passed into the containing function
+    if (modctx.funcref_wrappers.contains(instctx.func)) {
+        instctx.is_dynamic_callsite = true;
+        uint32_t containing_func_param_ct = instctx.func->sig->params.size();
+        // Last params is access_idx
+        instctx.access_idx = { 
+            .lc = LocalVal(WASM_TYPE_I32, containing_func_param_ct - 1)
+        };
+    }
 
     return builder;
 }
 
 
+
+// Setup for ImmSigTable (call_indirect) instructions
+// Passes additional access_idx to indirect target, which is instrumented
+// to accept this during tracing
+InstBuilder setup_call_indirect_instgen (InstructionContext &instctx, 
+        LocalAllocator &lc_allocator, InstrumentType &instrument_type, 
+        ModuleContext &modctx) {
+
+    std::shared_ptr<ImmSigTableInst> call_idr_inst = 
+        static_pointer_cast<ImmSigTableInst>(instctx.instruction);
+
+    InstBuilder builder = {};
+    // Temporary local for popping dynamic function index from stack
+    LocalVal dyn_func_idx_lc = lc_allocator.allocate(WASM_TYPE_I32);
+
+    // Access index
+    builder.push ({
+        INST (LocalSetInst(dyn_func_idx_lc.idx)),
+        INST (I32ConstInst(instctx.access_idx.constant)),
+        INST (LocalGetInst(dyn_func_idx_lc.idx))
+    });
+    instrument_type.lockless = true;
+    instrument_type.force_trace = true;
+    // Modify the signature of call_indirect target to accept access_idx
+    SigDecl new_sig(*(call_idr_inst->getSig()));
+    new_sig.params.push_back(WASM_TYPE_I32);
+    call_idr_inst->setSig(modctx.module.add_sig(new_sig));
+
+    return builder;
+}
+
 // Tracedump instruction generation for CALL_OP
-InstBuilder callop_trace_instgen(InstBasePtr &instruction, 
-        LocalAllocator &lc_allocator, uint32_t access_idx, 
-        CallInstInfo &recinfo, FuncDecl *tracedump_fn, 
-        InstrumentType &instrument_type,
+InstBuilder callop_trace_instgen(InstructionContext &instctx, 
+        LocalAllocator &lc_allocator, CallInstInfo &recinfo, 
+        FuncDecl *tracedump_fn, InstrumentType &instrument_type,
 		ThreadRecordInfo &thread_info, ModuleContext modctx)  {
 
-	uint16_t opcode = instruction->getOpcode();
+	uint16_t opcode = instctx.instruction->getOpcode();
 	RecordInterface::CallID call_id = recinfo.call_id;
 
     InstBuilder builder = {};
@@ -638,7 +707,7 @@ InstBuilder callop_trace_instgen(InstBasePtr &instruction,
 	uint32_t func_idx = modctx.module.getFuncIdx(recinfo.target);
     builder.push ({
         // Acc Idx
-        INST (I32ConstInst(access_idx)),
+        instctx.construct_access_idx_inst(),
         // Opcode
         INST (I32ConstInst(opcode)),
         // Function Index
@@ -720,14 +789,14 @@ InstBuilder callop_trace_instgen(InstBasePtr &instruction,
 
 
 
-InstBuilder memop_trace_instgen(InstBasePtr &instruction, LocalAllocator &lc_allocator,
-        uint32_t access_idx, MemopInstInfo &recinfo, FuncDecl *tracedump_fn, 
-        ModuleContext &modctx) {
+InstBuilder memop_trace_instgen(InstructionContext &instctx, 
+        LocalAllocator &lc_allocator, MemopInstInfo &recinfo, 
+        FuncDecl *tracedump_fn, ModuleContext &modctx) {
 
 	InstBasePtr neq;
 	InstBuilder builder = {};
 
-	uint16_t opcode = instruction->getOpcode();
+	uint16_t opcode = instctx.instruction->getOpcode();
 
     // Return value local from shadow memory operation
 	LocalVal shadow_retval_lc = recinfo.ret_lc;
@@ -760,7 +829,7 @@ InstBuilder memop_trace_instgen(InstBasePtr &instruction, LocalAllocator &lc_all
 
     builder.push({
         // Acc Idx
-        INST (I32ConstInst(access_idx)),
+        instctx.construct_access_idx_inst(),
         // Opcode
         INST (I32ConstInst(opcode)),
         // Addr for memops: Save in local too
@@ -828,6 +897,59 @@ InstBuilder memop_trace_instgen(InstBasePtr &instruction, LocalAllocator &lc_all
 	return builder;
 }
 
+// Required for catching call_indirects
+std::set<FuncDecl*> instrument_funcref_elems (WasmModule &module) {
+    uint32_t funcref_counter = 0;
+    std::set<FuncDecl*> newfuncs;
+    for (auto &elem: module.Elems()) {
+        if (elem.flag != 0) {
+            ERR("Currently only active elems are supported (got flag: %d)\n", elem.flag);
+        }
+        for (auto &funcref: elem.funcs) {
+            std::ostringstream oss;
+            auto dname_pair = module.get_debug_name_from_func(funcref);
+            if (dname_pair.first) {
+                oss << dname_pair.second << "__record_funcref_wrapper";
+            } else {
+                oss << funcref_counter << "__record_funcref_wrapper";
+            }
+            
+            SigDecl new_fn_sig(*(funcref->sig));
+            // Shepherd access_idx through the call parameters
+            new_fn_sig.params.push_back(WASM_TYPE_I32);
+            FuncDecl new_fn_decl = {
+                .sig = module.add_sig(new_fn_sig, false),
+                .pure_locals = wasm_localcsv_t(),
+                .num_pure_locals = 0,
+                .instructions = {
+                    INST(EndInst())
+                }
+            };
+
+            std::string new_dname = oss.str();
+            FuncDecl *new_fn = module.add_func(new_fn_decl, NULL, new_dname.c_str());
+            InstBuilder param_builder = {};
+            for (int i = 0; i < funcref->sig->params.size(); i++) {
+                param_builder.push_inst(LocalGetInst(i));
+            }
+            param_builder.push_inst(CallInst(funcref));
+            param_builder.splice_into(new_fn->instructions, new_fn->instructions.begin());
+
+            // Replace the original funcref in elem section with the new function
+            funcref = new_fn;
+            newfuncs.insert(new_fn);
+
+            funcref_counter++;
+        }
+    }
+    return newfuncs;
+}
+
+#define SETUP_INVOKE(ty) ({ \
+    auto xres = setup_##ty##_instgen(instctx, lc_allocator, modctx, record.Memop); \
+    record.optype = MEM_OP; \
+    xres; \
+})
 
 // Main R3 Record function
 void r3_record_instrument (WasmModule &module) {
@@ -853,6 +975,13 @@ void r3_record_instrument (WasmModule &module) {
 	// Create new memory: Must happen after adding all instrumentation pages
 	MemoryDecl new_mem = *def_mem;
 	MemoryDecl *record_mem = module.add_memory(new_mem);
+
+    // Update elems with funcref (works only if module uses active elems):
+    // `call_indirect`s will go through our instrumented elem targets, which
+    // take the access_idx and wrap the original target with a plain `call`. 
+    // Our instrumentation will then be able to catch these calls for
+    // instrumentation
+    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module);
 
 	// Generate quick lookup of ignored exported function idxs
 	std::map<FuncDecl*, std::string> func_ignore_map;
@@ -883,6 +1012,13 @@ void r3_record_instrument (WasmModule &module) {
     CallMaps call_maps = {
         .specialized = specialized_calls,
         .lockless = lockless_calls,
+    };
+
+    ModuleContext modctx = {
+        .module = module,
+        .def_mem = def_mem,
+        .record_mem = record_mem,
+        .funcref_wrappers = funcref_wrappers
     };
 
 	uint32_t access_tracker = 1;
@@ -916,10 +1052,11 @@ void r3_record_instrument (WasmModule &module) {
                 .force_trace = false 
             };
 
-            ModuleContext modctx = {
-                .module = module,
-                .def_mem = def_mem,
-                .record_mem = record_mem,
+            InstructionContext instctx = {
+                .instruction = instruction,
+                .func = &func,
+                .is_dynamic_callsite = false,
+                .access_idx = { .constant = access_tracker },
             };
 
             InstBuilder setup_builder = {};
@@ -929,9 +1066,6 @@ void r3_record_instrument (WasmModule &module) {
             lc_allocator.reset_allocator();
 
 			bool inc_access_tracker = true;
-#define SETUP_INVOKE(ty) \
-    setup_##ty##_instgen(instruction, lc_allocator, modctx, record.Memop);\
-    record.optype = MEM_OP;
 			switch(instruction->getImmType()) {
                 case IMM_MEMARG: setup_builder = SETUP_INVOKE(memarg); break;
 				case IMM_MEMARG_LANEIDX: setup_builder = SETUP_INVOKE(memarg_laneidx); break;
@@ -939,19 +1073,22 @@ void r3_record_instrument (WasmModule &module) {
 				case IMM_DATA_MEMORY: setup_builder = SETUP_INVOKE(data_memory); break;
 				case IMM_MEMORYCP: setup_builder = SETUP_INVOKE(memorycp); break;
 				// Calls: Lock those to select import functions
-				case IMM_FUNC: 
-					setup_builder = setup_call_instgen(instruction, lc_allocator, 
+				case IMM_FUNC: {
+					setup_builder = setup_call_instgen(instctx, lc_allocator, 
                                 call_maps, instrument_type, thread_record_info, 
                                 modctx, record.Call); 
                     record.optype = CALL_OP;
 					break;
-				///* Indirect Calls: Lock none */
-				//case IMM_SIG_TABLE: {
-				//                      PUSH_INST(NopInst()); break;
-				//                    }
+                }
+                // Indirect calls: Push access index and let instrumented call 
+                // targets handle it.
+				case IMM_SIG_TABLE: {
+                    setup_builder = setup_call_indirect_instgen(instctx, 
+                            lc_allocator, instrument_type, modctx);
+                    break;
+				}
 				default: { inc_access_tracker = false; }; 
 			}
-#undef SETUP_INVOKE
 			if (!setup_builder.empty() || instrument_type.force_trace) {
 				auto next_institr = std::next(institr);
 				// Insert instructions guarded by mutex (pre/post)
@@ -963,17 +1100,19 @@ void r3_record_instrument (WasmModule &module) {
 					case IMM_MEMORYCP:
 					case IMM_DATA_MEMORY:
 					case IMM_MEMARG: {
-                        trace_builder = memop_trace_instgen(instruction, lc_allocator,
-                            access_tracker, record.Memop, memop_tracedump_fn, modctx);
+                        trace_builder = memop_trace_instgen(instctx, lc_allocator, 
+                            record.Memop, memop_tracedump_fn, modctx);
 						break;
 					}
 					case IMM_FUNC: {
-                        trace_builder = callop_trace_instgen(instruction,
-                            lc_allocator, access_tracker, record.Call, 
-                            call_tracedump_fn, instrument_type, 
-                            thread_record_info, modctx);
+                        trace_builder = callop_trace_instgen(instctx,
+                            lc_allocator, record.Call, call_tracedump_fn, 
+                            instrument_type, thread_record_info, modctx);
 						break;
 					}
+                    case IMM_SIG_TABLE: { 
+                        break; 
+                    }
 					default: {
 						ERR("R3-Record-Error: Missupported Imm Type %d\n", instruction->getImmType()); \
 					}; 
@@ -1010,3 +1149,5 @@ void r3_record_instrument (WasmModule &module) {
 	}
 
 }
+
+#undef SETUP_INVOKE
