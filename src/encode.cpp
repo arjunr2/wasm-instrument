@@ -304,8 +304,8 @@ bytedeque WasmModule::encode_element_section() {
       }
     }
 
-    WR_U32 (elem.func_indices.size());
-    for (auto &func : elem.func_indices) {
+    WR_U32 (elem.funcs.size());
+    for (auto &func : elem.funcs) {
       uint32_t idx = this->getFuncIdx(func);
       WR_U32 (idx);
     }

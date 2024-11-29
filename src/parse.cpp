@@ -311,7 +311,7 @@ void WasmModule::decode_element_section (buffer_t &buf, uint32_t len) {
     for (uint32_t i = 0; i < num_idxs; i++) {
       uint32_t fn_idx = RD_U32();
       auto fptr = this->getFunc(fn_idx);
-      elem.func_indices.push_back(fptr);
+      elem.funcs.push_back(fptr);
     }
 
     this->elems.push_back(elem);

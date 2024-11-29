@@ -161,7 +161,7 @@ struct ElemDecl {
   uint32_t flag;
   Opcode_t opcode_offset;
   uint32_t table_offset;
-  std::list <FuncDecl*> func_indices;
+  std::list <FuncDecl*> funcs;
 };
 
 
@@ -327,6 +327,7 @@ class WasmModule {
     inline std::list  <FuncDecl> &Funcs() { return this->funcs; }
     inline std::deque <GlobalDecl> &Globals() { return this->globals; }
     inline std::list  <ExportDecl> &Exports() { return this->exports; }
+    inline std::list  <ElemDecl> &Elems() { return this->elems; }
 
     inline FuncDecl* get_start_fn() { return this->start_fn; }
     inline uint32_t get_num_customs() { return this->customs.size(); }
@@ -379,6 +380,7 @@ class WasmModule {
 
     /* Getters */
     ImportDecl* get_import_name_from_func (FuncDecl *func);
+    std::pair<bool, std::string&> get_debug_name_from_func (FuncDecl *func);
 
     /* Removal */
     bool remove_func (uint32_t idx);

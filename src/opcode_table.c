@@ -211,11 +211,25 @@ opcode_entry_t opcode_table[] = {
   [WASM_EXT1_SIMD] = {"simd extension", IMM_NONE},
   [WASM_EXT1_THREADS] = {"threads extension", IMM_NONE},
 
-  // 0xFC extension
+  // 0xFC extension: partially supported
+  [WASM_OP_I32_TRUNC_SAT_F32_S] = {"i32.trunc_sat_f32_s", IMM_NONE, -1 },
+  [WASM_OP_I32_TRUNC_SAT_F32_U] = {"i32.trunc_sat_f32_u", IMM_NONE, -1 },
+  [WASM_OP_I32_TRUNC_SAT_F64_S] = {"i32.trunc_sat_f64_s", IMM_NONE, -1 },
+  [WASM_OP_I32_TRUNC_SAT_F64_U] = {"i32.trunc_sat_f64_u", IMM_NONE, -1 },
+  [WASM_OP_I64_TRUNC_SAT_F32_S] = {"i64.trunc_sat_f32_s", IMM_NONE, -1 },
+  [WASM_OP_I64_TRUNC_SAT_F32_U] = {"i64.trunc_sat_f32_u", IMM_NONE, -1 },
+  [WASM_OP_I64_TRUNC_SAT_F64_S] = {"i64.trunc_sat_f64_s", IMM_NONE, -1 },
+  [WASM_OP_I64_TRUNC_SAT_F64_U] = {"i64.trunc_sat_f64_u", IMM_NONE, -1 },
   [WASM_OP_MEMORY_INIT] = {"memory.init", IMM_DATA_MEMORY},
   [WASM_OP_DATA_DROP] = {"data.drop", IMM_DATA},
   [WASM_OP_MEMORY_COPY] = {"memory.copy", IMM_MEMORYCP},
   [WASM_OP_MEMORY_FILL] = {"memory.fill", IMM_MEMORY},
+  [WASM_OP_TABLE_INIT] = {"table.init", IMM_NONE, -1 },
+  [WASM_OP_ELEM_DROP] = {"elem.drop", IMM_NONE, -1 },
+  [WASM_OP_TABLE_COPY] = {"table.copy", IMM_NONE, -1 },
+  [WASM_OP_TABLE_GROW] = {"table.grow", IMM_NONE, -1 },
+  [WASM_OP_TABLE_SIZE] = {"table.size", IMM_NONE, -1 },
+  [WASM_OP_TABLE_FILL] = {"table.fill", IMM_NONE, -1 },
 
   // SIMD Extension: 0xFD
   [WASM_OP_V128_LOAD] = {"v128.load", IMM_MEMARG },

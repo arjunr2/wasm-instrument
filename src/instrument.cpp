@@ -213,6 +213,18 @@ ImportDecl* WasmModule::get_import_name_from_func (FuncDecl *func) {
   return NULL;
 }
 
+static std::string empty_static_str = "";
+std::pair<bool, std::string&> WasmModule::get_debug_name_from_func (FuncDecl *func) {
+  if (auto debug_names_ptr = this->getFnDebugNames()) {
+    for (auto &dname_entry: *debug_names_ptr) {
+      if (dname_entry.func == func) {
+        return std::make_pair(true, std::ref(dname_entry.name));
+      }
+    }
+  }
+  return std::make_pair(false, std::ref(empty_static_str));
+}
+
 
 /* Removal methods */
 bool WasmModule::remove_func_core (uint32_t idx, FuncDecl *func) {

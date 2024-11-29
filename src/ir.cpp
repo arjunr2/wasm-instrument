@@ -104,7 +104,7 @@ TIME_SECTION(2, log_str,
   FunctionPatch (mod, reassign_cache);
   // Element Patch
   for (auto &elem : this->elems) {
-    for (auto &fn_ptr : elem.func_indices) {
+    for (auto &fn_ptr : elem.funcs) {
       fn_ptr = REASSIGN(fn_ptr, Func, FuncDecl);
     }
   }

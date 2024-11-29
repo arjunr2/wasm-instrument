@@ -129,6 +129,8 @@ class ImmSigTableInst: public InstBase {
     inline SigDecl* getSig()      { return sig; }
     inline TableDecl* getTable()  { return table; }
 
+    inline void setSig(SigDecl *sig) { this->sig = sig; }
+
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
 };

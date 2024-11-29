@@ -210,11 +210,25 @@
 #define WASM_EXT1_SIMD 0xFD
 #define WASM_EXT1_THREADS  0xFE
 
-/** 0xFC extensions: Partially implemented **/
+/** 0xFC extensions: partially illegal **/
+#define WASM_OP_I32_TRUNC_SAT_F32_S	0xFC00 /* "i32.trunc_sat_f32_s", ImmSigs.NONE */
+#define WASM_OP_I32_TRUNC_SAT_F32_U	0xFC01 /* "i32.trunc_sat_f32_u", ImmSigs.NONE */
+#define WASM_OP_I32_TRUNC_SAT_F64_S	0xFC02 /* "i32.trunc_sat_f64_s", ImmSigs.NONE */
+#define WASM_OP_I32_TRUNC_SAT_F64_U	0xFC03 /* "i32.trunc_sat_f64_u", ImmSigs.NONE */
+#define WASM_OP_I64_TRUNC_SAT_F32_S	0xFC04 /* "i64.trunc_sat_f32_s", ImmSigs.NONE */
+#define WASM_OP_I64_TRUNC_SAT_F32_U	0xFC05 /* "i64.trunc_sat_f32_u", ImmSigs.NONE */
+#define WASM_OP_I64_TRUNC_SAT_F64_S	0xFC06 /* "i64.trunc_sat_f64_s", ImmSigs.NONE */
+#define WASM_OP_I64_TRUNC_SAT_F64_U	0xFC07 /* "i64.trunc_sat_f64_u", ImmSigs.NONE */
 #define WASM_OP_MEMORY_INIT 0xFC08 /* "memory.init", ImmSigs.DATA_MEMORY */
 #define WASM_OP_DATA_DROP 0xFC09 /* "data.drop", ImmSigs.DATA */
 #define WASM_OP_MEMORY_COPY 0xFC0A /* "memory.copy", ImmSigs.MEMORYCP */
 #define WASM_OP_MEMORY_FILL 0xFC0B /* "memory.fill", ImmSigs.MEMORY */
+#define WASM_OP_TABLE_INIT 0xFC0C /* "table.init", ImmSigs.ELEM_TABLE */
+#define WASM_OP_ELEM_DROP 0xFC0D /* "elem.drop", ImmSigs.ELEM */
+#define WASM_OP_TABLE_COPY 0xFC0E /* "table.copy", ImmSigs.TABLECP */
+#define WASM_OP_TABLE_GROW 0xFC0F /* "table.grow", ImmSigs.TABLE */
+#define WASM_OP_TABLE_SIZE 0xFC10 /* "table.size", ImmSigs.TABLE */
+#define WASM_OP_TABLE_FILL 0xFC11 /* "table.fill", ImmSigs.TABLE */
 
 /** SIMD: 0xFD extensions **/
 #define WASM_OP_V128_LOAD 0xFD00 /* "v128.load", ImmSigs.MEMARG */
