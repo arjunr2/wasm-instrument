@@ -3,7 +3,6 @@
 #include <cstring>
 #include <cassert>
 #include <ranges>
-#include <sstream>
 
 #define INST(inv) InstBasePtr(new inv)
 
@@ -509,7 +508,6 @@ InstBuilder setup_call_instgen (InstructionContext &instctx,
     std::shared_ptr<ImmFuncInst> call_inst = 
         static_pointer_cast<ImmFuncInst>(instctx.instruction);
     
-    uint16_t opcode = call_inst->getOpcode();
     // Get the target of function call
 	FuncDecl *target = call_inst->getFunc();
     SigDecl *target_sig = target->sig;
@@ -590,19 +588,9 @@ InstBuilder setup_call_instgen (InstructionContext &instctx,
         internal_call = true;
     }
 
+    uint16_t call_opcode = call_inst->getOpcode();
     // Populate the relevant recording info to send to tracing function
-	recinfo.move_into(ret_lc, local_vals_allocated, opcode, target, call_id);
-
-    // Calls within instrumented funcref call_indirect targets must use the 
-    // access idx passed into the containing function
-    if (modctx.funcref_wrappers.contains(instctx.func)) {
-        instctx.is_dynamic_callsite = true;
-        uint32_t containing_func_param_ct = instctx.func->sig->params.size();
-        // Last params is access_idx
-        instctx.access_idx = { 
-            .lc = LocalVal(WASM_TYPE_I32, containing_func_param_ct - 1)
-        };
-    }
+    recinfo.move_into(ret_lc, local_vals_allocated, call_opcode, target, call_id);
 
     return builder;
 }
@@ -645,7 +633,6 @@ InstBuilder callop_trace_instgen(InstructionContext &instctx,
         FuncDecl *tracedump_fn, InstrumentType &instrument_type,
 		ThreadRecordInfo &thread_info, ModuleContext modctx)  {
 
-	uint16_t opcode = instctx.instruction->getOpcode();
 	RecordInterface::CallID call_id = recinfo.call_id;
 
     InstBuilder builder = {};
@@ -704,14 +691,14 @@ InstBuilder callop_trace_instgen(InstructionContext &instctx,
 		}
 	}
 
-	uint32_t func_idx = modctx.module.getFuncIdx(recinfo.target);
+	uint32_t target_func_idx = modctx.module.getFuncIdx(recinfo.target);
     builder.push ({
         // Acc Idx
         instctx.construct_access_idx_inst(),
         // Opcode
-        INST (I32ConstInst(opcode)),
+        INST (I32ConstInst(recinfo.opcode)),
         // Function Index
-        INST (I32ConstInst(func_idx)),
+        INST (I32ConstInst(target_func_idx)),
         // Call ID
         INST (I32ConstInst(call_id))
     });
@@ -897,53 +884,6 @@ InstBuilder memop_trace_instgen(InstructionContext &instctx,
 	return builder;
 }
 
-// Required for catching call_indirects
-std::set<FuncDecl*> instrument_funcref_elems (WasmModule &module) {
-    uint32_t funcref_counter = 0;
-    std::set<FuncDecl*> newfuncs;
-    for (auto &elem: module.Elems()) {
-        if (elem.flag != 0) {
-            ERR("Currently only active elems are supported (got flag: %d)\n", elem.flag);
-        }
-        for (auto &funcref: elem.funcs) {
-            std::ostringstream oss;
-            auto dname_pair = module.get_debug_name_from_func(funcref);
-            if (dname_pair.first) {
-                oss << dname_pair.second << "__record_funcref_wrapper";
-            } else {
-                oss << funcref_counter << "__record_funcref_wrapper";
-            }
-            
-            SigDecl new_fn_sig(*(funcref->sig));
-            // Shepherd access_idx through the call parameters
-            new_fn_sig.params.push_back(WASM_TYPE_I32);
-            FuncDecl new_fn_decl = {
-                .sig = module.add_sig(new_fn_sig, false),
-                .pure_locals = wasm_localcsv_t(),
-                .num_pure_locals = 0,
-                .instructions = {
-                    INST(EndInst())
-                }
-            };
-
-            std::string new_dname = oss.str();
-            FuncDecl *new_fn = module.add_func(new_fn_decl, NULL, new_dname.c_str());
-            InstBuilder param_builder = {};
-            for (int i = 0; i < funcref->sig->params.size(); i++) {
-                param_builder.push_inst(LocalGetInst(i));
-            }
-            param_builder.push_inst(CallInst(funcref));
-            param_builder.splice_into(new_fn->instructions, new_fn->instructions.begin());
-
-            // Replace the original funcref in elem section with the new function
-            funcref = new_fn;
-            newfuncs.insert(new_fn);
-
-            funcref_counter++;
-        }
-    }
-    return newfuncs;
-}
 
 #define SETUP_INVOKE(ty) ({ \
     auto xres = setup_##ty##_instgen(instctx, lc_allocator, modctx, record.Memop); \
@@ -976,12 +916,8 @@ void r3_record_instrument (WasmModule &module) {
 	MemoryDecl new_mem = *def_mem;
 	MemoryDecl *record_mem = module.add_memory(new_mem);
 
-    // Update elems with funcref (works only if module uses active elems):
-    // `call_indirect`s will go through our instrumented elem targets, which
-    // take the access_idx and wrap the original target with a plain `call`. 
-    // Our instrumentation will then be able to catch these calls for
-    // instrumentation
-    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module);
+    // Setup for call_indirect interposition
+    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module, true);
 
 	// Generate quick lookup of ignored exported function idxs
 	std::map<FuncDecl*, std::string> func_ignore_map;
@@ -1082,10 +1018,11 @@ void r3_record_instrument (WasmModule &module) {
                 }
                 // Indirect calls: Push access index and let instrumented call 
                 // targets handle it.
+                // Note: No break in this case; we don't want to increment 
+                // access_tracker since funcref wrappers handle it
 				case IMM_SIG_TABLE: {
                     setup_builder = setup_call_indirect_instgen(instctx, 
                             lc_allocator, instrument_type, modctx);
-                    break;
 				}
 				default: { inc_access_tracker = false; }; 
 			}

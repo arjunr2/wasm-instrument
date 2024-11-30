@@ -52,8 +52,9 @@ typedef struct {
     Opcode_t opcode;
     InstList::iterator &institr;
     InstList &insts;
-    // Function target if it's a call instruction
-    FuncDecl* call_func;
+    bool is_import_target;
+    // Function target for call instructions
+    FuncDecl *target_func;
 } InstMetaInfo;
 
 typedef struct ReplaySigMetaInfo {
@@ -464,14 +465,14 @@ static void replace_import_call(WasmModule &module, InstBuilder &builder,
         std::set<FuncDecl*> &remove_importfuncs, 
         ReplaySigMetaInfo &sigmeta, bool implicit_sync) {
 
-    FuncDecl *call_func = imeta_info.call_func;
+    FuncDecl *target_func = imeta_info.target_func;
     // Setup the replay op function declaration
     char replay_func_debug_name[100];
     bool remove_importfunc = false;
     if (implicit_sync) {
         sprintf(replay_func_debug_name, "__replay_instrument_#-#-%u", access_idx);
     } else {
-        ImportDecl *import_decl = module.get_import_name_from_func(imeta_info.call_func);
+        ImportDecl *import_decl = module.get_import_name_from_func(imeta_info.target_func);
         sprintf(replay_func_debug_name, "__replay_instrument_%s-%s-%u", 
             import_decl->mod_name.c_str(), 
             import_decl->member_name.c_str(),
@@ -494,7 +495,7 @@ static void replace_import_call(WasmModule &module, InstBuilder &builder,
     imeta_info.insts.insert(next_inst, INST(CallInst(replay_ops_func)));
     imeta_info.institr = std::prev(next_inst);
     if (remove_importfunc) {
-        remove_importfuncs.insert(call_func);
+        remove_importfuncs.insert(target_func);
     }
 }
 
@@ -516,12 +517,12 @@ static void insert_replay_op(WasmModule &module, InstMetaInfo &imeta_info,
     debug_log_call_info.access_idx = op.access_idx;
     debug_log_call_info.func_idx = op.func_idx;
 
-    FuncDecl *call_func = imeta_info.call_func;
+    FuncDecl *target_func = imeta_info.target_func;
 
     // Replay operator signature
     ReplaySigMetaInfo sigmeta;
     if (implicit_sync) {
-        if (!empty_replay_op) { assert (call_func == NULL); }
+        if (!empty_replay_op) { assert (target_func == NULL); }
         // Implicit operations require signature of instruction
         SigDecl s = get_sigdecl_from_cdef(memop_inst_table[imeta_info.opcode].sig);
         sigmeta.set_inst_sig(module.add_sig(s, false));
@@ -530,11 +531,11 @@ static void insert_replay_op(WasmModule &module, InstMetaInfo &imeta_info,
         // Verify that import function and the indices are consistent with record
         // before proceeding
         if (!empty_replay_op) {
-            uint32_t replay_func_idx = module.getFuncIdx(call_func);
+            uint32_t replay_func_idx = module.getFuncIdx(target_func);
             uint32_t record_func_idx = transform_to_record_func_idx(replay_func_idx);
             assert(op.func_idx == record_func_idx);
         }
-        sigmeta.set_inst_sig(call_func->sig);
+        sigmeta.set_inst_sig(target_func->sig);
     }
     // Set the block sig/sigidx used for replay function construction
     {
@@ -662,8 +663,13 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     MemoryDecl *def_mem = module.getMemory(0);
     FuncDecl *mutex_funcs[2];
     uint32_t instrument_page_count = 1;
-    uint32_t instrument_page_start = (add_pages(def_mem, instrument_page_count) * WASM_PAGE_SIZE);
-    FuncDecl *last_preinstrumented_func = &module.Funcs().back();
+    uint32_t instrument_page_start = 
+        (add_pages(def_mem, instrument_page_count) * WASM_PAGE_SIZE);
+    
+    // Call_indirect interpolation
+    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module, false);
+    
+    FuncDecl *last_instrumented_func = &module.Funcs().back();
 
     /* Create all thread-related management */
     uint32_t mutex_addr = instrument_page_start;
@@ -693,7 +699,8 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
         };
 
         if (callid_handlers.contains(replay_imports[i].key)) {
-            ERR("Duplicate Replay Handler Support for %s\n", replay_imports[i].iminfo.member_name.c_str());
+            ERR("Duplicate Replay Handler Support for %s\n", 
+                replay_imports[i].iminfo.member_name.c_str());
         }
         callid_handlers[replay_imports[i].key] = rep_imfunc;
         unused_callid_handlers.insert(rep_imfunc);
@@ -733,7 +740,7 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
 
     for (auto &func: module.Funcs()) {
         /* Ignore instrument hooks and exported map functions */
-        if (&func == last_preinstrumented_func) {
+        if (&func == last_instrumented_func) {
             break;
         }
         if (func_ignore_map.count(&func)) {
@@ -743,22 +750,21 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
         for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
             InstBasePtr &instruction = *institr;
             bool inc_access_tracker = true;
-            bool import_call = false;
             InstMetaInfo imeta_info = { 
                 .opcode = instruction->getOpcode(),
                 .institr = institr,
                 .insts = insts,
-                .call_func = NULL
+                .is_import_target = false,
+                .target_func = NULL
             };
             switch (instruction->getImmType()) {
                 case IMM_FUNC: {
                     std::shared_ptr<ImmFuncInst> call_inst = 
                         static_pointer_cast<ImmFuncInst>(instruction);
-                    imeta_info.call_func = call_inst->getFunc();
-                    import_call = module.isImport(imeta_info.call_func);
+                    imeta_info.target_func = call_inst->getFunc();
+                    imeta_info.is_import_target = module.isImport(imeta_info.target_func);
                     break;
                 }
-                case IMM_SIG_TABLE:
                 case IMM_MEMARG:
                 case IMM_MEMARG_LANEIDX:
                 case IMM_MEMORY:
@@ -782,19 +788,20 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
             bool run_replay_replacement = false;
             // Default curr_op for untracked accesses
             ReplayOp curr_op = { 
-                .access_idx = cur_access_tracker, .func_idx = 0, .props = nullptr, .num_props = 0 
+                .access_idx = cur_access_tracker, .func_idx = 0, 
+                .props = nullptr, .num_props = 0 
             };
 
             bool is_tracked_access_idx = (op_idx < num_ops) && 
                     (cur_access_tracker == ops[op_idx].access_idx);
             if (is_tracked_access_idx) {
-                // Tracked: Replay import calls and implicit syncs
+                // Tracked: Replay the relevant calls and implicit syncs
                 curr_op = ops[op_idx++];
-                assert(import_call || curr_op.implicit_sync);
+                assert(imeta_info.is_import_target || curr_op.implicit_sync);
                 run_replay_replacement = true;
             } else {
-                // Untracked: Replay import calls only
-                run_replay_replacement = import_call;
+                // Untracked: Replay direct import calls only
+                run_replay_replacement = imeta_info.is_import_target;
             }
 
             if (run_replay_replacement) {
