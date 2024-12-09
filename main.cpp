@@ -47,7 +47,7 @@ args_t parse_args(int argc, char* argv[]) {
         ERR("Usage: %s [--trace (opt)] [--multithread (opt)] [--time (opt)] "
             "[--scheme SCHEME] [--args SCHEME_ARGS (opt)] [--out OUTFILE] input-file\n", argv[0]);
         ERR("Supported schemes: \'empty\', \'sample\', \'loop-count\', "
-            "\'memaccess-stochastic\', \'r3-record\', \'plc-trace\'\n");
+            "\'memaccess-stochastic\', \'r3-record\', \'allspark-trace\'\n");
         exit(opt != 'h');
     }
   }
@@ -165,7 +165,13 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
   else if (routine == "loop-count") { loop_instrument(module); }
   else if (routine == "opcode-count") { opcode_count_instrument(module); }
   else if (routine == "r3-record") { r3_record_instrument(module); }
-  else if (routine == "plc-trace") { plc_trace_instrument(module); }
+  else if (routine == "allspark-trace") { 
+    if ((args.size() > 1)) {
+      throw std::runtime_error("allspark-trace needs 0/1 args");
+    }
+    std::string entry_export = ((args.size() == 1) ? args[0] : start_export_str);    
+    allspark_trace_instrument(module, entry_export); 
+  }
   else {
     printf("Unsupported instrumentation scheme\n");
   }

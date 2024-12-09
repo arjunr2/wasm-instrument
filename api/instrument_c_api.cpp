@@ -86,8 +86,9 @@ void r3_record_insthandle (WasmModule &module, ArgVec args) {
   r3_record_instrument(module);
 }
 
-void plc_trace_insthandle (WasmModule &module, ArgVec args) {
-  plc_trace_instrument(module);
+void allspark_trace_insthandle (WasmModule &module, ArgVec args) {
+  std::string entry_export = (args.empty() ? start_export_str : POP_STR(args));
+  allspark_trace_instrument(module, entry_export);
 }
 
 void empty_insthandle (WasmModule &module, ArgVec args) { return; }
@@ -103,7 +104,7 @@ static std::vector<routines_t> inst_routines = {
   { "opcode-count"        ,   0,  0, StringArgs,  InstrumentFn { .string_arg = opcode_count_insthandle } },
   { "r3-record"           ,   0,  0, StringArgs,  InstrumentFn { .string_arg = r3_record_insthandle } },
   { "r3-replay-generator" ,   0,  UINT32_MAX, AnonArrArgs, InstrumentFn { .anonarr_arg = r3_replay_instrument } },
-  { "plc-trace"           ,   0,  0, StringArgs,  InstrumentFn { .string_arg = plc_trace_insthandle } },
+  { "allspark-trace"      ,   0,  1, StringArgs,  InstrumentFn { .string_arg = allspark_trace_insthandle } },
   { "empty"               ,   0,  0, StringArgs,  InstrumentFn { .string_arg = empty_insthandle   }}
 };
 
