@@ -173,7 +173,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
     allspark_trace_instrument(module, entry_export); 
   }
   else {
-    printf("Unsupported instrumentation scheme\n");
+    ERR("Unsupported instrumentation scheme\n");
   }
 
   if (!is_batch) {
