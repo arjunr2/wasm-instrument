@@ -307,6 +307,16 @@ void allspark_trace_instrument (WasmModule &module, std::string entry_export) {
             INST (I32LoadInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
 #endif
             INST (CallInst(trace_data.tracedump_fn)),
+            // Clear the globals
+#if USE_GLOBALS_TRACE != 0
+            INST (I32ConstInst(0)),
+            INST (GlobalSetInst(trace_data.ctrlflow_bytes)),
+#else
+            INST (I32ConstInst(0)),
+            INST (I32ConstInst(0)),
+            INST (I32StoreInst(2, trace_data.ctrlflow_bytes_addr, 
+                module.getMemory(0))),
+#endif
         });
         builder.splice_into(trace_data.curr_fn->instructions, institr);
     };
