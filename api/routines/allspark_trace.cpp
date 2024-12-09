@@ -24,23 +24,33 @@
 #define LARGEST_BASE_OPCODE (1 << 8)
 #define OPCOUNT_SIZE (1 << 3)
 
+// Use globals (as opposed to memory) to store tracing metadata
+#define USE_GLOBALS_TRACE 0
+// Use atomics to update memory (when USE_GLOBALS_TRACE == 0)
+#define USE_ATOMICS 0
+
 struct TraceInstrumentData {
+#if USE_GLOBALS_TRACE != 0
     // Number of bytes for storing control flow
     GlobalDecl* ctrlflow_bytes;
     // Vector of control flow
     GlobalDecl* ctrlflow_vector;
+#endif
+    // Memory addresses for these: both u32 (4 bytes) if USE_GLOBALS_TRACE == 0
+    uint32_t ctrlflow_bytes_addr;
+    uint32_t ctrlflow_vector_start;
+
     FuncDecl* main_fn;
     FuncDecl* curr_fn;
     uint32_t tmp_i32_locals[2];
+    uint32_t tmp_i64_locals[1];
     FuncDecl* tracedump_fn;
 
     TraceInstrumentData(WasmModule &module, FuncDecl* main_fn, uint32_t instmem_start) {
-        GlobalDecl ctrlflow_brsite_gdecl = {
-            .type = WASM_TYPE_I32,
-            .is_mutable = true,
-            .init_expr_bytes = INIT_EXPR(I32_CONST, 0),
-        };
+        this->ctrlflow_bytes_addr = instmem_start;
+        this->ctrlflow_vector_start = instmem_start + 8;
 
+#if USE_GLOBALS_TRACE != 0
         GlobalDecl ctrlflow_bytes_gdecl = {
             .type = WASM_TYPE_I32,
             .is_mutable = true,
@@ -50,11 +60,13 @@ struct TraceInstrumentData {
         GlobalDecl ctrlflow_vector_gdecl = {
             .type = WASM_TYPE_I32,
             .is_mutable = true,
-            .init_expr_bytes = INIT_EXPR(I32_CONST, instmem_start),
+            .init_expr_bytes = INIT_EXPR(I32_CONST, this->ctrlflow_vector_start),
         };
 
         this->ctrlflow_bytes = module.add_global(ctrlflow_bytes_gdecl, "ctrlflow_bytes");
         this->ctrlflow_vector = module.add_global(ctrlflow_vector_gdecl, "ctrlflow_vector");
+#endif
+
         this->main_fn = main_fn;
         
         // Parameters for tracedump function are as follows:
@@ -70,6 +82,7 @@ struct TraceInstrumentData {
     void set_current_fn(FuncDecl* func) {
         this->tmp_i32_locals[0] = func->add_local(WASM_TYPE_I32);
         this->tmp_i32_locals[1] = func->add_local(WASM_TYPE_I32);
+        this->tmp_i64_locals[0] = func->add_local(WASM_TYPE_I64);
         this->curr_fn = func;
     }
 };
@@ -125,24 +138,49 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
             uint64_t brpc_shift = ((uint64_t)instptr->getOrigPc() << 32);
             builder.push ({
                 // Control flow target
-                INST (LocalSetInst(trace_data.tmp_i32_locals[0])),
+                INST (LocalSetInst(trace_data.tmp_i64_locals[0])),
                 // Base address to write target entry
+#if USE_GLOBALS_TRACE != 0
                 INST (GlobalGetInst(trace_data.ctrlflow_vector)),
                 INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
-                INST (I32AddInst()),
-                // Temp for the base address
+#else
+                INST (I32ConstInst(trace_data.ctrlflow_vector_start)),
+#if USE_ATOMICS != 0
+                // Increment and get with atomic
+                INST (I32ConstInst(0)),
+                INST (I32ConstInst(8)),
+                INST (I32AtomicRmwAddInst(2, trace_data.ctrlflow_bytes_addr, 
+                    module.getMemory(0))),
+#else
+                // Load and save old ctrlflow_bytes
+                INST (I32ConstInst(0)),
+                INST (I32LoadInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
                 INST (LocalTeeInst(trace_data.tmp_i32_locals[1])),
-                // Pack br_pc, target and write
-                INST (I64ConstInst(brpc_shift)),
-                INST (LocalGetInst(trace_data.tmp_i32_locals[0])),
-                INST (I64ExtendI32UInst()),
-                INST (I64OrInst()),
-                INST (I64StoreInst(3, 0, module.getMemory(0))),
+                // Address to writeback
+                INST (I32ConstInst(0)),
                 // Increment ctrlflow_bytes
+                INST (LocalGetInst(trace_data.tmp_i32_locals[1])),
+                INST (I32ConstInst(8)),
+                INST (I32AddInst()),
+                // Storeback
+                INST (I32StoreInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
+#endif
+#endif
+                // Base Address for writing entry
+                INST (I32AddInst()),
+                // Value to write -- Pack br_pc, target
+                INST (I64ConstInst(brpc_shift)),
+                INST (LocalGetInst(trace_data.tmp_i64_locals[0])),
+                INST (I64OrInst()),
+                // Write to memory
+                INST (I64StoreInst(3, 0, module.getMemory(0))),
+#if USE_GLOBALS_TRACE != 0
+                // Increment ctrlflow_bytes if using globals
                 INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
                 INST (I32ConstInst(8)),
                 INST (I32AddInst()),
                 INST (GlobalSetInst(trace_data.ctrlflow_bytes)),
+#endif
             });
         };
 
@@ -151,7 +189,7 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
             std::shared_ptr<ImmLabelInst> br_inst = std::static_pointer_cast<ImmLabelInst>(instptr);
             uint32_t target_pc = get_br_target_pc(br_inst->getLabel());
             // Target on stack
-            builder.push_inst(I32ConstInst(target_pc));
+            builder.push_inst(I64ConstInst(target_pc));
             record_ctrlflow();
             builder.splice_into(trace_data.curr_fn->instructions, institr);
         };
@@ -163,8 +201,8 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
             builder.push ({
                 // Save br_cond
                 INST (LocalTeeInst(trace_data.tmp_i32_locals[0])),
-                INST (I32ConstInst(succ_pc)),
-                INST (I32ConstInst(fail_pc)),
+                INST (I64ConstInst(succ_pc)),
+                INST (I64ConstInst(fail_pc)),
                 INST (LocalGetInst(trace_data.tmp_i32_locals[0])),
                 INST (SelectInst())
             });
@@ -179,8 +217,8 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
             uint32_t max_idx = *std::max_element(labels.begin(), labels.end());
             max_idx = std::max(max_idx, br_table_inst->getDefLabel());
             // 
-            SigDecl i32_ret_sigdecl = { .params = { }, .results = { WASM_TYPE_I32 } };   
-            SigDecl *block_sig = module.add_sig(i32_ret_sigdecl, false);
+            SigDecl i64_ret_sigdecl = { .params = { }, .results = { WASM_TYPE_I64 } };   
+            SigDecl *block_sig = module.add_sig(i64_ret_sigdecl, false);
             uint32_t block_sig_idx = module.getSigIdx(block_sig);
 
             // Store dynamic branch site in local
@@ -190,7 +228,7 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
             }
             builder.push ({
                 INST (BlockInst(block_sig_idx)),
-                INST (I32ConstInst(0)),
+                INST (I64ConstInst(0)),
                 INST (LocalGetInst(trace_data.tmp_i32_locals[0])),
                 INST (ImmLabelsInst(*br_table_inst)),
                 INST (EndInst())
@@ -199,7 +237,7 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
                 uint32_t target_pc = get_br_target_pc(i);
                 // Target on stack
                 builder.push ({
-                    INST (I32ConstInst(target_pc)),
+                    INST (I64ConstInst(target_pc)),
                     INST (BrInst(max_idx - i)),
                     INST (EndInst())
                 });
@@ -260,8 +298,14 @@ void allspark_trace_instrument (WasmModule &module, std::string entry_export) {
     auto insert_tracedump = [&module, &trace_data](auto institr) {
         InstBuilder builder = {};
         builder.push ({
+#if USE_GLOBALS_TRACE != 0
             INST (GlobalGetInst(trace_data.ctrlflow_vector)),
             INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
+#else
+            INST (I32ConstInst(trace_data.ctrlflow_vector_start)),
+            INST (I32ConstInst(0)),
+            INST (I32LoadInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
+#endif
             INST (CallInst(trace_data.tracedump_fn)),
         });
         builder.splice_into(trace_data.curr_fn->instructions, institr);
