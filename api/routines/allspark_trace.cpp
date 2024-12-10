@@ -1,22 +1,9 @@
 #include "routine_common.h"
 #include <cassert>
+#include <cmath>
 
-// Record the following information for every "scope"
-// 1. Scope ID (Statically determined)
-// 2. Entire Memory State After Execution of the Basic Block
-// 3. I/O calls to the program
-// 4. Distribution of Bytecodes for the Basic Block
-// (optional) 5. Instruction + memory address, size mapping for 
-//   each memory instruction in basic block
-
-
-// Identifying Scopes
-// 1. Anything that modifies control flow (branches, returns)
-// 2. Scope starts -- loop, block, if/else
-// 3. Scope end and end of function
-
-// Assumptions: Wasm code only uses the bulk-memory extension 
-// (no threads, exceptions, simd)
+// Record the following information for every branch
+// Function index, Source PC, Target PC
 
 #define INST(inv) InstBasePtr(new inv)
 
@@ -46,7 +33,11 @@ struct TraceInstrumentData {
     uint32_t tmp_i64_locals[1];
     FuncDecl* tracedump_fn;
 
-    TraceInstrumentData(WasmModule &module, FuncDecl* main_fn, uint32_t instmem_start) {
+    uint32_t pc_bits;
+    uint32_t fnidx_bits;
+
+    TraceInstrumentData(WasmModule &module, FuncDecl* main_fn, 
+            uint32_t instmem_start, uint32_t pc_bits, uint32_t fnidx_bits) {
         this->ctrlflow_bytes_addr = instmem_start;
         this->ctrlflow_vector_start = instmem_start + 8;
 
@@ -74,9 +65,12 @@ struct TraceInstrumentData {
         // 2: Size of buffer in bytes
         SigDecl s = { .params = { WASM_TYPE_I32, WASM_TYPE_I32 }, 
             .results = { } };
-        ImportInfo iminfo = { .mod_name = "allspark-trace", .member_name = "prog_tracedump" };
+        ImportInfo iminfo = { .mod_name = "allspark:trace", .member_name = "prog_tracedump" };
         ImportDecl* import_decl = module.add_import(iminfo, s); 
         this->tracedump_fn = import_decl->desc.func;
+
+        this->pc_bits = pc_bits;
+        this->fnidx_bits = fnidx_bits;
     }
 
     void set_current_fn(FuncDecl* func) {
@@ -135,7 +129,11 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
 
         // Instructions to record ctrlflow path into vector in memory
         auto record_ctrlflow = [&module, &trace_data, &builder, &instptr]() {
-            uint64_t brpc_shift = ((uint64_t)instptr->getOrigPc() << 32);
+            // Packed function index and target pc
+            // We subtract 1 from function index since we insert an import
+            uint64_t br_fn_srcpc_shift = 
+                ((uint64_t)instptr->getOrigPc() << 24) | 
+                (((uint64_t)module.getFuncIdx(trace_data.curr_fn) - 1) << 48);
             builder.push ({
                 // Control flow target
                 INST (LocalSetInst(trace_data.tmp_i64_locals[0])),
@@ -169,7 +167,7 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
                 // Base Address for writing entry
                 INST (I32AddInst()),
                 // Value to write -- Pack br_pc, target
-                INST (I64ConstInst(brpc_shift)),
+                INST (I64ConstInst(br_fn_srcpc_shift)),
                 INST (LocalGetInst(trace_data.tmp_i64_locals[0])),
                 INST (I64OrInst()),
                 // Write to memory
@@ -283,7 +281,21 @@ void allspark_trace_instrument (WasmModule &module, std::string entry_export) {
     // Increase memory a lot to store the vectors
     uint32_t old_page_count = add_pages(module.getMemory(0), 16384);
 
-    TraceInstrumentData trace_data(module, main_fn, old_page_count * WASM_PAGE_SIZE);
+    // First scan functions to see how to pack function, pc and target together
+    uint32_t max_pc = 0;
+    for (auto &func: module.Funcs()) {
+        if (module.isImport(&func)) { continue; }
+        max_pc = std::max((func.instructions.back())->getOrigPc(), max_pc);
+    }
+    uint32_t max_pc_bits = std::ceil(log2(max_pc));
+    uint32_t max_fn_bits = std::ceil(log2(module.Funcs().size()));
+    printf("Max PC bits: %u; Max Function Bits: %u\n", max_pc_bits, max_fn_bits);
+    // Assert that we can pack function (16b), and two pcs (24b each) 
+    // together in 64b value
+    assert (max_fn_bits <= 16 && max_pc_bits <= 24);
+
+    TraceInstrumentData trace_data(module, 
+        main_fn, old_page_count * WASM_PAGE_SIZE, max_pc_bits, max_fn_bits);
 
     // Generate scopes for the main function
     for (auto &func: module.Funcs()) {
