@@ -6,7 +6,7 @@ WALI :=
 
 build:
 	cmake -B build -DCMAKE_BUILD_TYPE=Debug
-	make -C build -j6
+	make -C build -j
 
 build-wali:
 	cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=$(WALI_CXX) -DCMAKE_C_COMPILER=$(WALI_CC) -DCMAKE_VERBOSE_MAKEFILE=True \

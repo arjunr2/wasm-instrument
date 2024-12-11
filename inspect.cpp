@@ -87,6 +87,9 @@ std::string inspect_call (WasmModule &module, std::string routine, std::vector<s
   else if (routine == "func-idx") {
     ret = func_indexes_inspect(module);
   }
+  else if (routine == "allspark-trace-blocks") {
+    ret = allspark_trace_blocks_inspect(module);
+  }
 
   return ret;
 }

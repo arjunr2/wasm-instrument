@@ -1,36 +1,31 @@
 #include "inspect_common.h"
-#include "cJSON.h"
+#include <nlohmann/json.hpp>
 
+
+using json = nlohmann::json;
 
 std::string call_count_inspect(WasmModule &module) {
-  cJSON *json_out = cJSON_CreateObject();
+  json outd;
   std::list<DebugNameAssoc> *debug = module.getFnDebugNames();
   for (auto &entry : *debug) {
+    outd[entry.name] = {{"calls", 0}, {"indirects", 0}, {"inst_count", 0}};
+    auto &entryd = outd[entry.name];
     int idx = module.getFuncIdx(entry.func);
     if (!module.isImport(entry.func)) {
-      uint32_t calls = 0;
-      uint32_t indirects = 0;
-      uint32_t num_inst = 0;
       for (auto &inst: entry.func->instructions) {
         switch(inst->getOpcode()) {
           case WASM_OP_CALL_INDIRECT:
           case WASM_OP_CALL_REF:
-                      indirects++;
+                      entryd["indirects"] = entryd["indirects"].get<int>() + 1;
           case WASM_OP_CALL:
-                      calls++;
+                      entryd["calls"] = entryd["calls"].get<int>() + 1;
                       break;
           default:    {};
         }
-        num_inst++;
+        entryd["inst_count"] = entryd["inst_count"].get<int>() + 1;
       }
-      cJSON *js = cJSON_CreateObject();
-      cJSON_AddNumberToObject(js, "calls", calls);
-      cJSON_AddNumberToObject(js, "indirects", indirects);
-      cJSON_AddNumberToObject(js, "inst_count", num_inst);
-      cJSON_AddItemToObject(json_out, entry.name.c_str(), js);
     }
   }
-  std::string ret = cJSON_Print(json_out);
-  cJSON_Delete(json_out);
+  std::string ret = outd.dump();
   return ret;
 }
