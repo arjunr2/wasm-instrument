@@ -38,9 +38,11 @@ class InstBase {
     inline bool is(Opcode_t opc) { return (this->opcode == opc); } 
     inline opcode_imm_type getImmType() { return imm_type; }
     inline bool isImmType(opcode_imm_type oit) { return (this->imm_type == oit); }
+    inline std::string opString() const { return opcode_table[opcode].mnemonic; }
 
     //virtual void decode_imm (WasmModule &module , buffer_t &buf) const = 0;
     virtual void encode_imm (WasmModule &module, bytedeque &bdeq) const = 0;
+    virtual std::string to_string (WasmModule &module) const { return this->opString(); }
 };
 
 
@@ -67,10 +69,11 @@ class ImmBlocktInst: public InstBase {
     ImmBlocktInst (Opcode_t opcode, int64_t type) : 
       InstBase(opcode), type(type) { }
 
-    inline int64_t getType() { return type; }
+    inline int64_t getType() const { return type; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -81,10 +84,11 @@ class ImmLabelInst: public InstBase {
     ImmLabelInst (Opcode_t opcode, uint32_t idx) : 
       InstBase(opcode), idx(idx) { }
 
-    inline uint32_t getLabel() { return idx; }
+    inline uint32_t getLabel() const { return idx; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -97,10 +101,11 @@ class ImmLabelsInst: public InstBase {
       InstBase(opcode), idxs(idxs), def_idx(def_idx) { }
 
     inline std::list<uint32_t>& getLabels() { return idxs; }
-    inline uint32_t getDefLabel()           { return def_idx; }
+    inline uint32_t getDefLabel() const { return def_idx; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -111,10 +116,11 @@ class ImmFuncInst: public InstBase {
     ImmFuncInst (Opcode_t opcode, FuncDecl* func) :
       InstBase(opcode), func(func) { }
 
-    inline FuncDecl* getFunc() { return func; }
+    inline FuncDecl* getFunc() const { return func; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -126,13 +132,14 @@ class ImmSigTableInst: public InstBase {
     ImmSigTableInst (Opcode_t opcode, SigDecl *sig, TableDecl *table) : 
       InstBase(opcode), sig(sig), table(table) { }
 
-    inline SigDecl* getSig()      { return sig; }
-    inline TableDecl* getTable()  { return table; }
+    inline SigDecl* getSig()      const { return sig; }
+    inline TableDecl* getTable()  const { return table; }
 
     inline void setSig(SigDecl *sig) { this->sig = sig; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -143,10 +150,11 @@ class ImmLocalInst: public InstBase {
     ImmLocalInst (Opcode_t opcode, uint32_t idx) : 
       InstBase(opcode), idx(idx) { }
 
-    inline uint32_t getLocal() { return idx; }
+    inline uint32_t getLocal() const { return idx; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -157,10 +165,11 @@ class ImmGlobalInst: public InstBase {
     ImmGlobalInst (Opcode_t opcode, GlobalDecl* global) : 
       InstBase(opcode), global(global) { }
 
-    inline GlobalDecl* getGlobal() { return global; }
+    inline GlobalDecl* getGlobal() const { return global; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -171,10 +180,11 @@ class ImmTableInst: public InstBase {
     ImmTableInst (Opcode_t opcode, TableDecl* table) : 
       InstBase(opcode), table(table) { }
 
-    inline TableDecl* getTable() { return table; }
+    inline TableDecl* getTable() const { return table; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -187,14 +197,15 @@ class ImmMemargInst: public InstBase {
     ImmMemargInst (Opcode_t opcode, uint32_t align, uint32_t offset, MemoryDecl *mem) : 
       InstBase(opcode), align(align), offset(offset), mem(mem) { }
 
-    inline uint32_t getOffset()  { return offset; }
-    inline uint32_t getAlign()   { return align; }
-    inline MemoryDecl* getMemory() { return mem; }
+    inline uint32_t getOffset()  const { return offset; }
+    inline uint32_t getAlign()   const { return align; }
+    inline MemoryDecl* getMemory() const { return mem; }
 
     inline void setMemory(MemoryDecl *mem) { this->mem = mem; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -205,10 +216,11 @@ class ImmI32Inst: public InstBase {
     ImmI32Inst (Opcode_t opcode, int32_t value) : 
       InstBase(opcode), value(value) { }
 
-    inline int32_t getValue() { return value; }
+    inline int32_t getValue() const { return value; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -219,10 +231,11 @@ class ImmF64Inst: public InstBase {
     ImmF64Inst (Opcode_t opcode, double value) : 
       InstBase(opcode), value(value) { }
 
-    inline double getValue() { return value; }
+    inline double getValue() const { return value; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -233,12 +246,13 @@ class ImmMemoryInst: public InstBase {
     ImmMemoryInst (Opcode_t opcode, MemoryDecl* mem) : 
       InstBase(opcode), mem(mem) { }
 
-    inline MemoryDecl* getMemory() { return mem; }
+    inline MemoryDecl* getMemory() const { return mem; }
 
     inline void setMemory(MemoryDecl *mem) { this->mem = mem; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -252,6 +266,7 @@ class ImmTagInst: public InstBase {
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -262,10 +277,11 @@ class ImmI64Inst: public InstBase {
     ImmI64Inst (Opcode_t opcode, int64_t value) : 
       InstBase(opcode), value(value) { }
 
-    inline int64_t getValue() { return value; }
+    inline int64_t getValue() const { return value; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -276,10 +292,11 @@ class ImmF32Inst: public InstBase {
     ImmF32Inst (Opcode_t opcode, float value) : 
       InstBase(opcode), value(value) { }
 
-    inline float getValue() { return value; }
+    inline float getValue() const { return value; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -290,10 +307,11 @@ class ImmRefnulltInst: public InstBase {
     ImmRefnulltInst (Opcode_t opcode, wasm_type_t type) : 
       InstBase(opcode), type(type) { }
 
-    inline wasm_type_t getType() { return type; }
+    inline wasm_type_t getType() const { return type; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -308,6 +326,7 @@ class ImmValtsInst: public InstBase {
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 // Extensions
@@ -320,13 +339,14 @@ class ImmDataMemoryInst: public InstBase {
     ImmDataMemoryInst (Opcode_t opcode, DataDecl* data, MemoryDecl* mem) : 
       InstBase(opcode), data(data), mem(mem) { }
 
-    inline DataDecl* getData()      { return data; }
-    inline MemoryDecl* getMemory()  { return mem; }
+    inline DataDecl* getData()      const { return data; }
+    inline MemoryDecl* getMemory()  const { return mem; }
 
     inline void setMemory(MemoryDecl *mem) { this->mem = mem; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -337,10 +357,11 @@ class ImmDataInst: public InstBase {
     ImmDataInst (Opcode_t opcode, DataDecl* data) : 
       InstBase(opcode), data(data) { }
 
-    inline DataDecl* getData()      { return data; }
+    inline DataDecl* getData() const { return data; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -352,14 +373,15 @@ class ImmMemorycpInst: public InstBase {
     ImmMemorycpInst (Opcode_t opcode, MemoryDecl* dst, MemoryDecl* src) : 
       InstBase(opcode), dst(dst), src(src) { }
 
-    inline MemoryDecl* getDstMemory()  { return dst; }
-    inline MemoryDecl* getSrcMemory()  { return src; }
+    inline MemoryDecl* getDstMemory() const { return dst; }
+    inline MemoryDecl* getSrcMemory() const { return src; }
 
     inline void setDstMemory(MemoryDecl *mem) { this->dst = mem; }
     inline void setSrcMemory(MemoryDecl *mem) { this->src = mem; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -371,11 +393,12 @@ class ImmDataTableInst: public InstBase {
     ImmDataTableInst (Opcode_t opcode, DataDecl* data, TableDecl* table) : 
       InstBase(opcode), data(data), table(table) { }
 
-    inline DataDecl* getData()  { return data; }
-    inline TableDecl* getTable()  { return table; }
+    inline DataDecl* getData() const { return data; }
+    inline TableDecl* getTable() const { return table; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -387,11 +410,12 @@ class ImmTablecpInst: public InstBase {
     ImmTablecpInst (Opcode_t opcode, TableDecl* dst, TableDecl* src) : 
       InstBase(opcode), dst(dst), src(src) { }
 
-    inline TableDecl* getDstTable()  { return dst; }
-    inline TableDecl* getSrcTable()  { return src; }
+    inline TableDecl* getDstTable() const { return dst; }
+    inline TableDecl* getSrcTable() const { return src; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -402,10 +426,11 @@ class ImmV128Inst: public InstBase {
     ImmV128Inst (Opcode_t opcode, V128_t value) : 
       InstBase(opcode), value(value) { }
 
-    inline V128_t getValue() { return value; }
+    inline V128_t getValue() const { return value; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -416,10 +441,11 @@ class ImmLaneidxInst: public InstBase {
     ImmLaneidxInst (Opcode_t opcode, Laneidx_t idx) : 
       InstBase(opcode), idx(idx) { }
 
-    inline Laneidx_t getLaneidx() { return idx; }
+    inline Laneidx_t getLaneidx() const { return idx; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -430,10 +456,11 @@ class ImmLaneidx16Inst: public InstBase {
     ImmLaneidx16Inst (Opcode_t opcode, Laneidx16_t idxs) : 
       InstBase(opcode), idxs(idxs) { }
 
-    inline Laneidx16_t getLaneidx16() { return idxs; }
+    inline Laneidx16_t getLaneidx16() const { return idxs; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 
@@ -447,15 +474,16 @@ class ImmMemargLaneidxInst: public InstBase {
     ImmMemargLaneidxInst (Opcode_t opcode, uint32_t align, uint32_t offset, MemoryDecl *mem, Laneidx_t laneidx) : 
       InstBase(opcode), align(align), offset(offset), mem(mem), laneidx(laneidx) { }
 
-    inline uint32_t getOffset()  { return offset; }
-    inline uint32_t getAlign()   { return align; }
-    inline MemoryDecl* getMemory() { return mem; }
-    inline Laneidx_t getLaneidx() { return laneidx; }
+    inline uint32_t getOffset() const { return offset; }
+    inline uint32_t getAlign() const { return align; }
+    inline MemoryDecl* getMemory() const { return mem; }
+    inline Laneidx_t getLaneidx() const { return laneidx; }
 
     inline void setMemory(MemoryDecl *mem) { this->mem = mem; }
 
     //void decode_imm (WasmModule &module , buffer_t &buf) const override;
     void encode_imm (WasmModule &module, bytedeque &bdeq) const override;
+    std::string to_string(WasmModule &module) const override;
 };
 
 

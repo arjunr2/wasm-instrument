@@ -1,5 +1,15 @@
 #include <cstring>
+#include <cstdarg>
 #include "inst_internal.h"
+
+std::string sprintf_string(const char *fmt, ...) {
+  char buf[200];
+  va_list args;
+  va_start(args, fmt);
+  vsprintf(buf, fmt, args);
+  va_end(args);
+  return std::string(buf);
+}
 
 /* InstBase encode error for unimplemented classes */
 void InstBase::encode_imm (WasmModule &module, bytedeque &bdeq) const {
@@ -7,61 +17,11 @@ void InstBase::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   throw std::runtime_error("Encode unimplemented for this opcode\n");
 }
 
-/* Reads next instructions from buf (advancing it) and 
-      constructs the specified instruction type */
-//InstBasePtr InstBase::next_inst_from_buf(WasmModule &module, buffer_t &buf) {
-//  InstBasePtr instptr;
-//  uint32_t pc = buf.ptr - buf.start;
-//  Opcode_t opcode = RD_OPCODE();
-//  opcode_imm_type imm_type = opcode_table[opcode].imm_type;
-//  #define ICS(cs, clsname) \
-//    case cs: instptr.reset(new clsname(module, opcode, buf)); break;
-//  switch (imm_type) {
-//    ICS (IMM_NONE, ImmNoneInst);
-//    ICS (IMM_BLOCKT, ImmBlocktInst);
-//    ICS (IMM_LABEL, ImmLabelInst);
-//    ICS (IMM_LABELS, ImmLabelsInst);
-//    ICS (IMM_FUNC, ImmFuncInst);
-//    ICS (IMM_SIG_TABLE, ImmSigTableInst);
-//    ICS (IMM_LOCAL, ImmLocalInst);
-//    ICS (IMM_GLOBAL, ImmGlobalInst);
-//    ICS (IMM_TABLE, ImmTableInst);
-//    ICS (IMM_MEMARG, ImmMemargInst);
-//    ICS (IMM_I32, ImmI32Inst);
-//    ICS (IMM_F64, ImmF64Inst);
-//    ICS (IMM_MEMORY, ImmMemoryInst);
-//    ICS (IMM_TAG, ImmTagInst);
-//    ICS (IMM_I64, ImmI64Inst);
-//    ICS (IMM_F32, ImmF32Inst);
-//    ICS (IMM_REFNULLT, ImmRefnulltInst);
-//    ICS (IMM_VALTS, ImmValtsInst);
-//    // Extension Immediates
-//    ICS (IMM_DATA_MEMORY, ImmDataMemoryInst);
-//    ICS (IMM_DATA, ImmDataInst);
-//    ICS (IMM_MEMORYCP, ImmMemorycpInst);
-//    ICS (IMM_DATA_TABLE, ImmDataTableInst);
-//    ICS (IMM_TABLECP, ImmTablecpInst);
-//    ICS (IMM_V128, ImmV128Inst);
-//    ICS (IMM_LANEIDX, ImmLaneidxInst);
-//    ICS (IMM_LANEIDX16, ImmLaneidx16Inst);
-//    ICS (IMM_MEMARG_LANEIDX, ImmMemargLaneidxInst);
-//  #undef ICS
-//    default:
-//      ERR("Unknown imm type: %d\n", imm_type);
-//      throw std::runtime_error("Unknown imm");
-//  }
-//  TRACE("O: %s\n", opcode_table[instptr->getOpcode()].mnemonic);
-//  return instptr;
-//}
-
-
-
 /* ImmNoneInst  */
 ImmNoneInst::ImmNoneInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
                           : InstBase(opcode) { }
 
 void ImmNoneInst::encode_imm (WasmModule &module, bytedeque &bdeq) const { }
-
 
 /* ImmBlocktInst  */
 ImmBlocktInst::ImmBlocktInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
@@ -77,6 +37,9 @@ ImmBlocktInst::ImmBlocktInst (WasmModule &module, Opcode_t opcode, buffer_t &buf
 void ImmBlocktInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_I64 (this->type);
 }
+std::string ImmBlocktInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s type[%ld]", this->opString(), this->getType());
+}
 
 
 /* ImmLabelInst  */
@@ -88,7 +51,9 @@ ImmLabelInst::ImmLabelInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
 void ImmLabelInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (this->idx);
 }
-
+std::string ImmLabelInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %ld", this->opString(), this->getLabel());
+}
 
 /* ImmLabelsInst  */
 ImmLabelsInst::ImmLabelsInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
@@ -107,6 +72,13 @@ void ImmLabelsInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   }
   WR_U32 (this->def_idx);
 }
+std::string ImmLabelsInst::to_string(WasmModule &module) const {
+  std::string labels = "";
+  for (auto idx : this->idxs) {
+    labels += std::to_string(idx) + " ";
+  }
+  return sprintf_string("%s %s %ld", this->opString(), this->def_idx);
+}
 
 
 /* ImmFuncInst  */
@@ -118,6 +90,10 @@ ImmFuncInst::ImmFuncInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
 void ImmFuncInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t idx = module.getFuncIdx(this->func);
   WR_U32 (idx);
+}
+std::string ImmFuncInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %ld", this->opString(), 
+    module.getFuncIdx(this->getFunc()));
 }
 
 
@@ -134,6 +110,10 @@ void ImmSigTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (sig_idx);
   WR_U32 (table_idx);
 }
+std::string ImmSigTableInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s type[%ld] table[%ld]", this->opString(), 
+    module.getSigIdx(this->getSig()), module.getTableIdx(this->getTable()));
+}
 
 
 /* ImmLocalInst  */
@@ -144,6 +124,9 @@ ImmLocalInst::ImmLocalInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
 
 void ImmLocalInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (this->idx);
+}
+std::string ImmLocalInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %ld", this->opString(), this->getLocal());
 }
 
 
@@ -157,6 +140,10 @@ void ImmGlobalInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t idx = module.getGlobalIdx(this->global);
   WR_U32 (idx);
 }
+std::string ImmGlobalInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %ld", this->opString(), 
+    module.getGlobalIdx(this->getGlobal()));
+}
 
 
 /* ImmTableInst  */
@@ -168,6 +155,10 @@ ImmTableInst::ImmTableInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
 void ImmTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t idx = module.getTableIdx(this->table);
   WR_U32 (idx);
+}
+std::string ImmTableInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %ld", this->opString(), 
+    module.getTableIdx(this->getTable()));
 }
 
 
@@ -191,6 +182,12 @@ void ImmMemargInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   }
   WR_U32 (this->offset);
 }
+std::string ImmMemargInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s [%d] offset=%ld align=%ld", this->opString(), 
+    module.getMemoryIdx(this->getMemory()),
+    this->getOffset(), 
+    this->getAlign());
+}
 
 
 /* ImmI32Inst  */
@@ -201,6 +198,10 @@ ImmI32Inst::ImmI32Inst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
 
 void ImmI32Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_I32 (this->value);
+}
+std::string ImmI32Inst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %d", this->opString(), 
+    this->getValue());
 }
 
 
@@ -216,6 +217,10 @@ void ImmF64Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   memcpy(&rawbits, &this->value, sizeof(uint64_t));
   WR_U64_RAW (rawbits);
 }
+std::string ImmF64Inst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %f", this->opString(), 
+    this->getValue());
+}
 
 
 /* ImmMemoryInst  */
@@ -229,6 +234,10 @@ void ImmMemoryInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t idx = module.getMemoryIdx(this->mem);
   WR_U32 (idx);
 }
+std::string ImmMemoryInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %d", this->opString(), 
+    module.getMemoryIdx(this->getMemory()));
+}
 
 
 /* ImmTagInst: UNIMPLEMENTED  */
@@ -240,6 +249,10 @@ ImmTagInst::ImmTagInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
 void ImmTagInst::encode_imm (WasmModule &module, bytedeque &bdeq) const { 
   throw std::runtime_error ("Unimplemeted TAG opcode");
 } 
+std::string ImmTagInst::to_string(WasmModule &module) const {
+  throw std::runtime_error ("Unimplemented TAG opcode");
+  return std::string();
+}
 
 
 /* ImmI64Inst  */
@@ -250,6 +263,9 @@ ImmI64Inst::ImmI64Inst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
 
 void ImmI64Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_I64 (this->value);
+}
+std::string ImmI64Inst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %ld", this->opString(), this->getValue());
 }
 
 
@@ -265,6 +281,9 @@ void ImmF32Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   memcpy (&rawbits, &this->value, sizeof(float));
   WR_U32_RAW (rawbits);
 }
+std::string ImmF32Inst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %f", this->opString(), this->getValue());
+}
 
 
 /* ImmRefnulltInst  */
@@ -279,6 +298,9 @@ ImmRefnulltInst::ImmRefnulltInst (WasmModule &module, Opcode_t opcode, buffer_t 
 
 void ImmRefnulltInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_BYTE (this->type);
+}
+std::string ImmRefnulltInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %d", this->opString(), this->getType());
 }
 
 
@@ -298,6 +320,13 @@ void ImmValtsInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
     WR_BYTE (type);
   }
 }
+std::string ImmValtsInst::to_string(WasmModule &module) const {
+  std::string types = "";
+  for (auto type : this->types) {
+    types += std::to_string(type) + " ";
+  }
+  return sprintf_string("%s %s", this->opString(), types);
+}
 
 
 /* ImmDataMemoryInst  */
@@ -313,6 +342,11 @@ void ImmDataMemoryInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t mem_idx = module.getMemoryIdx(this->mem);
   WR_U32 (mem_idx);
 }
+std::string ImmDataMemoryInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %d %d", this->opString(), 
+    module.getDataIdx(this->getData()),
+    module.getMemoryIdx(this->getMemory()));
+}
 
 
 /* ImmDataInst  */
@@ -324,6 +358,10 @@ ImmDataInst::ImmDataInst (WasmModule &module, Opcode_t opcode, buffer_t &buf)
 void ImmDataInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t data_idx = module.getDataIdx(this->data);
   WR_U32 (data_idx);
+}
+std::string ImmDataInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %d", this->opString(), 
+    module.getDataIdx(this->getData()));
 }
 
 
@@ -339,6 +377,11 @@ void ImmMemorycpInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (dst_idx);
   uint32_t src_idx = module.getMemoryIdx(this->src);
   WR_U32 (src_idx);
+}
+std::string ImmMemorycpInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s dst=%d src=%d", this->opString(), 
+    module.getMemoryIdx(this->getDstMemory()),
+    module.getMemoryIdx(this->getSrcMemory()));
 }
 
 
@@ -358,6 +401,11 @@ void ImmDataTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t table_idx = module.getTableIdx(this->table);
   WR_U32 (table_idx);
 }
+std::string ImmDataTableInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %d %d", this->opString(), 
+    module.getDataIdx(this->getData()),
+    module.getTableIdx(this->getTable()));
+}
 
 
 /* ImmTablecpInst  */
@@ -373,6 +421,11 @@ void ImmTablecpInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   uint32_t src_idx = module.getTableIdx(this->src);
   WR_U32 (src_idx);
 }
+std::string ImmTablecpInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %d %d", this->opString(), 
+    module.getTableIdx(this->getDstTable()),
+    module.getTableIdx(this->getSrcTable()));
+}
 
 
 /* ImmV128Inst  */
@@ -386,6 +439,10 @@ void ImmV128Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U64_RAW (this->value.v[0]);
   WR_U64_RAW (this->value.v[1]);
 }
+std::string ImmV128Inst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %u %u", this->opString(), 
+    this->getValue().v[0], this->getValue().v[1]);
+}
 
 
 /* ImmLaneidxInst  */
@@ -396,6 +453,9 @@ ImmLaneidxInst::ImmLaneidxInst (WasmModule &module, Opcode_t opcode, buffer_t &b
 
 void ImmLaneidxInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_BYTE (this->idx);
+}
+std::string ImmLaneidxInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s %u", this->opString(), this->getLaneidx());
 }
 
 
@@ -411,6 +471,13 @@ void ImmLaneidx16Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   for (int i = 0; i < 16; i++) {
     WR_BYTE (this->idxs.l[i]);
   }
+}
+std::string ImmLaneidx16Inst::to_string(WasmModule &module) const {
+  std::string idxs = "";
+  for (int i = 0; i < 16; i++) {
+    idxs += std::to_string(this->idxs.l[i]) + " ";
+  }
+  return sprintf_string("%s %s", this->opString(), idxs);
 }
 
 
@@ -435,4 +502,11 @@ void ImmMemargLaneidxInst::encode_imm (WasmModule &module, bytedeque &bdeq) cons
   }
   WR_U32 (this->offset);
   WR_BYTE (this->laneidx);
+}
+std::string ImmMemargLaneidxInst::to_string(WasmModule &module) const {
+  return sprintf_string("%s [] [] offset=%d align=%d", 
+    module.getMemoryIdx(this->mem),
+    this->laneidx,
+    this->offset,
+    this->align);
 }
