@@ -45,7 +45,7 @@ args_t parse_args(int argc, char* argv[]) {
       default:
         ERR("Usage: %s [--trace (opt)] [--multithread (opt)] [--time (opt)] "
             "[--scheme SCHEME] [--args SCHEME_ARGS (opt)] [--out OUTFILE] input-file\n", argv[0]);
-        ERR("Supported schemes: \'call-count\', \'func-idx\'\n");
+        ERR("Supported schemes: \'call-count\', \'func-idx\', \'allspark-trace-blocks\'\n");
         exit(opt != 'h');
     }
   }

@@ -3,7 +3,7 @@
 #include "inst_internal.h"
 
 std::string sprintf_string(const char *fmt, ...) {
-  char buf[200];
+  char buf[3000];
   va_list args;
   va_start(args, fmt);
   vsprintf(buf, fmt, args);
@@ -38,7 +38,7 @@ void ImmBlocktInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_I64 (this->type);
 }
 std::string ImmBlocktInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s type[%ld]", this->opString(), this->getType());
+  return sprintf_string("%s type[%ld]", this->opString().c_str(), this->getType());
 }
 
 
@@ -52,7 +52,7 @@ void ImmLabelInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (this->idx);
 }
 std::string ImmLabelInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %ld", this->opString(), this->getLabel());
+  return sprintf_string("%s %ld", this->opString().c_str(), this->getLabel());
 }
 
 /* ImmLabelsInst  */
@@ -77,7 +77,8 @@ std::string ImmLabelsInst::to_string(WasmModule &module) const {
   for (auto idx : this->idxs) {
     labels += std::to_string(idx) + " ";
   }
-  return sprintf_string("%s %s %ld", this->opString(), this->def_idx);
+  return sprintf_string("%s %s %ld", this->opString().c_str(), 
+    labels.c_str(), this->def_idx);
 }
 
 
@@ -92,7 +93,7 @@ void ImmFuncInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (idx);
 }
 std::string ImmFuncInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %ld", this->opString(), 
+  return sprintf_string("%s %ld", this->opString().c_str(), 
     module.getFuncIdx(this->getFunc()));
 }
 
@@ -111,7 +112,7 @@ void ImmSigTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (table_idx);
 }
 std::string ImmSigTableInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s type[%ld] table[%ld]", this->opString(), 
+  return sprintf_string("%s type[%ld] table[%ld]", this->opString().c_str(), 
     module.getSigIdx(this->getSig()), module.getTableIdx(this->getTable()));
 }
 
@@ -126,7 +127,7 @@ void ImmLocalInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (this->idx);
 }
 std::string ImmLocalInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %ld", this->opString(), this->getLocal());
+  return sprintf_string("%s %ld", this->opString().c_str(), this->getLocal());
 }
 
 
@@ -141,7 +142,7 @@ void ImmGlobalInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (idx);
 }
 std::string ImmGlobalInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %ld", this->opString(), 
+  return sprintf_string("%s %ld", this->opString().c_str(), 
     module.getGlobalIdx(this->getGlobal()));
 }
 
@@ -157,7 +158,7 @@ void ImmTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (idx);
 }
 std::string ImmTableInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %ld", this->opString(), 
+  return sprintf_string("%s %ld", this->opString().c_str(), 
     module.getTableIdx(this->getTable()));
 }
 
@@ -183,10 +184,8 @@ void ImmMemargInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (this->offset);
 }
 std::string ImmMemargInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s [%d] offset=%ld align=%ld", this->opString(), 
-    module.getMemoryIdx(this->getMemory()),
-    this->getOffset(), 
-    this->getAlign());
+  return sprintf_string("%s [%d] offset=%ld align=%ld", this->opString().c_str(), 
+    module.getMemoryIdx(this->getMemory()), this->getOffset(), this->getAlign());
 }
 
 
@@ -200,8 +199,7 @@ void ImmI32Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_I32 (this->value);
 }
 std::string ImmI32Inst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %d", this->opString(), 
-    this->getValue());
+  return sprintf_string("%s %d", this->opString().c_str(), this->getValue());
 }
 
 
@@ -218,8 +216,9 @@ void ImmF64Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U64_RAW (rawbits);
 }
 std::string ImmF64Inst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %f", this->opString(), 
-    this->getValue());
+  uint64_t rawbits;
+  memcpy(&rawbits, &this->value, sizeof(uint64_t));
+  return sprintf_string("%s %llu", this->opString().c_str(), rawbits);
 }
 
 
@@ -235,7 +234,7 @@ void ImmMemoryInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (idx);
 }
 std::string ImmMemoryInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %d", this->opString(), 
+  return sprintf_string("%s %d", this->opString().c_str(), 
     module.getMemoryIdx(this->getMemory()));
 }
 
@@ -265,7 +264,7 @@ void ImmI64Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_I64 (this->value);
 }
 std::string ImmI64Inst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %ld", this->opString(), this->getValue());
+  return sprintf_string("%s %ld", this->opString().c_str(), this->getValue());
 }
 
 
@@ -282,7 +281,7 @@ void ImmF32Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32_RAW (rawbits);
 }
 std::string ImmF32Inst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %f", this->opString(), this->getValue());
+  return sprintf_string("%s", this->opString().c_str());
 }
 
 
@@ -300,7 +299,7 @@ void ImmRefnulltInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_BYTE (this->type);
 }
 std::string ImmRefnulltInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %d", this->opString(), this->getType());
+  return sprintf_string("%s %d", this->opString().c_str(), this->getType());
 }
 
 
@@ -325,7 +324,7 @@ std::string ImmValtsInst::to_string(WasmModule &module) const {
   for (auto type : this->types) {
     types += std::to_string(type) + " ";
   }
-  return sprintf_string("%s %s", this->opString(), types);
+  return sprintf_string("%s %s", this->opString().c_str(), types);
 }
 
 
@@ -343,7 +342,7 @@ void ImmDataMemoryInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (mem_idx);
 }
 std::string ImmDataMemoryInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %d %d", this->opString(), 
+  return sprintf_string("%s %d %d", this->opString().c_str(), 
     module.getDataIdx(this->getData()),
     module.getMemoryIdx(this->getMemory()));
 }
@@ -360,7 +359,7 @@ void ImmDataInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (data_idx);
 }
 std::string ImmDataInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %d", this->opString(), 
+  return sprintf_string("%s %d", this->opString().c_str(), 
     module.getDataIdx(this->getData()));
 }
 
@@ -379,7 +378,7 @@ void ImmMemorycpInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (src_idx);
 }
 std::string ImmMemorycpInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s dst=%d src=%d", this->opString(), 
+  return sprintf_string("%s dst=%d src=%d", this->opString().c_str(), 
     module.getMemoryIdx(this->getDstMemory()),
     module.getMemoryIdx(this->getSrcMemory()));
 }
@@ -402,7 +401,7 @@ void ImmDataTableInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (table_idx);
 }
 std::string ImmDataTableInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %d %d", this->opString(), 
+  return sprintf_string("%s %d %d", this->opString().c_str(), 
     module.getDataIdx(this->getData()),
     module.getTableIdx(this->getTable()));
 }
@@ -422,7 +421,7 @@ void ImmTablecpInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U32 (src_idx);
 }
 std::string ImmTablecpInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %d %d", this->opString(), 
+  return sprintf_string("%s %d %d", this->opString().c_str(), 
     module.getTableIdx(this->getDstTable()),
     module.getTableIdx(this->getSrcTable()));
 }
@@ -440,7 +439,7 @@ void ImmV128Inst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_U64_RAW (this->value.v[1]);
 }
 std::string ImmV128Inst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %u %u", this->opString(), 
+  return sprintf_string("%s %u %u", this->opString().c_str(), 
     this->getValue().v[0], this->getValue().v[1]);
 }
 
@@ -455,7 +454,7 @@ void ImmLaneidxInst::encode_imm (WasmModule &module, bytedeque &bdeq) const {
   WR_BYTE (this->idx);
 }
 std::string ImmLaneidxInst::to_string(WasmModule &module) const {
-  return sprintf_string("%s %u", this->opString(), this->getLaneidx());
+  return sprintf_string("%s %u", this->opString().c_str(), this->getLaneidx());
 }
 
 
@@ -477,7 +476,7 @@ std::string ImmLaneidx16Inst::to_string(WasmModule &module) const {
   for (int i = 0; i < 16; i++) {
     idxs += std::to_string(this->idxs.l[i]) + " ";
   }
-  return sprintf_string("%s %s", this->opString(), idxs);
+  return sprintf_string("%s %s", this->opString().c_str(), idxs);
 }
 
 
