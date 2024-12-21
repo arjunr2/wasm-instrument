@@ -29,15 +29,17 @@ struct TraceInstrumentData {
 
     FuncDecl* main_fn;
     FuncDecl* curr_fn;
-    uint32_t tmp_i32_locals[2];
-    uint32_t tmp_i64_locals[1];
+
+    LocalAllocator lc_allocator;
     FuncDecl* tracedump_fn;
 
     uint32_t pc_bits;
     uint32_t fnidx_bits;
 
     TraceInstrumentData(WasmModule &module, FuncDecl* main_fn, 
-            uint32_t instmem_start, uint32_t pc_bits, uint32_t fnidx_bits) {
+            uint32_t instmem_start, uint32_t pc_bits, uint32_t fnidx_bits) : 
+            lc_allocator(NULL, {}) {
+
         this->ctrlflow_bytes_addr = instmem_start;
         this->ctrlflow_vector_start = instmem_start + 8;
 
@@ -71,15 +73,91 @@ struct TraceInstrumentData {
 
         this->pc_bits = pc_bits;
         this->fnidx_bits = fnidx_bits;
+
     }
 
-    void set_current_fn(FuncDecl* func) {
-        this->tmp_i32_locals[0] = func->add_local(WASM_TYPE_I32);
-        this->tmp_i32_locals[1] = func->add_local(WASM_TYPE_I32);
-        this->tmp_i64_locals[0] = func->add_local(WASM_TYPE_I64);
+    void reset_current_fn(FuncDecl* func) {
+        this->lc_allocator = LocalAllocator(func, {
+            {WASM_TYPE_I32, 2}, {WASM_TYPE_I64, 1}
+        });
         this->curr_fn = func;
     }
 };
+
+// Encode the function index and source pc of instruction into packed high
+// bits of 64-bit value
+inline uint64_t get_fn_srcpc_shift(WasmModule &module, TraceInstrumentData &trace_data,
+        InstBasePtr &instptr) {
+    // We subtract 1 from function index since we insert an import
+    return ((uint64_t)instptr->getOrigPc() << 24) | 
+        (((uint64_t)module.getFuncIdx(trace_data.curr_fn) - 1) << 48);
+}
+
+// Instructions to record ctrlflow path into vector in memory
+// To use this, control flow target is expected on top of the stack
+InstBuilder ctrlflow_recorder(WasmModule &module, 
+        TraceInstrumentData &trace_data, InstBasePtr &instptr,
+        bool is_call_indirect = false) {
+
+    uint64_t br_fn_srcpc_shift = get_fn_srcpc_shift(module, trace_data, instptr);
+
+    auto lc_imap = trace_data.lc_allocator.get_idx_map();
+    auto i32_locals = lc_imap[WASM_TYPE_I32];
+    auto i64_locals = lc_imap[WASM_TYPE_I64];
+
+    InstBuilder builder = {};    
+    builder.push ({
+        // Control flow target
+        INST (LocalSetInst(i64_locals[0])),
+        // Base address to write target entry
+#if USE_GLOBALS_TRACE != 0
+        INST (GlobalGetInst(trace_data.ctrlflow_vector)),
+        INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
+#else
+        INST (I32ConstInst(trace_data.ctrlflow_vector_start)),
+#if USE_ATOMICS != 0
+        // Increment and get with atomic
+        INST (I32ConstInst(0)),
+        INST (I32ConstInst(8)),
+        INST (I32AtomicRmwAddInst(2, trace_data.ctrlflow_bytes_addr, 
+            module.getMemory(0))),
+#else
+        // Load and save old ctrlflow_bytes
+        INST (I32ConstInst(0)),
+        INST (I32LoadInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
+        INST (LocalTeeInst(i32_locals[1])),
+        // Address to writeback
+        INST (I32ConstInst(0)),
+        // Increment ctrlflow_bytes
+        INST (LocalGetInst(i32_locals[1])),
+        INST (I32ConstInst(8)),
+        INST (I32AddInst()),
+        // Storeback
+        INST (I32StoreInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
+#endif
+#endif
+        // Base Address for writing entry
+        INST (I32AddInst()),
+        // Value to write -- Pack br_pc, target
+        // For call indirect, this is the last argument in function
+        is_call_indirect ? 
+            INST (LocalGetInst(trace_data.curr_fn->sig->params.size() - 1)) :
+            INST (I64ConstInst(br_fn_srcpc_shift)),
+        INST (LocalGetInst(i64_locals[0])),
+        INST (I64OrInst()),
+        // Write to memory
+        INST (I64StoreInst(3, 0, module.getMemory(0))),
+#if USE_GLOBALS_TRACE != 0
+        // Increment ctrlflow_bytes if using globals
+        INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
+        INST (I32ConstInst(8)),
+        INST (I32AddInst()),
+        INST (GlobalSetInst(trace_data.ctrlflow_bytes)),
+#endif
+    });
+    return builder;
+};
+
 
 void local_cfscope_handler(WasmModule &module, ScopeBlock &scope, 
         TraceInstrumentData &trace_data) {
@@ -127,88 +205,37 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
             }
         };
 
-        // Instructions to record ctrlflow path into vector in memory
-        auto record_ctrlflow = [&module, &trace_data, &builder, &instptr]() {
-            // Packed function index and target pc
-            // We subtract 1 from function index since we insert an import
-            uint64_t br_fn_srcpc_shift = 
-                ((uint64_t)instptr->getOrigPc() << 24) | 
-                (((uint64_t)module.getFuncIdx(trace_data.curr_fn) - 1) << 48);
-            builder.push ({
-                // Control flow target
-                INST (LocalSetInst(trace_data.tmp_i64_locals[0])),
-                // Base address to write target entry
-#if USE_GLOBALS_TRACE != 0
-                INST (GlobalGetInst(trace_data.ctrlflow_vector)),
-                INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
-#else
-                INST (I32ConstInst(trace_data.ctrlflow_vector_start)),
-#if USE_ATOMICS != 0
-                // Increment and get with atomic
-                INST (I32ConstInst(0)),
-                INST (I32ConstInst(8)),
-                INST (I32AtomicRmwAddInst(2, trace_data.ctrlflow_bytes_addr, 
-                    module.getMemory(0))),
-#else
-                // Load and save old ctrlflow_bytes
-                INST (I32ConstInst(0)),
-                INST (I32LoadInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
-                INST (LocalTeeInst(trace_data.tmp_i32_locals[1])),
-                // Address to writeback
-                INST (I32ConstInst(0)),
-                // Increment ctrlflow_bytes
-                INST (LocalGetInst(trace_data.tmp_i32_locals[1])),
-                INST (I32ConstInst(8)),
-                INST (I32AddInst()),
-                // Storeback
-                INST (I32StoreInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
-#endif
-#endif
-                // Base Address for writing entry
-                INST (I32AddInst()),
-                // Value to write -- Pack br_pc, target
-                INST (I64ConstInst(br_fn_srcpc_shift)),
-                INST (LocalGetInst(trace_data.tmp_i64_locals[0])),
-                INST (I64OrInst()),
-                // Write to memory
-                INST (I64StoreInst(3, 0, module.getMemory(0))),
-#if USE_GLOBALS_TRACE != 0
-                // Increment ctrlflow_bytes if using globals
-                INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
-                INST (I32ConstInst(8)),
-                INST (I32AddInst()),
-                INST (GlobalSetInst(trace_data.ctrlflow_bytes)),
-#endif
-            });
-        };
 
         auto br_insert = [&module, &trace_data, &pc, &institr, &instptr, 
-                &builder, &get_br_target_pc, &record_ctrlflow]() {
+                &builder, &get_br_target_pc]() {
             std::shared_ptr<ImmLabelInst> br_inst = std::static_pointer_cast<ImmLabelInst>(instptr);
             uint32_t target_pc = get_br_target_pc(br_inst->getLabel());
             // Target on stack
             builder.push_inst(I64ConstInst(target_pc));
-            record_ctrlflow();
+            auto cf_builder = ctrlflow_recorder(module, trace_data, instptr);
+            builder.splice(cf_builder);
             builder.splice_into(trace_data.curr_fn->instructions, institr);
         };
         auto br_if_insert = [&module, &trace_data, &pc, &institr, &instptr, 
-                &builder, &get_br_target_pc, &record_ctrlflow]() {
+                &builder, &get_br_target_pc]() {
             std::shared_ptr<ImmLabelInst> br_if_inst = std::static_pointer_cast<ImmLabelInst>(instptr);
             uint32_t succ_pc = get_br_target_pc(br_if_inst->getLabel());
             uint32_t fail_pc = (*std::next(institr))->getOrigPc();
+            auto i32_locals = trace_data.lc_allocator.get_type_vector(WASM_TYPE_I32);
             builder.push ({
                 // Save br_cond
-                INST (LocalTeeInst(trace_data.tmp_i32_locals[0])),
+                INST (LocalTeeInst(i32_locals[0])),
                 INST (I64ConstInst(succ_pc)),
                 INST (I64ConstInst(fail_pc)),
-                INST (LocalGetInst(trace_data.tmp_i32_locals[0])),
+                INST (LocalGetInst(i32_locals[0])),
                 INST (SelectInst())
             });
-            record_ctrlflow();
+            auto cf_builder = ctrlflow_recorder(module, trace_data, instptr);
+            builder.splice(cf_builder);
             builder.splice_into(trace_data.curr_fn->instructions, institr);
         };
         auto br_table_insert = [&module, &trace_data, &pc, &institr, &instptr, 
-                &builder, &get_br_target_pc, &record_ctrlflow]() {
+                &builder, &get_br_target_pc]() {
             std::shared_ptr<ImmLabelsInst> br_table_inst = std::static_pointer_cast<ImmLabelsInst>(instptr);
             auto labels = br_table_inst->getLabels();
             // Get the number of arms
@@ -219,15 +246,16 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
             SigDecl *block_sig = module.add_sig(i64_ret_sigdecl, false);
             uint32_t block_sig_idx = module.getSigIdx(block_sig);
 
+            auto i32_locals = trace_data.lc_allocator.get_type_vector(WASM_TYPE_I32);
             // Store dynamic branch site in local
-            builder.push_inst (LocalTeeInst(trace_data.tmp_i32_locals[0]));
+            builder.push_inst (LocalTeeInst(i32_locals[0]));
             for (int i = 0; i < max_idx + 1; i++) {
                 builder.push_inst(BlockInst(block_sig_idx));
             }
             builder.push ({
                 INST (BlockInst(block_sig_idx)),
                 INST (I64ConstInst(0)),
-                INST (LocalGetInst(trace_data.tmp_i32_locals[0])),
+                INST (LocalGetInst(i32_locals[0])),
                 INST (ImmLabelsInst(*br_table_inst)),
                 INST (EndInst())
             });
@@ -240,7 +268,29 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
                     INST (EndInst())
                 });
             }
-            record_ctrlflow();
+            auto cf_builder = ctrlflow_recorder(module, trace_data, instptr);
+            builder.splice(cf_builder);
+            builder.splice_into(trace_data.curr_fn->instructions, institr);
+        };
+
+        auto call_indirect_insert = [&module, &trace_data, &pc, &institr, 
+                &instptr, &builder]() {
+            auto call_idr_inst = std::static_pointer_cast<ImmSigTableInst>(instptr);
+            auto i32_locals = trace_data.lc_allocator.get_type_vector(WASM_TYPE_I32);
+
+            builder.push({
+                INST (LocalSetInst(i32_locals[0])),
+                // Source information for call_indirect
+                // Wrapper handles target information
+                INST (I64ConstInst(get_fn_srcpc_shift(module, trace_data, instptr))),
+                INST (LocalGetInst(i32_locals[0])),
+            });
+
+            SigDecl new_sig(*(call_idr_inst->getSig()));
+            new_sig.params.push_back(WASM_TYPE_I64);
+            // Update call_indirect type check
+            call_idr_inst->setSig(module.add_sig(new_sig, false));
+
             builder.splice_into(trace_data.curr_fn->instructions, institr);
         };
 
@@ -252,17 +302,46 @@ void local_cfscope_handler(WasmModule &module, ScopeBlock &scope,
             continue;
         }
 
-        // Monitor before instructions that modify control flow
+        // Monitor before instructions that modify control flow dynamically
         switch (opcode) {
             case WASM_OP_BR: { br_insert(); break; }
             case WASM_OP_BR_IF: { br_if_insert(); break; }
             case WASM_OP_BR_TABLE: { br_table_insert(); break; }
+            case WASM_OP_CALL_INDIRECT: { call_indirect_insert(); break; }
             default: {}
         }
     }
 
     cfscope_stack.pop_back();
 }
+
+
+void insert_tracedump(WasmModule &module, TraceInstrumentData &trace_data, 
+            InstItr institr) {
+    InstBuilder builder = {};
+    builder.push ({
+#if USE_GLOBALS_TRACE != 0
+        INST (GlobalGetInst(trace_data.ctrlflow_vector)),
+        INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
+#else
+        INST (I32ConstInst(trace_data.ctrlflow_vector_start)),
+        INST (I32ConstInst(0)),
+        INST (I32LoadInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
+#endif
+        INST (CallInst(trace_data.tracedump_fn)),
+        // Clear the globals
+#if USE_GLOBALS_TRACE != 0
+        INST (I32ConstInst(0)),
+        INST (GlobalSetInst(trace_data.ctrlflow_bytes)),
+#else
+        INST (I32ConstInst(0)),
+        INST (I32ConstInst(0)),
+        INST (I32StoreInst(2, trace_data.ctrlflow_bytes_addr, 
+            module.getMemory(0))),
+#endif
+    });
+    builder.splice_into(trace_data.curr_fn->instructions, institr);
+};
 
 // Main Allspark Trace Instrumenter
 void allspark_trace_instrument (WasmModule &module, std::string entry_export) {
@@ -294,54 +373,54 @@ void allspark_trace_instrument (WasmModule &module, std::string entry_export) {
     // together in 64b value
     assert (max_fn_bits <= 16 && max_pc_bits <= 24);
 
+    // We marshall the 64-bit <fn-idx><src-pc> packing
+    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module, {WASM_TYPE_I64});
+
     TraceInstrumentData trace_data(module, 
         main_fn, old_page_count * WASM_PAGE_SIZE, max_pc_bits, max_fn_bits);
 
-    // Generate scopes for the main function
+    // Trace functions through generated scopes
     for (auto &func: module.Funcs()) {
-        if (module.isImport(&func)) { continue; }
+        if (module.isImport(&func) || funcref_wrappers.contains(&func)) { 
+            continue; 
+        }
         ScopeList main_scopes = module.gen_scopes_from_instructions(&func);
         ScopeBlock main_scope = main_scopes.front();
 
-        trace_data.set_current_fn(&func);
+        trace_data.reset_current_fn(&func);
         local_cfscope_handler(module, main_scope, trace_data); 
     }
 
-    auto insert_tracedump = [&module, &trace_data](auto institr) {
-        InstBuilder builder = {};
-        builder.push ({
-#if USE_GLOBALS_TRACE != 0
-            INST (GlobalGetInst(trace_data.ctrlflow_vector)),
-            INST (GlobalGetInst(trace_data.ctrlflow_bytes)),
-#else
-            INST (I32ConstInst(trace_data.ctrlflow_vector_start)),
-            INST (I32ConstInst(0)),
-            INST (I32LoadInst(2, trace_data.ctrlflow_bytes_addr, module.getMemory(0))),
-#endif
-            INST (CallInst(trace_data.tracedump_fn)),
-            // Clear the globals
-#if USE_GLOBALS_TRACE != 0
-            INST (I32ConstInst(0)),
-            INST (GlobalSetInst(trace_data.ctrlflow_bytes)),
-#else
-            INST (I32ConstInst(0)),
-            INST (I32ConstInst(0)),
-            INST (I32StoreInst(2, trace_data.ctrlflow_bytes_addr, 
-                module.getMemory(0))),
-#endif
-        });
-        builder.splice_into(trace_data.curr_fn->instructions, institr);
-    };
+    // Add call indirect target recording
+    for (auto &func: funcref_wrappers) {
+        trace_data.reset_current_fn(func);
 
-    trace_data.set_current_fn(trace_data.main_fn);
+        InstBuilder builder = {};
+        uint32_t target_func_idx = 0xFFFFFFFF;
+        for (auto &inst: func->instructions) {
+            // Get the target function index of the call_indirect wrapper
+            if (inst->getOpcode() == WASM_OP_CALL) {
+                auto call_inst = 
+                    std::static_pointer_cast<ImmFuncInst>(inst);
+                target_func_idx = module.getFuncIdx(call_inst->getFunc());
+            }
+        }
+        auto institr = func->instructions.begin();
+        builder.push_inst(I64ConstInst(target_func_idx));
+        auto cf_builder = ctrlflow_recorder(module, trace_data, *institr, true);
+        builder.splice(cf_builder);
+        builder.splice_into(trace_data.curr_fn->instructions, institr);
+    }
+
+    trace_data.reset_current_fn(trace_data.main_fn);
     // Dump vector trace at the end of the main function and returns
     for (auto institr = main_fn->instructions.begin(); institr != main_fn->instructions.end(); ++institr) {
         InstBasePtr instptr = *institr;
         uint16_t opcode = instptr->getOpcode();
         if (opcode == WASM_OP_RETURN) {
-            insert_tracedump(institr);
+            insert_tracedump(module, trace_data, institr);
         }
     }
-    insert_tracedump(std::prev(main_fn->instructions.end()));
+    insert_tracedump(module, trace_data, std::prev(main_fn->instructions.end()));
 
 }

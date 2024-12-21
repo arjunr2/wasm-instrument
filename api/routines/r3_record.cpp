@@ -6,15 +6,6 @@
 
 #define INST(inv) InstBasePtr(new inv)
 
-// Wasm locals representation for instrumentation
-struct LocalVal {
-	wasm_type_t type;
-	uint32_t idx;
-
-    public:
-        LocalVal() : type((wasm_type_t)0), idx(-1) {}
-        LocalVal(wasm_type_t t, uint32_t i) : type(t), idx(i) {}
-};
 
 // Memory operation trace-relevant properties
 struct MemopInstInfo {
@@ -136,48 +127,6 @@ struct CallMaps {
 		bool found = (x != lockless.end());
 		return std::make_pair(found, found ? x->second : std::string());
     }
-};
-
-// Allocator interface for Wasm locals
-class LocalAllocator {
-    private:
-        std::map<wasm_type_t, std::vector<uint32_t>> idx_map;
-        std::map<wasm_type_t, uint32_t> allocator;
-
-    public:
-        // Initialize local index map from the locals count
-        LocalAllocator(FuncDecl *func, std::map<wasm_type_t, uint32_t> locals_count) {
-            idx_map.clear();
-            for (auto &x: locals_count) {
-                idx_map[x.first] = std::vector<uint32_t>(x.second);
-                for (int i = 0; i < x.second; i++) {
-                    idx_map[x.first][i] = func->add_local(x.first);
-                }
-            }
-        }
-
-        // Reset all allocations
-        void reset_allocator() {
-            for (auto &x: allocator) { x.second = 0; }
-        }
-
-        // Allocate a local of specific type
-        LocalVal allocate(wasm_type_t type) {
-            auto type_idx_vector = idx_map.at(type);
-            if (allocator[type] >= type_idx_vector.size()) {
-                ERR("Local allocation exceeded for type %d\n", type);
-                return LocalVal();
-            }
-            return LocalVal(type, type_idx_vector[allocator[type]++]);
-            //return (LocalVal) { .type = type, .idx = type_entry[allocator[type]++] };
-        }
-
-        // Get the total number of locals allocatable across all types
-        uint32_t get_local_pool_count() {
-            uint32_t max = 0;
-            for (auto &x: idx_map) { max += x.second.size(); }
-            return max;
-        }
 };
 
 
@@ -917,7 +866,8 @@ void r3_record_instrument (WasmModule &module) {
 	MemoryDecl *record_mem = module.add_memory(new_mem);
 
     // Setup for call_indirect interposition
-    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module, true);
+    // During record: we marshall the access_idx and wrap the original target with a plain `call`.
+    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module, {WASM_TYPE_I32});
 
 	// Generate quick lookup of ignored exported function idxs
 	std::map<FuncDecl*, std::string> func_ignore_map;

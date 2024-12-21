@@ -3,7 +3,6 @@
 
 #include "routine_common.h"
 #include "r3_memops_table.h"
-#include <sstream>
 
 #define INST(v) InstBasePtr(new v)
 
@@ -306,61 +305,6 @@ static bool set_func_export_map(WasmModule &module, std::string name, std::map<F
   return false;
 }
 
-// Core instrumentation for call_indirect interposition
-// Update elems with funcref (works only if module uses active elems):
-// `call_indirect`s will go through our instrumented elem targets, allowing us
-// interpose on its capability dynamically.
-// During record: we pass the access_idx and wrap the original target with a plain `call`.
-// During replay: access_idx is unneccessary and import calls will be replaced as needed 
-static std::set<FuncDecl*> instrument_funcref_elems (WasmModule &module, 
-      bool record_phase = false) {
-    uint32_t funcref_counter = 0;
-    std::set<FuncDecl*> newfuncs;
-    for (auto &elem: module.Elems()) {
-        if (elem.flag != 0) {
-            ERR("Currently only active elems are supported (got flag: %d)\n", elem.flag);
-        }
-        for (auto &funcref: elem.funcs) {
-            std::ostringstream oss;
-            auto dname_pair = module.get_debug_name_from_func(funcref);
-            if (dname_pair.first) {
-                oss << dname_pair.second << "__funcref_wrapper";
-            } else {
-                oss << funcref_counter << "__funcref_wrapper";
-            }
-
-            SigDecl new_fn_sig(*(funcref->sig));
-            if (record_phase) {
-              // Shepherd access_idx through the call parameters for record
-              new_fn_sig.params.push_back(WASM_TYPE_I32);
-            }
-            FuncDecl new_fn_decl = {
-                .sig = module.add_sig(new_fn_sig, false),
-                .pure_locals = wasm_localcsv_t(),
-                .num_pure_locals = 0,
-                .instructions = {
-                    INST(EndInst())
-                }
-            };
-
-            std::string new_dname = oss.str();
-            FuncDecl *new_fn = module.add_func(new_fn_decl, NULL, new_dname.c_str());
-            InstBuilder param_builder = {};
-            for (int i = 0; i < funcref->sig->params.size(); i++) {
-                param_builder.push_inst(LocalGetInst(i));
-            }
-            param_builder.push_inst(CallInst(funcref));
-            param_builder.splice_into(new_fn->instructions, new_fn->instructions.begin());
-
-            // Replace the original funcref in elem section with the new function
-            funcref = new_fn;
-            newfuncs.insert(new_fn);
-
-            funcref_counter++;
-        }
-    }
-    return newfuncs;
-}
 
 /* Record currently inserts the import functions (call_tracedump & memop_tracedump),
   making the function indices we get at replay time offset by the inserted amount.

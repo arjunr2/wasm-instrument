@@ -666,8 +666,9 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     uint32_t instrument_page_start = 
         (add_pages(def_mem, instrument_page_count) * WASM_PAGE_SIZE);
     
-    // Call_indirect interpolation
-    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module, false);
+    // call_indirect interpolation
+    // During replay: access_idx is unneccessary and import calls will be replaced as needed 
+    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module);
     
     FuncDecl *last_instrumented_func = &module.Funcs().back();
 
