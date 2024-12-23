@@ -12,7 +12,7 @@ typedef enum {
     GENERIC_INST_TYPE
 } TraceInstType;
 
-std::string allspark_trace_blocks_inspect (WasmModule &module) {
+std::string allspark_layout_inspect (WasmModule &module) {
     json outd;
     FuncDecl *start_fn = module.get_start_fn();
     if (start_fn) { 

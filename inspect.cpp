@@ -45,7 +45,7 @@ args_t parse_args(int argc, char* argv[]) {
       default:
         ERR("Usage: %s [--trace (opt)] [--multithread (opt)] [--time (opt)] "
             "[--scheme SCHEME] [--args SCHEME_ARGS (opt)] [--out OUTFILE] input-file\n", argv[0]);
-        ERR("Supported schemes: \'call-count\', \'func-idx\', \'allspark-trace-blocks\'\n");
+        ERR("Supported schemes: \'call-count\', \'func-idx\', \'allspark-layout\'\n");
         exit(opt != 'h');
     }
   }
@@ -87,8 +87,8 @@ std::string inspect_call (WasmModule &module, std::string routine, std::vector<s
   else if (routine == "func-idx") {
     ret = func_indexes_inspect(module);
   }
-  else if (routine == "allspark-trace-blocks") {
-    ret = allspark_trace_blocks_inspect(module);
+  else if (routine == "allspark-layout") {
+    ret = allspark_layout_inspect(module);
   }
 
   return ret;
