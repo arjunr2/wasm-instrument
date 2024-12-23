@@ -26,9 +26,10 @@ uint32_t add_pages(MemoryDecl *mem, uint32_t num_pages) {
     throw std::runtime_error("Adding pages exceeds 4GB limit");
   }
   if (memlimit.has_max && (new_size > memlimit.max)) {
-    WARN("Adding more pages (%u + %u) than max memory size (%u); "
+    WARN("Adding more pages (%u + %u) than current max memory size (%u); "
       "Expanding max accordingly\n", memlimit.initial, num_pages, 
       memlimit.max);
+    memlimit.max = (uint32_t) new_size;
   }
   memlimit.initial = (uint32_t) new_size;
   return retval;

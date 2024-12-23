@@ -402,7 +402,8 @@ void allspark_trace_instrument (WasmModule &module, std::string entry_export) {
             if (inst->getOpcode() == WASM_OP_CALL) {
                 auto call_inst = 
                     std::static_pointer_cast<ImmFuncInst>(inst);
-                target_func_idx = module.getFuncIdx(call_inst->getFunc());
+                // Offset function index here as well
+                target_func_idx = module.getFuncIdx(call_inst->getFunc()) - 1;
             }
         }
         auto institr = func->instructions.begin();

@@ -323,6 +323,8 @@ class WasmModule {
     inline bool isImport(TableDecl *table)    { return getTableIdx(table)   < this->imports.num_tables; }
     inline bool isImport(MemoryDecl *mem)     { return getMemoryIdx(mem)    < this->imports.num_mems; }
 
+    inline uint32_t getNumImportFuncs()       { return this->imports.num_funcs; }
+
     /* Section Accessors */
     inline std::list  <FuncDecl> &Funcs() { return this->funcs; }
     inline std::deque <GlobalDecl> &Globals() { return this->globals; }
