@@ -4,7 +4,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Get JSON library for inspections
 include(FetchContent)
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(json)
 
 set (INSTRUMENT_DIR ${CMAKE_CURRENT_LIST_DIR})
