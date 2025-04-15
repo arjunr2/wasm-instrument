@@ -30,3 +30,5 @@ void r3_record_instrument (WasmModule &module);
 void r3_replay_instrument (WasmModule &module, void *replay_ops, uint32_t num_ops, int64_t flags);
 
 void allspark_trace_instrument (WasmModule &module, std::string entry_export = start_export_str);
+
+void snapshot_instrument (WasmModule &module);

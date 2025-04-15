@@ -125,6 +125,8 @@ class LocalAllocator {
         }
 };
 
+// Instructions to typecast any type to I64
+InstBuilder builder_push_i64_extend(InstBuilder &builder, wasm_type_t type);
 
 /* Method to look for either main or _start */
 ExportDecl* get_main_export(WasmModule &module);
@@ -140,5 +142,8 @@ uint32_t add_pages(MemoryDecl *mem, uint32_t num_pages);
 std::set<FuncDecl*> instrument_funcref_elems (WasmModule &module, 
       std::vector<wasm_type_t> marshall_vals = {});
 
+// Method to insert instructions at the end of execution of entry function or relevant import funcs
+void insert_on_exit(WasmModule &module, FuncDecl *entry_func, InstBuilder &builder, 
+  std::vector<ImportInfo> import_exits = {});
   
 #endif

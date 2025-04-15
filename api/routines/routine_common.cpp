@@ -4,6 +4,24 @@
 
 #define INST(inv) InstBasePtr(new inv)
 
+// Instructions to typecast any type to I64
+InstBuilder builder_push_i64_extend(InstBuilder &builder, wasm_type_t type) {
+    switch (type) {
+        case WASM_TYPE_I32: builder.push_inst (I64ExtendI32UInst()); break;
+        case WASM_TYPE_I64: ; break;
+        case WASM_TYPE_F32: builder.push({
+            INST (I32ReinterpretF32Inst()),
+            INST (I64ExtendI32UInst())
+        }); break;
+        case WASM_TYPE_F64: builder.push_inst (I64ReinterpretF64Inst()); break;
+		default: { 
+            ERR("Error: Unsupported type %d for I64 Extend\n", type); 
+        }
+    }
+    return builder;
+}
+
+
 /* Method to look for either main or _start */
 ExportDecl* get_main_export(WasmModule &module) {
   ExportDecl* main_fn_exp = module.find_export("main");
@@ -34,7 +52,6 @@ uint32_t add_pages(MemoryDecl *mem, uint32_t num_pages) {
   memlimit.initial = (uint32_t) new_size;
   return retval;
 }
-
 
 // Core instrumentation for call_indirect interposition
 // Update elems with funcref (works only if module uses active elems):
@@ -90,3 +107,45 @@ std::set<FuncDecl*> instrument_funcref_elems (WasmModule &module,
     }
     return newfuncs;
 }
+
+
+// Method to insert instructions at the end of execution of entry function or relevant import funcs
+void insert_on_exit(WasmModule &module, FuncDecl *entry_func, InstBuilder &builder, 
+    std::vector<ImportInfo> import_func_exits) {
+
+  auto instbuf = builder.get_buf();
+
+  std::set<FuncDecl*> exit_decls;
+  for (auto &x: import_func_exits) {
+    exit_decls.insert(module.find_import_func(x.mod_name, x.member_name));
+  }
+
+  // Probe the calls to an exit decl
+  if (exit_decls.size() > 0) {
+    instrument_funcref_elems(module, {});
+    for (auto &func: module.Funcs()) {
+      for (auto institr = func.instructions.begin(); institr != func.instructions.end(); ++institr) {
+        InstBasePtr &instptr = *institr;
+        if (instptr->getImmType() == IMM_FUNC) {
+          auto immfunc = static_pointer_cast<ImmFuncInst>(instptr);
+          if (exit_decls.contains(immfunc->getFunc())) {
+            func.instructions.insert(institr, instbuf.begin(), instbuf.end());
+          }
+        }
+      }
+    }
+  }
+
+  // Probe entry function's return
+  for (auto institr = entry_func->instructions.begin(); institr != entry_func->instructions.end(); ++institr) {
+      InstBasePtr instptr = *institr;
+      uint16_t opcode = instptr->getOpcode();
+      if (opcode == WASM_OP_RETURN) {
+        entry_func->instructions.insert(institr, instbuf.begin(), instbuf.end());
+      }
+  }
+  // Probe entry function end
+  auto enditr = std::prev(entry_func->instructions.end());
+  entry_func->instructions.insert(enditr, instbuf.begin(), instbuf.end());
+}
+

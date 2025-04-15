@@ -172,6 +172,7 @@ std::vector<WasmModule> instrument_call (WasmModule &module, std::string routine
     std::string entry_export = ((args.size() == 1) ? args[0] : start_export_str);    
     allspark_trace_instrument(module, entry_export); 
   }
+  else if (routine == "snapshot") { snapshot_instrument(module); }
   else {
     ERR("Unsupported instrumentation scheme\n");
   }
