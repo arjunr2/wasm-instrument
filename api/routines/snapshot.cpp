@@ -35,7 +35,7 @@ void snapshot_instrument (WasmModule &module) {
     }
     builder.push({
         INST(MemorySizeInst(memory)),
-        INST(I32ConstInst(globals_per_page)),
+        INST(I32ConstInst(WASM_PAGE_SIZE)),
         INST(I32MulInst()),
         INST(CallInst(import_decl->desc.func)),
     });
