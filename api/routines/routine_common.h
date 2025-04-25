@@ -12,55 +12,8 @@
 #include "ir.h"
 #include "views.h"
 #include "instructions.h"
+#include "builder.h"
 
-
-/* A Builder Class that enables easy generation of instrumented logic */
-class InstBuilder {
-    private:
-        InstList buf;
-    public:
-        InstBuilder(std::initializer_list<InstBasePtr> xargs) {
-          buf.insert(buf.end(), xargs.begin(), xargs.end());
-        }
-
-        inline InstList& get_buf() { return buf; }
-
-        /* Pushing single instruction */
-        template<typename T>
-        void push_inst (T inst) {
-          InstBasePtr x = std::make_shared<T>(inst);
-          buf.push_back(x);
-        }
-
-        inline void push_inst (InstBasePtr instptr) {
-          buf.push_back(instptr);
-        }
-
-        /* Pushing list of instructions */
-        void push(std::initializer_list<InstBasePtr> xargs) {
-          for (auto x : xargs) {
-              this->push_inst(x);
-          }
-        }
-
-        /* Splices the list (default to the end) */
-        inline void splice(InstBuilder &other) {
-          buf.splice(this->buf.end(), other.get_buf());
-        }
-
-        inline void splice(InstBuilder &other, InstList::iterator pos) {
-          buf.splice(pos, other.get_buf());
-        }
-
-        inline void splice_into(InstList &other, InstList::iterator pos) {
-          other.splice(pos, buf);
-        }
-
-        /* Size */
-        inline bool empty() {
-          return buf.empty();
-        }
-};
 
 // Wasm locals representation for instrumentation
 struct LocalVal {
@@ -105,7 +58,6 @@ class LocalAllocator {
                 return LocalVal();
             }
             return LocalVal(type, type_idx_vector[allocator[type]++]);
-            //return (LocalVal) { .type = type, .idx = type_entry[allocator[type]++] };
         }
 
         // Get the total number of locals allocatable across all types
@@ -128,22 +80,4 @@ class LocalAllocator {
 // Instructions to typecast any type to I64
 InstBuilder builder_push_i64_extend(InstBuilder &builder, wasm_type_t type);
 
-/* Method to look for either main or _start */
-ExportDecl* get_main_export(WasmModule &module);
-
-/* Add pages to memory statically. Return the old number of pages */
-uint32_t add_pages(MemoryDecl *mem, uint32_t num_pages);
-
-// Core instrumentation for call_indirect interposition
-// Update elems with funcref (works only if module uses active elems):
-// `call_indirect`s will go through our instrumented elem targets, allowing us
-// interpose on its capability dynamically.
-// Setting record_phase = true allows passing an additional I32 param
-std::set<FuncDecl*> instrument_funcref_elems (WasmModule &module, 
-      std::vector<wasm_type_t> marshall_vals = {});
-
-// Method to insert instructions at the end of execution of entry function or relevant import funcs
-void insert_on_exit(WasmModule &module, FuncDecl *entry_func, InstBuilder &builder, 
-  std::vector<ImportInfo> import_exits = {});
-  
 #endif

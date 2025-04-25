@@ -4,8 +4,6 @@
 #include "routine_common.h"
 #include "r3_memops_table.h"
 
-#define INST(v) InstBasePtr(new v)
-
 namespace RecordInterface {
   /* Types of Call instructions */
   typedef enum {
@@ -386,7 +384,5 @@ static SigDecl get_sigdecl_from_cdef(CSigDecl csig) {
   }
   return sig;
 }
-
-#undef INST
 
 #endif

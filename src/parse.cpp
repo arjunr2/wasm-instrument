@@ -54,8 +54,8 @@ inline static GlobalDecl read_globaltype(buffer_t &buf) {
   return glob;
 }
 
-inline static typelist read_type_list(uint32_t num, buffer_t &buf) {
-  typelist vec;
+inline static TypeList read_type_list(uint32_t num, buffer_t &buf) {
+  TypeList vec;
   for (uint32_t j = 0; j < num; j++) {
     vec.push_back((wasm_type_t) RD_BYTE());
   }

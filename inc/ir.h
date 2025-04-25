@@ -4,24 +4,16 @@
 #include <cstdint>
 #include <cstddef>
 #include <list>
+#include <set>
 #include <string>
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <unordered_map>
 
 #include "common.h"
 #include "wasmdefs.h"
-
-/* For instruction parsing */
-class InstBase;
-typedef std::shared_ptr<InstBase> InstBasePtr;
-typedef std::list<InstBasePtr>::iterator InstItr;
-typedef std::list<InstBasePtr> InstList;
-
-typedef std::list<wasm_type_t> typelist;
-
-struct ScopeBlock;
-typedef std::list<ScopeBlock> ScopeList;
+#include "ir_defs.h"
 
 /* Utility Functions */
 const char* wasm_type_string(wasm_type_t type);
@@ -29,6 +21,8 @@ const char* wasm_section_name(byte sec_code);
 const char* wasm_kind_string(wasm_kind_t kind);
 
 class WasmModule;
+class FuncDecl;
+class InstBuilder;
 
 /* Intermediate components */
 struct wasm_limits_t {
@@ -72,8 +66,8 @@ struct CustomDecl {
 
 
 struct SigDecl {
-  typelist params;
-  typelist results;
+  TypeList params;
+  TypeList results;
 
   bool operator==(const SigDecl &sig) const {
     bool parameq = std::equal(this->params.begin(), this->params.end(),
@@ -112,22 +106,14 @@ struct FuncDecl {
   /* Code: Raw static instructions */ 
   InstList instructions;
 
-  uint32_t add_local(wasm_type_t new_type) {
-    wasm_localcse_t &last = this->pure_locals.back();
-    if (last.type == new_type) {
-      last.count++;
-    } else {
-      this->pure_locals.push_back( { .count = 1, .type = new_type } );
-    }
-    uint32_t idx = this->sig->params.size() + num_pure_locals;
-    num_pure_locals++;
-    return idx;
-  }
+  uint32_t add_local(wasm_type_t new_type);
 };
 
 
 struct MemoryDecl {
   wasm_limits_t limits;
+
+  uint32_t add_pages(uint32_t num_pages);
 };
 
 
@@ -348,31 +334,24 @@ class WasmModule {
     bytedeque encode_module (char* outfile);
 
 
-    /* Instrumentation methods */
-    
-    /* Addition */
-    /* Module-internal values with optional export */
+    /* Base Instrumentation methods */
     SigDecl*    add_sig     (SigDecl &sig, bool force_dup = false);
     GlobalDecl* add_global  (GlobalDecl &global, const char* export_name = NULL);
     TableDecl*  add_table   (TableDecl &table, const char* export_name = NULL);
     MemoryDecl* add_memory  (MemoryDecl &mem, const char* export_name = NULL);
     FuncDecl*   add_func    (FuncDecl &func, const char* export_name = NULL, const char* debug_name = NULL);
 
-    /* Imported values */
     ImportDecl* add_import (ImportInfo &info, GlobalInfo &global);
     ImportDecl* add_import (ImportInfo &info, TableDecl &table);
     ImportDecl* add_import (ImportInfo &info, MemoryDecl &mem);
     ImportDecl* add_import (ImportInfo &info, SigDecl &sig);
 
-    /* Exported values */
     ExportDecl* add_export (std::string export_name, GlobalDecl &global);
     ExportDecl* add_export (std::string export_name, TableDecl &table);
     ExportDecl* add_export (std::string export_name, MemoryDecl &mem);
     ExportDecl* add_export (std::string export_name, FuncDecl &func);
 
-    /* Find */
     ExportDecl* find_export (std::string export_name);
-
     FuncDecl* find_func_from_debug_name (std::string debug_name);
 
     GlobalDecl* find_import_global (std::string mod_name, std::string member_name);
@@ -380,19 +359,23 @@ class WasmModule {
     MemoryDecl* find_import_memory (std::string mod_name, std::string member_name);
     FuncDecl* find_import_func (std::string mod_name, std::string member_name);
 
-    /* Getters */
     ImportDecl* get_import_name_from_func (FuncDecl *func);
     std::pair<bool, std::string&> get_debug_name_from_func (FuncDecl *func);
 
-    /* Removal */
     bool remove_func (uint32_t idx);
     bool remove_func (FuncDecl *func);
+    
+    
+    /* Common Instrumentation Methods */
+    FuncDecl* get_main_fn();
 
-    /* Replace uses: UNIMPLEMENTED */
-    void replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst);
-    void replace_all_uses (TableDecl* old_inst, TableDecl* new_inst);
-    void replace_all_uses (MemoryDecl* old_inst, MemoryDecl* new_inst);
-    void replace_all_uses (FuncDecl* old_inst, FuncDecl* new_inst);
+    std::set<FuncDecl*> funcref_wrap (std::vector<wasm_type_t> marshall_vals = {});
+
+    void exit_instrument(InstBuilder &builder, std::vector<ImportInfo> import_func_exits = {}, 
+      FuncDecl *entry_func = NULL);
+
+    void beforeFuncCall (std::map<FuncDecl*, DirectCallSiteCallback> &builder_map);
+    void beforeImmTypeInstruction (opcode_imm_type opcode, InstructionSiteCallback callback);
 };
 
 

@@ -58,7 +58,7 @@ inline static void write_globaltype(bytedeque &bdeq, GlobalDecl &global) {
   WR_BYTE (global.is_mutable);
 }
 
-static void write_type_list (bytedeque &bdeq, typelist &tlist) {
+static void write_type_list (bytedeque &bdeq, TypeList &tlist) {
   WR_U32(tlist.size());
   for (auto &type : tlist)
     WR_BYTE(type);

@@ -1,4 +1,6 @@
+/* Implementation of base instrumentation methods */
 #include "ir.h"
+#include <stdexcept>
 
 #define FIND_OR_CREATE_SIG(sig) ({ \
   auto &sigs = this->sigs;  \
@@ -18,7 +20,16 @@
   sigptr; \
 })
 
-/*** Instrumentation Functions ***/
+
+// Add fields to module
+#define ADD_FIELD(field) ({ \
+  this->field##s.push_back(field);  \
+  auto &ref = this->field##s.back();  \
+  if (export_name) {  \
+    add_export(export_name, ref); \
+  } \
+  &ref; \
+})
 
 SigDecl* WasmModule::add_sig (SigDecl &sig, bool force_dup) {
   if (force_dup) {
@@ -29,29 +40,15 @@ SigDecl* WasmModule::add_sig (SigDecl &sig, bool force_dup) {
   }
 }
 
-
-#define ADD_FIELD(field) ({ \
-  this->field##s.push_back(field);  \
-  auto &ref = this->field##s.back();  \
-  if (export_name) {  \
-    add_export(export_name, ref); \
-  } \
-  &ref; \
-})
-
-/* Add a global to a module */
 GlobalDecl* WasmModule::add_global (GlobalDecl &global, const char* export_name) {
   return ADD_FIELD (global);
 }
-
 TableDecl* WasmModule::add_table (TableDecl &table, const char* export_name) {
   return ADD_FIELD (table);
 }
-
 MemoryDecl* WasmModule::add_memory (MemoryDecl &mem, const char* export_name) {
   return ADD_FIELD (mem);
 }
-
 FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name, const char* debug_name) {
   func.sig = this->add_sig(*(func.sig), false);
   FuncDecl* ifn = ADD_FIELD (func);
@@ -62,10 +59,12 @@ FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name, const c
   return ifn;
 }
 
+
+// Add imports to module
 #define IMPORT_INJ_KIND_GLOBAL(objref)
 #define IMPORT_INJ_KIND_TABLE(objref)
 #define IMPORT_INJ_KIND_MEMORY(objref)
-/* Debug Info only for Func Kind if it has info */
+// Debug Info only for Func Kind if it has info
 #define IMPORT_INJ_KIND_FUNC(objref) {  \
   if (this->fn_names_debug) {  \
     DebugNameAssoc dname = { .func = &this->funcs.front(), .name = info.member_name };  \
@@ -91,7 +90,6 @@ FuncDecl* WasmModule::add_func (FuncDecl &func, const char* export_name, const c
   return &imports.list.front(); \
 }
 
-/* Imports for all declarations */
 ImportDecl* WasmModule::add_import (ImportInfo &info, GlobalInfo &global) {
   GlobalDecl gdecl = {
     .type = global.type,
@@ -99,16 +97,12 @@ ImportDecl* WasmModule::add_import (ImportInfo &info, GlobalInfo &global) {
   };
   IMPORT_ADD(KIND_GLOBAL, global, gdecl);
 }
-
 ImportDecl* WasmModule::add_import (ImportInfo &info, TableDecl &table) {
   IMPORT_ADD (KIND_TABLE, table, table);
 }
-
 ImportDecl* WasmModule::add_import (ImportInfo &info, MemoryDecl &mem) {
   IMPORT_ADD (KIND_MEMORY, mem, mem);
 }
-
-
 ImportDecl* WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
   SigDecl* sigptr = this->add_sig(sig, false);
   FuncDecl fdecl = { .sig = sigptr };
@@ -116,7 +110,7 @@ ImportDecl* WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
 }
 
 
-
+// Add exports to module
 #define EXPORT_ADD(kd, field) { \
   /* Add to export list */  \
   auto &exports = this->exports;  \
@@ -129,25 +123,21 @@ ImportDecl* WasmModule::add_import (ImportInfo &info, SigDecl &sig) {
   return &exports.back(); \
 }
 
-/* Exports for all declarations */
+// Exports for all declarations
 ExportDecl* WasmModule::add_export (std::string export_name, GlobalDecl &global) {
   EXPORT_ADD (KIND_GLOBAL, global);
 }
-
 ExportDecl* WasmModule::add_export (std::string export_name, TableDecl &table) {
   EXPORT_ADD (KIND_TABLE, table);
 }
-
 ExportDecl* WasmModule::add_export (std::string export_name, MemoryDecl &mem) {
   EXPORT_ADD (KIND_MEMORY, mem);
 }
-
 ExportDecl* WasmModule::add_export (std::string export_name, FuncDecl &func) {
   EXPORT_ADD (KIND_FUNC, func);
 }
 
-
-/* Find methods */
+// Find export by name
 ExportDecl* WasmModule::find_export (std::string export_name) {
   for (auto &exp : this->exports) {
     if (exp.name == export_name) { return &exp; }
@@ -155,6 +145,7 @@ ExportDecl* WasmModule::find_export (std::string export_name) {
   return NULL;
 }
 
+// Find function from debug name in custom section
 FuncDecl* WasmModule::find_func_from_debug_name (std::string debug_name) {
   if (auto debug_names_ptr = this->getFnDebugNames()) {
     auto &debug_names = *debug_names_ptr;
@@ -167,6 +158,7 @@ FuncDecl* WasmModule::find_func_from_debug_name (std::string debug_name) {
   return NULL;
 }
 
+// Find import fields
 #define IMPORT_FIND(kd, field) { \
   for (auto &import: this->imports.list) { \
     if (import.mod_name == mod_name && import.member_name == member_name && kd == import.kind)  \
@@ -178,21 +170,19 @@ FuncDecl* WasmModule::find_func_from_debug_name (std::string debug_name) {
 GlobalDecl* WasmModule::find_import_global (std::string mod_name, std::string member_name) {
   IMPORT_FIND (KIND_GLOBAL, global);
 }
-
 TableDecl* WasmModule::find_import_table (std::string mod_name, std::string member_name) {
   IMPORT_FIND (KIND_TABLE, table);
 }
-
 MemoryDecl* WasmModule::find_import_memory (std::string mod_name, std::string member_name) {
   IMPORT_FIND (KIND_MEMORY, mem);
 }
-
 FuncDecl* WasmModule::find_import_func (std::string mod_name, std::string member_name) {
   IMPORT_FIND (KIND_FUNC, func);
 }
 
 
-/* Getter methods */
+// Get metadata from module 
+
 ImportDecl* WasmModule::get_import_name_from_func (FuncDecl *func) {
   if (!this->isImport(func)) {
     return NULL;
@@ -225,8 +215,6 @@ std::pair<bool, std::string&> WasmModule::get_debug_name_from_func (FuncDecl *fu
   return std::make_pair(false, std::ref(empty_static_str));
 }
 
-
-/* Removal methods */
 bool WasmModule::remove_func_core (uint32_t idx, FuncDecl *func) {
   auto &funcs = this->Funcs();
   auto &imports = this->imports;
@@ -266,6 +254,8 @@ bool WasmModule::remove_func_core (uint32_t idx, FuncDecl *func) {
   return true;
 }
 
+
+// Removal methods
 bool WasmModule::remove_func (uint32_t idx) {
   return this->remove_func_core(idx, this->getFunc(idx));
 }
@@ -273,12 +263,3 @@ bool WasmModule::remove_func (uint32_t idx) {
 bool WasmModule::remove_func (FuncDecl *func) {
   return this->remove_func_core(this->getFuncIdx(func), func);
 }
-
-/* Replace methods */
-void WasmModule::replace_all_uses (GlobalDecl* old_inst, GlobalDecl* new_inst) {}
-
-void WasmModule::replace_all_uses (TableDecl* old_inst, TableDecl* new_inst) {}
-
-void WasmModule::replace_all_uses (MemoryDecl* old_inst, MemoryDecl* new_inst) {}
-
-void WasmModule::replace_all_uses (FuncDecl* old_inst, FuncDecl* new_inst) {}

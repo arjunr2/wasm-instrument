@@ -1,5 +1,6 @@
 #include "ir.h"
 #include "inst_internal.h"
+#include <stdexcept>
 
 #include <chrono>
 
@@ -65,6 +66,40 @@ const char* wasm_section_name(byte code) {
   (rettype*) cached_val; \
 })
 #endif
+
+// Add pages to a memory; return the old number of pages
+uint32_t MemoryDecl::add_pages(uint32_t num_pages) {
+  wasm_limits_t &memlimit = this->limits;
+  uint32_t memdata_end = memlimit.initial * WASM_PAGE_SIZE;
+
+  uint64_t retval = memlimit.initial;
+  uint64_t new_size = retval + (uint64_t) num_pages;
+  if (new_size > (1ULL<<32) - 1) {
+    throw std::runtime_error("Adding pages exceeds 4GB limit");
+  }
+  if (memlimit.has_max && (new_size > memlimit.max)) {
+    WARN("Adding more pages (%u + %u) than current max memory size (%u); "
+      "Expanding max accordingly\n", memlimit.initial, num_pages, 
+      memlimit.max);
+    memlimit.max = (uint32_t) new_size;
+  }
+  memlimit.initial = (uint32_t) new_size;
+  return retval;
+
+}
+
+// Add locals to a function
+uint32_t FuncDecl::add_local(wasm_type_t new_type) {
+  wasm_localcse_t &last = this->pure_locals.back();
+  if (last.type == new_type) {
+    last.count++;
+  } else {
+    this->pure_locals.push_back( { .count = 1, .type = new_type } );
+  }
+  uint32_t idx = this->sig->params.size() + num_pure_locals;
+  num_pure_locals++;
+  return idx;
+}
 
 
 WasmModule& WasmModule::deepcopy(const WasmModule &mod, const char* log_str) {

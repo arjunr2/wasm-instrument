@@ -398,7 +398,7 @@ static void memfiltered_instrument_internal (
 
   /* Pre-compute sig indices since list indexing is expensive */
   uint32_t sig_indices[7];
-  typelist blocktypes[7] = {
+  TypeList blocktypes[7] = {
     {WASM_TYPE_I32}, // Addr
     {WASM_TYPE_I32, WASM_TYPE_I32}, // Addr | I32
     {WASM_TYPE_I32, WASM_TYPE_I64}, // Addr | I64
@@ -449,8 +449,7 @@ static void memfiltered_instrument_internal (
     }
   }
 
-  ExportDecl* main_exp = get_main_export(module);
-  FuncDecl* main_fn = main_exp->desc.func;
+  FuncDecl* main_fn = module.get_main_fn();
 
   /* Start/End function instrument import */
   if (insert_global) {

@@ -4,9 +4,6 @@
 #include <cassert>
 #include <ranges>
 
-#define INST(inv) InstBasePtr(new inv)
-
-
 // Memory operation trace-relevant properties
 struct MemopInstInfo {
     SigDecl *sig;
@@ -212,7 +209,7 @@ static std::pair<bool, LocalVal> allocate_retval_local(LocalAllocator &lc_alloca
 // New locals are ordered in the same order as `values`
 static std::vector<LocalVal> 
 save_stack_args(InstBuilder &builder, LocalAllocator &lc_allocator, 
-        typelist &values) {
+        TypeList &values) {
     int num_params = values.size();
     std::vector<LocalVal> local_vals_allocated(num_params);
 
@@ -834,7 +831,7 @@ void r3_record_instrument (WasmModule &module) {
 
 	MemoryDecl *def_mem = module.getMemory(0);
 	FuncDecl *mutex_funcs[2];
-	uint32_t mutex_addr = (add_pages(def_mem, 1) * WASM_PAGE_SIZE);
+	uint32_t mutex_addr = def_mem->add_pages(1) * WASM_PAGE_SIZE;
 	// Create custom mutex lock/unlock functions
 	create_mutex_funcs(module, mutex_addr, mutex_funcs);
 
@@ -849,7 +846,7 @@ void r3_record_instrument (WasmModule &module) {
 
     // Setup for call_indirect interposition
     // During record: we marshall the access_idx and wrap the original target with a plain `call`.
-    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module, {WASM_TYPE_I32});
+    std::set<FuncDecl*> funcref_wrappers = module.funcref_wrap({WASM_TYPE_I32});
 
 	// Generate quick lookup of ignored exported function idxs
 	std::map<FuncDecl*, std::string> func_ignore_map;

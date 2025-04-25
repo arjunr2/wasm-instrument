@@ -35,14 +35,15 @@ void sample_instrument (WasmModule& module) {
   }
 
   /* Add a I32 Const + Drop before every call in main */
-  ExportDecl* main_exp = get_main_export(module);
-  FuncDecl* main_fn = main_exp->desc.func;
-  InstList &insts = main_fn->instructions;
-  for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
-    InstBasePtr &instruction = *institr;
-    if (instruction->is(WASM_OP_CALL)) {
-      insts.insert(institr, InstBasePtr(new I32ConstInst(0xDEADBEEF)));
-      insts.insert(institr, InstBasePtr(new DropInst()));
+  FuncDecl* main_fn = module.get_main_fn();
+  if (main_fn) {
+    InstList &insts = main_fn->instructions;
+    for (auto institr = insts.begin(); institr != insts.end(); ++institr) {
+      InstBasePtr &instruction = *institr;
+      if (instruction->is(WASM_OP_CALL)) {
+        insts.insert(institr, InstBasePtr(new I32ConstInst(0xDEADBEEF)));
+        insts.insert(institr, InstBasePtr(new DropInst()));
+      }
     }
   }
 }

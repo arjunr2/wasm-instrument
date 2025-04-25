@@ -5,8 +5,6 @@
 // Record the following information for every branch
 // Function index, Source PC, Target PC
 
-#define INST(inv) InstBasePtr(new inv)
-
 #define LARGEST_OPCODE (1 << 12)
 #define LARGEST_BASE_OPCODE (1 << 8)
 #define OPCOUNT_SIZE (1 << 3)
@@ -358,7 +356,7 @@ void allspark_trace_instrument (WasmModule &module, std::string entry_export) {
     FuncDecl* main_fn = exp->desc.func;
 
     // Increase memory a lot to store the vectors
-    uint32_t old_page_count = add_pages(module.getMemory(0), 16384);
+    uint32_t old_page_count = module.getMemory(0)->add_pages(16384);
 
     // First scan functions to see how to pack function, pc and target together
     uint32_t max_pc = 0;
@@ -374,7 +372,7 @@ void allspark_trace_instrument (WasmModule &module, std::string entry_export) {
     assert (max_fn_bits <= 16 && max_pc_bits <= 24);
 
     // We marshall the 64-bit <fn-idx><src-pc> packing
-    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module, {WASM_TYPE_I64});
+    std::set<FuncDecl*> funcref_wrappers = module.funcref_wrap({WASM_TYPE_I64});
 
     TraceInstrumentData trace_data(module, 
         main_fn, old_page_count * WASM_PAGE_SIZE, max_pc_bits, max_fn_bits);

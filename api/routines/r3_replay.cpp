@@ -6,8 +6,6 @@
 #include <numeric>
 #include <initializer_list>
 
-#define INST(inv) InstBasePtr(new inv)
-
 /* Replay Op C Structure */
 typedef struct {
     int32_t addr;
@@ -664,11 +662,11 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
     FuncDecl *mutex_funcs[2];
     uint32_t instrument_page_count = 1;
     uint32_t instrument_page_start = 
-        (add_pages(def_mem, instrument_page_count) * WASM_PAGE_SIZE);
+        (def_mem->add_pages(instrument_page_count) * WASM_PAGE_SIZE);
     
     // call_indirect interpolation
     // During replay: access_idx is unneccessary and import calls will be replaced as needed 
-    std::set<FuncDecl*> funcref_wrappers = instrument_funcref_elems(module);
+    std::set<FuncDecl*> funcref_wrappers = module.funcref_wrap();
     
     FuncDecl *last_instrumented_func = &module.Funcs().back();
 
@@ -709,7 +707,7 @@ void r3_replay_instrument (WasmModule &module, void *replay_ops,
 
     /* Pre-compute sig indices for replay blocks */
     uint32_t sig_indices[5];
-    typelist blocktypes[5] = {
+    TypeList blocktypes[5] = {
         {WASM_TYPE_I32},
         {WASM_TYPE_I64},
         {WASM_TYPE_F32},

@@ -3,20 +3,6 @@
 #include "wasmdefs.h"
 #include "ir.h"
 
-class BasicBlock {
-  std::list<InstBasePtr>::iterator start;
-  std::list<InstBasePtr>::iterator end;
-  std::list<BasicBlock*> succs;
-  std::list<BasicBlock*> preds;
-
-  public:
-  BasicBlock(std::list<InstBasePtr>::iterator start, 
-              std::list<InstBasePtr>::iterator end): start(start), end(end) { }
-  void add_successor(BasicBlock* succ) { this->succs.push_back(succ); }
-  void add_predecessor(BasicBlock* pred) { this->preds.push_back(pred); }
-};
-
-
 /* All the following instructions should never be instantiated explicitly, only by parser */
 class InstBase {
   private:
