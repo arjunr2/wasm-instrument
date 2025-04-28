@@ -146,7 +146,7 @@ static std::pair<uint32_t, SigDecl*> get_sig_idx_cache(WasmModule &module, SigDe
 
 /** Common instruction instrumentation patterns **/
 // Instructions to conditionally grab a lock if local_val == val
-static InstBuilder builder_push_ifeq_lock(
+static InstBuilder& builder_push_ifeq_lock(
         InstBuilder &builder, ThreadRecordInfo &thread_info, 
         LocalVal &local_val, uint32_t val) {
     builder.push ({
@@ -164,30 +164,6 @@ static InstBuilder builder_push_ifeq_lock(
     return builder;
 }
 
-// Generate an <type>_NE instruction
-static InstBasePtr ne_type_inst(wasm_type_t type) {
-    switch (type) {
-        case WASM_TYPE_I32: return INST(I32NeInst());
-        case WASM_TYPE_I64: return INST(I64NeInst());
-        case WASM_TYPE_F32: return INST(F32NeInst());
-        case WASM_TYPE_F64: return INST(F64NeInst());
-        default: { ERR("R3-Record-Error: Unsupported type %d for NEQ\n", type); }
-    }
-    return NULL;
-}
-
-
-// Generate a instruction to store <type> sized data back to (recorded) memory
-static InstBasePtr writeback_inst(uint32_t size, MemoryDecl *mem) {
-    switch (size) {
-        case 1: return INST(I64Store8Inst(0, 0, mem));
-        case 2: return INST(I64Store16Inst(0, 0, mem));
-        case 4: return INST(I64Store32Inst(0, 0, mem));
-        case 8: return INST(I64StoreInst(0, 0, mem));
-        default: { ERR("R3-Record-Error: Unsupported size %d for writeback\n", size); }
-    }
-    return NULL;
-}
 /** */
 
 // Helper method to allocate a return value local
@@ -632,8 +608,8 @@ InstBuilder callop_trace_instgen(InstructionContext &instctx,
     });
 	// Return Value: For values without ret, it is resolved at replay gen
 	if (has_ret) {
-		builder.push_inst(LocalGetInst(ret_lc.idx));
-		builder_push_i64_extend(builder, ret_lc.type);
+		builder.push_inst(LocalGetInst(ret_lc.idx))
+            .i64_convert(ret_lc.type);
 	} else {
         builder.push_inst(I64ConstInst(0));
 	}
@@ -643,16 +619,16 @@ InstBuilder callop_trace_instgen(InstructionContext &instctx,
     // Helper method to push args for tracedump
     auto push_arglocals_i64_extend = [&lc_allocator, &builder, &recinfo, &num_args]() {
         for (int i = 0; i < num_args; i++) {
-            builder.push_inst(LocalGetInst(recinfo.args[i].idx));
-            builder_push_i64_extend(builder, recinfo.args[i].type);
+            builder.push_inst(LocalGetInst(recinfo.args[i].idx))
+                .i64_convert(recinfo.args[i].type);
         }
     };
 
 	switch (call_id) {
 		case RecordInterface::SC_MMAP: {
 			num_args = 1;
-            builder.push_inst(LocalGetInst(i32_lc_cond_1.idx));
-            builder_push_i64_extend(builder, i32_lc_cond_1.type);
+            builder.push_inst(LocalGetInst(i32_lc_cond_1.idx))
+                .i64_convert(i32_lc_cond_1.type);
 			break;
 		}
 		case RecordInterface::SC_WRITEV: {
@@ -735,8 +711,7 @@ InstBuilder memop_trace_instgen(InstructionContext &instctx,
             INST (LocalTeeInst(main_retval_lc.idx)),
             INST (LocalGetInst(main_retval_lc.idx)),
             INST (LocalGetInst(shadow_retval_lc.idx)),
-            ne_type_inst(shadow_retval_lc.type)
-        });
+        }).ne(shadow_retval_lc.type);
     } else {
 		builder.push_inst(I32ConstInst(0));
 	}
@@ -774,21 +749,17 @@ InstBuilder memop_trace_instgen(InstructionContext &instctx,
             // main memory to shadow memory
             INST (LocalGetInst(full_addr_lc.idx)),
             INST (LocalGetInst(main_retval_lc.idx)),
-        });
-        builder_push_i64_extend(builder, main_retval_lc.type);
-        builder.push_inst (LocalTeeInst(i64_main_retval_lc.idx));
+        })
+            .i64_convert(main_retval_lc.type)
+            .push_inst(LocalTeeInst(i64_main_retval_lc.idx))
+            .i64_store(memop_inst_table[opcode].size, modctx.record_mem)
+            .push_inst(LocalGetInst(shadow_retval_lc.idx))
+            .i64_convert(shadow_retval_lc.type)
+            .push ({
+                INST (LocalSetInst(i64_shadow_retval_lc.idx)),
+                INST (EndInst())
+            });
 
-        builder.push ({
-            // Store back main memory retval value to shadow memory
-            writeback_inst(memop_inst_table[opcode].size, modctx.record_mem),
-		    // Expected shadow memory load value 
-            INST (LocalGetInst(shadow_retval_lc.idx))
-        });
-        builder_push_i64_extend(builder, shadow_retval_lc.type);
-        builder.push ({
-            INST (LocalSetInst(i64_shadow_retval_lc.idx)),
-            INST (EndInst())
-        });
         builder.push ({
             // Main memory load value
             INST (LocalGetInst(i64_main_retval_lc.idx)),

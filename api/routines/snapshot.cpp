@@ -14,9 +14,8 @@ void snapshot_exit_insert(WasmModule &module, MemoryDecl *memory, uint32_t instm
             builder.push({
                 INST(I32ConstInst(0)),
                 INST(GlobalGetInst(global)),
-            });
-            builder_push_i64_extend(builder, global->type);
-            builder.push_inst(I64StoreInst(0, instmem_start, module.getMemory(0)));
+            }).i64_convert(global->type)
+                .push_inst(I64StoreInst(0, instmem_start, module.getMemory(0)));
         }
         instmem_start += 8;
     }

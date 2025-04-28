@@ -77,7 +77,4 @@ class LocalAllocator {
         }
 };
 
-// Instructions to typecast any type to I64
-InstBuilder builder_push_i64_extend(InstBuilder &builder, wasm_type_t type);
-
 #endif

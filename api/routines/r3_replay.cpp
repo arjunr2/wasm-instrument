@@ -114,35 +114,6 @@ typedef struct ReplayImportFuncDecl {
 } ReplayImportFuncDecl;
 
 
-
-static InstBasePtr get_replay_retval_inst(wasm_type_t type, int64_t val64) {
-    uint32_t val32;
-    float valf32;
-    double valf64;
-    switch (type) {
-        case WASM_TYPE_I32: {
-            std::memcpy(&val32, &val64, sizeof(uint32_t));
-            return INST(I32ConstInst(val32));
-        }
-        case WASM_TYPE_I64: {
-            return INST(I64ConstInst(val64));
-        }
-        case WASM_TYPE_F32: {
-            std::memcpy(&valf32, &val64, sizeof(float));
-            return INST(F32ConstInst(valf32));
-        }
-        case WASM_TYPE_F64: {
-            std::memcpy(&valf64, &val64, sizeof(double));
-            return INST(F64ConstInst(valf64));
-        }
-        default: {
-            ERR("Invalid type %d for return value\n", type);
-            return nullptr;
-        }
-    }
-}
-
-
 // Wrapped around replay import call; return nullptr if it doesn't generate call 
 // Uncreated calls are recorded as unused, which is pruned at the end
 static InstBasePtr create_call_to_replay_import(ReplayImportFuncDecl &replay_import,
@@ -164,7 +135,7 @@ static InstBasePtr create_call_to_replay_import(ReplayImportFuncDecl &replay_imp
 static inline InstBuilder& builder_push_return_value(InstBuilder &builder, 
         ReplaySigMetaInfo &sigmeta, int64_t return_value = 0xDEADBEEFULL) {
     if (sigmeta.has_retval()) {
-        builder.push_inst(get_replay_retval_inst(sigmeta.get_ret_type(), return_value));
+        builder.scalar_const(sigmeta.get_ret_type(), return_value);
     }
     return builder;
 }
@@ -548,7 +519,7 @@ static void insert_replay_op(WasmModule &module, InstMetaInfo &imeta_info,
     if (empty_replay_op) {
         // If no props, skip replay function construction and insert a nop
         if (sigmeta.has_retval()) {
-            builder.push_inst (get_replay_retval_inst(sigmeta.get_ret_type(), 0));
+            builder.scalar_const(sigmeta.get_ret_type(), 0);
         } 
         builder.push_inst (EndInst());
     }

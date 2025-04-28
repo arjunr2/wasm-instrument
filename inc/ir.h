@@ -363,7 +363,7 @@ class WasmModule {
     bool remove_func (FuncDecl *func);
     /* --- */
     
-    /* --- Common Instrumentation Methods --- */
+    /* --- Common Instrumentation Patterns --- */
     FuncDecl* get_main_fn();
 
     std::set<FuncDecl*> funcref_wrap (std::vector<wasm_type_t> marshall_vals = {});
