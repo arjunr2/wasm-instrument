@@ -534,19 +534,19 @@ void WasmModule::decode_buffer(buffer_t &buf, bool gen_cfg) {
     buffer_t cbuf = {buf.ptr, buf.ptr, buf.ptr + len};
     #define DECODE_CALL(sec,...)  this->decode_##sec##_section (cbuf, len __VA_OPT__(,) __VA_ARGS__); break;
     switch (section_id) {
-      case WASM_SECT_TYPE:      DECODE_CALL(type); 
-      case WASM_SECT_IMPORT:    DECODE_CALL(import); 
-      case WASM_SECT_FUNCTION:  DECODE_CALL(function); 
-      case WASM_SECT_TABLE:     DECODE_CALL(table); 
-      case WASM_SECT_MEMORY:    DECODE_CALL(memory); 
-      case WASM_SECT_GLOBAL:    DECODE_CALL(global); 
-      case WASM_SECT_EXPORT:    DECODE_CALL(export); 
-      case WASM_SECT_START:     DECODE_CALL(start); 
-      case WASM_SECT_ELEMENT:   DECODE_CALL(element);  
-      case WASM_SECT_CODE:      DECODE_CALL(code, gen_cfg); 
-      case WASM_SECT_DATA:      DECODE_CALL(data); 
-      case WASM_SECT_DATACOUNT: DECODE_CALL(datacount); 
-      case WASM_SECT_CUSTOM:    DECODE_CALL(custom); 
+      case WASM_SECT_TYPE:      this->decode_type_section(cbuf, len); break;
+      case WASM_SECT_IMPORT:    this->decode_import_section(cbuf, len); break;
+      case WASM_SECT_FUNCTION:  this->decode_function_section(cbuf, len); break;
+      case WASM_SECT_TABLE:     this->decode_table_section(cbuf, len); break;
+      case WASM_SECT_MEMORY:    this->decode_memory_section(cbuf, len); break;
+      case WASM_SECT_GLOBAL:    this->decode_global_section(cbuf, len); break;
+      case WASM_SECT_EXPORT:    this->decode_export_section(cbuf, len); break;
+      case WASM_SECT_START:     this->decode_start_section(cbuf, len); break;
+      case WASM_SECT_ELEMENT:   this->decode_element_section(cbuf, len); break;
+      case WASM_SECT_CODE:      this->decode_code_section(cbuf, len, gen_cfg); break;
+      case WASM_SECT_DATA:      this->decode_data_section(cbuf, len); break;
+      case WASM_SECT_DATACOUNT: this->decode_datacount_section(cbuf, len); break;
+      case WASM_SECT_CUSTOM:    this->decode_custom_section(cbuf, len); break;
       default:
         ERR("Unknown section id: %u\n", section_id);
         throw std::runtime_error("Section parsing error");

@@ -223,60 +223,58 @@ class WasmModule {
     /* Custom name section debug reference */
     std::list <DebugNameAssoc> *fn_names_debug;
 
-    /* Decode functions */
-    #define DECODE_DECL(sec,...)  \
-      void decode_##sec##_section (buffer_t &buf, uint32_t len __VA_OPT__(,) __VA_ARGS__);
-    DECODE_DECL(type);
-    DECODE_DECL(import);
-    DECODE_DECL(function);
-    DECODE_DECL(table);
-    DECODE_DECL(memory);
-    DECODE_DECL(global);
-    DECODE_DECL(export);
-    DECODE_DECL(start);
-    DECODE_DECL(element);
-    DECODE_DECL(code, bool gen_cfg);
-    DECODE_DECL(data);
-    DECODE_DECL(datacount);
-    DECODE_DECL(custom);
+    /* --- Parsing and Encoding --- */
+    // Decode functions
+    void decode_type_section (buffer_t &buf, uint32_t len);
+    void decode_import_section (buffer_t &buf, uint32_t len);
+    void decode_function_section (buffer_t &buf, uint32_t len);
+    void decode_table_section (buffer_t &buf, uint32_t len);
+    void decode_memory_section (buffer_t &buf, uint32_t len);
+    void decode_global_section (buffer_t &buf, uint32_t len);
+    void decode_export_section (buffer_t &buf, uint32_t len);
+    void decode_start_section (buffer_t &buf, uint32_t len);
+    void decode_element_section (buffer_t &buf, uint32_t len);
+    void decode_code_section (buffer_t &buf, uint32_t len, bool gen_cfg);
+    void decode_data_section (buffer_t &buf, uint32_t len);
+    void decode_datacount_section (buffer_t &buf, uint32_t len);
+    void decode_custom_section (buffer_t &buf, uint32_t len);
 
-    /* Encode functions */
-    #define ENCODE_DECL(sec, ...)  \
-      bytedeque encode_##sec##_section (__VA_ARGS__);
-    ENCODE_DECL(type);
-    ENCODE_DECL(import);
-    ENCODE_DECL(function);
-    ENCODE_DECL(table);
-    ENCODE_DECL(memory);
-    ENCODE_DECL(global);
-    ENCODE_DECL(export);
-    ENCODE_DECL(start);
-    ENCODE_DECL(element);
-    ENCODE_DECL(code);
-    ENCODE_DECL(data);
-    ENCODE_DECL(datacount);
-    ENCODE_DECL(custom, CustomDecl &custom);
+    // Encode functions
+    bytedeque encode_type_section ();
+    bytedeque encode_import_section ();
+    bytedeque encode_function_section ();
+    bytedeque encode_table_section ();
+    bytedeque encode_memory_section ();
+    bytedeque encode_global_section ();
+    bytedeque encode_export_section ();
+    bytedeque encode_start_section ();
+    bytedeque encode_element_section ();
+    bytedeque encode_code_section ();
+    bytedeque encode_data_section ();
+    bytedeque encode_datacount_section ();
+    bytedeque encode_custom_section (CustomDecl &custom);
 
-    /* Code decoding for instructions */
+    // Code decoding for instructions
     InstList decode_expr_to_insts (buffer_t &buf, bool gen_cfg);
-    /* Code encoding for instructions */
+    // Code encoding for instructions
     void encode_expr_to_insts (bytedeque &bdeq, InstList &instlist, bytearr &bytes);
-    /* Code + local encoding for instructions */
+    // Code + local encoding for instructions
     bytedeque encode_code (FuncDecl &func);
-
-    /* Instrumentation helper methods */
+    // Instrumentation helper methods
     bool remove_func_core (uint32_t idx, FuncDecl *func);
+    /* --- */
 
-    /* Descriptor patching for copy/assign */
+    /* --- Deep-Copy Support --- */
+    // Descriptor patching for copy/assign
     template<typename T>
     void DescriptorPatch (std::list<T> &list, const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
-    /* Function patching for copy/assign */
+    // Function patching for copy/assign
     void FunctionPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
-    /* Custom section patching for copy/assign */
+    // Custom section patching for copy/assign
     void CustomPatch (const WasmModule &mod, std::unordered_map<void*, void*> &reassign_cache);
-
-    /* Perform a full deep copy */
+    // Perform a full deep copy 
     WasmModule& deepcopy(const WasmModule &mod, const char* log_str);
+    /* --- */
 
   public:
     WasmModule () = default;
@@ -285,7 +283,12 @@ class WasmModule {
 
     WasmModule& operator=(const WasmModule &mod);
 
-    /* Field Accessors */
+    // Decode wasm file from buffer
+    void decode_buffer (buffer_t &buf, bool gen_cfg);
+    // Encode module into wasm format
+    bytedeque encode_module (char* outfile);
+
+    // Field Accessors
     inline SigDecl* getSig(uint32_t idx)        { return GET_LIST_ELEM(this->sigs, idx); }
     inline FuncDecl* getFunc(uint32_t idx)      { return GET_LIST_ELEM(this->funcs, idx); }
     inline GlobalDecl* getGlobal(uint32_t idx)  { return GET_DEQUE_ELEM(this->globals, idx); }
@@ -294,7 +297,7 @@ class WasmModule {
     inline DataDecl* getData(uint32_t idx)      { return GET_LIST_ELEM(this->datas, idx); }
     inline ImportDecl* getImport(uint32_t idx)  { return GET_LIST_ELEM(this->imports.list, idx); }
 
-    /* Index Accessors */
+    // Index Accessors
     inline uint32_t getSigIdx(SigDecl *sig)           const { return GET_LIST_IDX(this->sigs, sig); }
     inline uint32_t getFuncIdx(FuncDecl *func)        const { return GET_LIST_IDX(this->funcs, func); }
     inline uint32_t getGlobalIdx(GlobalDecl *global)  const { return GET_DEQUE_IDX(this->globals, global); }
@@ -303,7 +306,7 @@ class WasmModule {
     inline uint32_t getDataIdx(DataDecl *data)        const { return GET_LIST_IDX(this->datas, data); }
     inline uint32_t getImportIdx(ImportDecl *import)  const { return GET_LIST_IDX(this->imports.list, import); }
 
-    /* Import accessors */
+    // Import accessors
     inline bool isImport(FuncDecl *func)      { return getFuncIdx(func)     < this->imports.num_funcs; }
     inline bool isImport(GlobalDecl *global)  { return getGlobalIdx(global) < this->imports.num_globals; }
     inline bool isImport(TableDecl *table)    { return getTableIdx(table)   < this->imports.num_tables; }
@@ -311,7 +314,7 @@ class WasmModule {
 
     inline uint32_t getNumImportFuncs()       { return this->imports.num_funcs; }
 
-    /* Section Accessors */
+    // Section Accessors
     inline std::list  <FuncDecl> &Funcs() { return this->funcs; }
     inline std::deque <GlobalDecl> &Globals() { return this->globals; }
     inline std::list  <ExportDecl> &Exports() { return this->exports; }
@@ -320,21 +323,15 @@ class WasmModule {
     inline FuncDecl* get_start_fn() { return this->start_fn; }
     inline uint32_t get_num_customs() { return this->customs.size(); }
 
-    /* Debug Accessor */
+    // Debug Accessor
     inline std::list<DebugNameAssoc>* getFnDebugNames() { return this->fn_names_debug; }
 
-    /* Scope view of function code */
+    // Scope view of function code
     ScopeList gen_scopes_from_instructions(FuncDecl *func);
     // Same as above method, but only return the main scope block
     ScopeBlock gen_func_static_scope_hierarchy(FuncDecl *func);
 
-    /* Decode wasm file from buffer */
-    void decode_buffer (buffer_t &buf, bool gen_cfg);
-    /* Encode module into wasm format */
-    bytedeque encode_module (char* outfile);
-
-
-    /* Base Instrumentation methods */
+    /* --- Instrumentation Primitives --- */
     SigDecl*    add_sig     (SigDecl &sig, bool force_dup = false);
     GlobalDecl* add_global  (GlobalDecl &global, const char* export_name = NULL);
     TableDecl*  add_table   (TableDecl &table, const char* export_name = NULL);
@@ -364,9 +361,9 @@ class WasmModule {
 
     bool remove_func (uint32_t idx);
     bool remove_func (FuncDecl *func);
+    /* --- */
     
-    
-    /* Common Instrumentation Methods */
+    /* --- Common Instrumentation Methods --- */
     FuncDecl* get_main_fn();
 
     std::set<FuncDecl*> funcref_wrap (std::vector<wasm_type_t> marshall_vals = {});
