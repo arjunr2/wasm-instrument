@@ -1,9 +1,9 @@
 #pragma once
 
+#include "wasmdefs.h"
+#include <functional>
 #include <list>
 #include <memory>
-#include <functional>
-#include "wasmdefs.h"
 
 class InstBase;
 // Instructions
@@ -23,7 +23,11 @@ typedef std::list<wasm_type_t> TypeList;
 class WasmModule;
 class FuncDecl;
 // Callbacks
-typedef std::function<void(WasmModule &module, FuncDecl *src_func, FuncDecl* call_func)> DirectCallSiteCallback;
-typedef std::function<void(WasmModule &module, FuncDecl *src_func, InstBasePtr instptr)> InstructionSiteCallback;
-typedef std::function<void(WasmModule &module, FuncDecl *func)> FuncDeclCallback;
-
+typedef std::function<void(WasmModule &module, FuncDecl *src_func,
+                           FuncDecl *call_func)>
+    DirectCallSiteCallback;
+typedef std::function<void(WasmModule &module, FuncDecl *src_func,
+                           InstBasePtr instptr)>
+    InstructionSiteCallback;
+typedef std::function<void(WasmModule &module, FuncDecl *func)>
+    FuncDeclCallback;

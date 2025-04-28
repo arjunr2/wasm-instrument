@@ -1,11 +1,11 @@
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <random>
 #include <set>
-#include <map>
 #include <unordered_set>
 
 #include "common.h"
+#include "instructions.h"
 #include "ir.h"
 #include "views.h"
-#include "instructions.h"
