@@ -214,22 +214,14 @@
 #define WASM_EXT1_THREADS 0xFE
 
 /** 0xFC extensions: partially illegal **/
-#define WASM_OP_I32_TRUNC_SAT_F32_S                                            \
-    0xFC00 /* "i32.trunc_sat_f32_s", ImmSigs.NONE */
-#define WASM_OP_I32_TRUNC_SAT_F32_U                                            \
-    0xFC01 /* "i32.trunc_sat_f32_u", ImmSigs.NONE */
-#define WASM_OP_I32_TRUNC_SAT_F64_S                                            \
-    0xFC02 /* "i32.trunc_sat_f64_s", ImmSigs.NONE */
-#define WASM_OP_I32_TRUNC_SAT_F64_U                                            \
-    0xFC03 /* "i32.trunc_sat_f64_u", ImmSigs.NONE */
-#define WASM_OP_I64_TRUNC_SAT_F32_S                                            \
-    0xFC04 /* "i64.trunc_sat_f32_s", ImmSigs.NONE */
-#define WASM_OP_I64_TRUNC_SAT_F32_U                                            \
-    0xFC05 /* "i64.trunc_sat_f32_u", ImmSigs.NONE */
-#define WASM_OP_I64_TRUNC_SAT_F64_S                                            \
-    0xFC06 /* "i64.trunc_sat_f64_s", ImmSigs.NONE */
-#define WASM_OP_I64_TRUNC_SAT_F64_U                                            \
-    0xFC07                         /* "i64.trunc_sat_f64_u", ImmSigs.NONE */
+#define WASM_OP_I32_TRUNC_SAT_F32_S 0xFC00 /* "i32.trunc_sat_f32_s", ImmSigs.NONE */
+#define WASM_OP_I32_TRUNC_SAT_F32_U 0xFC01 /* "i32.trunc_sat_f32_u", ImmSigs.NONE */
+#define WASM_OP_I32_TRUNC_SAT_F64_S 0xFC02 /* "i32.trunc_sat_f64_s", ImmSigs.NONE */
+#define WASM_OP_I32_TRUNC_SAT_F64_U 0xFC03 /* "i32.trunc_sat_f64_u", ImmSigs.NONE */
+#define WASM_OP_I64_TRUNC_SAT_F32_S 0xFC04 /* "i64.trunc_sat_f32_s", ImmSigs.NONE */
+#define WASM_OP_I64_TRUNC_SAT_F32_U 0xFC05 /* "i64.trunc_sat_f32_u", ImmSigs.NONE */
+#define WASM_OP_I64_TRUNC_SAT_F64_S 0xFC06 /* "i64.trunc_sat_f64_s", ImmSigs.NONE */
+#define WASM_OP_I64_TRUNC_SAT_F64_U 0xFC07 /* "i64.trunc_sat_f64_u", ImmSigs.NONE */
 #define WASM_OP_MEMORY_INIT 0xFC08 /* "memory.init", ImmSigs.DATA_MEMORY */
 #define WASM_OP_DATA_DROP 0xFC09   /* "data.drop", ImmSigs.DATA */
 #define WASM_OP_MEMORY_COPY 0xFC0A /* "memory.copy", ImmSigs.MEMORYCP */
