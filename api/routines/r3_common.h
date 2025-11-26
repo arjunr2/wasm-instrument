@@ -44,8 +44,8 @@ typedef enum {
 
 /** Special function data for record-replay */
 /* List of export functions to ignore during recording */
-static const char *ignored_export_funcnames[] = {"wasm_memory_grow",
-                                                 "wasm_memory_size"};
+static const char *ignored_export_funcnames[] = {"__wasm_memory_grow",
+                                                 "__wasm_memory_size"};
 /* List of functions to ignore by debug name */
 static const char *ignored_debug_funcnames[] = {"__wasm_init_memory"};
 /* List of recording functions that require additional special operations
